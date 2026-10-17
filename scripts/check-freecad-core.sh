@@ -25,7 +25,7 @@ if [[ -z "$freecad_cmd" ]]; then
   fi
 fi
 
-output="$(QT_QPA_PLATFORM=offscreen \
+if output="$(QT_QPA_PLATFORM=offscreen \
   XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-/tmp/datumloopds-config}" \
   XDG_DATA_HOME="${XDG_DATA_HOME:-/tmp/datumloopds-data}" \
   XDG_CACHE_HOME="${XDG_CACHE_HOME:-/tmp/datumloopds-cache}" \
@@ -33,8 +33,16 @@ output="$(QT_QPA_PLATFORM=offscreen \
   -M "$repo_root/freecad/DatumLoopDS" \
   -P "$repo_root/src" \
   "${extra_python_args[@]}" \
-  "$repo_root/tests/FreeCADWidgetSmoke.FCMacro" 2>&1)"
+  "$repo_root/tests/FreeCADWidgetSmoke.FCMacro" 2>&1)"; then
+  command_status=0
+else
+  command_status=$?
+fi
 printf '%s\n' "$output"
+if [[ "$command_status" -ne 0 ]]; then
+  echo "FreeCAD core smoke exited with status ${command_status}." >&2
+  exit "$command_status"
+fi
 if ! grep -Fq "DatumLoopDS 1.1.3" <<<"$output"; then
   echo "FreeCAD core smoke did not report the branded DatumLoopDS 1.1.3 identity." >&2
   exit 1

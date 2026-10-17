@@ -106,9 +106,9 @@ dirty and revision state, topology reference signatures, an object-scoped
 feature graph, and separate engineering and electronics models.
 `DatumElectronicsModel` owns shared material definitions/states, circuits, and
 PCB boards; PCB layers and material regions reference that same material
-collection. `DldProjectStore` reads and writes the version-six `.dld` manifest
+collection. `DldProjectStore` reads and writes the version-seven `.dld` manifest
 using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates display
-tessellation after load. Schema v1 through v5 projects migrate while preserving
+tessellation after load. Schema v1 through v6 projects migrate while preserving
 supported engineering and electronics data where the older schema allowed it.
 Feature-backed
 objects persist their feature inputs and recompute exact shapes on load; direct
@@ -152,7 +152,8 @@ remain unresolved. The native viewport supports Object, Face, Edge, and Vertex
 modes. Large-model acceleration and distinct subshape highlight geometry
 remain future work.
 
-`DatumEngineeringModel` stores schema-six mechanism definitions separately
+`DatumEngineeringModel` stores schema-seven mechanism definitions and structural
+study records separately
 from CAD objects: stable body IDs and geometry-source references, sourced
 optional mass properties, body-local joint frames, supported joint types,
 actuators, contacts, requirements, legacy datum axes, and motors.
@@ -195,6 +196,9 @@ DatumElectronicsModel -> Circuit JSON / KiCad format adapters
 EquationRegistry -> ScientificTask routing and structured proposals
                  -> maturity-gated SolverRequest -> numerical adapter
                  -> analytical checks and educational cantilever FEM/MFEM
+DatumDocument/DatumEngineeringModel -> persistent CAD-face boundary conditions
+                                    -> OCCT rectangular-solid analysis mesh
+                                    -> MFEM 3D linear elasticity -> field datasets/provenance
 RobotModel -> backend-neutral observation/action contracts
            -> deterministic fixture environment -> MJCF export -> MuJoCo runtime check
            -> simulated StateInterface / hardware writes disabled
@@ -205,16 +209,20 @@ FreeCAD Python workbench -> separate compatibility path
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
-version-six `.dld` save/open with an initial recomputable feature graph,
+version-seven `.dld` save/open with an initial recomputable feature graph,
 mechanism body/joint/actuator/contact/requirement data, motors, and native
-material/circuit/PCB models. Separate
-engineering prototypes add an E0-E6 equation registry, generic solver
-contracts, a 1D cantilever reference and optional MFEM adapter, a held-out
-reduced beam response, provider-neutral scientific-agent routing, and a
-simulated-only one-axis robot/RL environment. The exact exported MJCF runs in
-the MuJoCo runtime check. Those equation, scientific-agent, and robotics
-prototypes are not persisted in `.dld` or exposed in the Qt workspace. The
-mechanism data foundation and its limits are described in
+material/circuit/PCB models, material sources/states, topology-linked static
+structural studies, mesh provenance, and MFEM field results. The first 3D
+structural path is bounded to one axis-aligned rectangular OCCT solid and
+serial Q1 isotropic small-strain elasticity. It runs a four-resolution
+cantilever check with force balance, section stress, energy, and field
+provenance; it does not establish experimental validation. Separate
+engineering prototypes retain the E0-E6 equation registry, generic solver
+contracts, 1D cantilever reference, held-out reduced beam response,
+provider-neutral scientific-agent routing, and simulated-only one-axis
+robot/RL environment. The exact exported MJCF runs in the MuJoCo runtime
+check. Equation, scientific-agent, and robotics prototypes are not exposed in
+the Qt workspace. The mechanism data foundation and its limits are described in
 [`milestone-2-mechanism-definition.md`](milestone-2-mechanism-definition.md).
 Renderer/display-mesh separation,
 workspace/editor composition, picking-service
@@ -229,9 +237,10 @@ unverified. See
 The first electronics slice imports supported Circuit JSON and KiCad PCB
 profiles, builds a display-only OCCT preview, and runs a small ngspice DC
 resistor/source example in a worker process. Result power is only a thermal
-source placeholder. The worker cannot mutate the document. No general
-thermal, structural, CFD, EM, chemistry, metallurgy, or coupled production
-solver is implemented; the cantilever is a narrow verification benchmark.
+source placeholder. The worker cannot mutate the document. No general thermal,
+structural, CFD, EM, chemistry, metallurgy, or coupled production solver is
+implemented. The 3D static elasticity path is limited to one axis-aligned
+rectangular solid and remains a numerical verification benchmark.
 See [`electronics-materials-multiphysics.md`](electronics-materials-multiphysics.md)
 for the material, physics, coupling, digital-twin, format, and license plan.
 
@@ -265,19 +274,26 @@ workflow pass with software OpenGL. Hardware-GPU behavior remains unverified.
 The manual native viewport and `.dld` verification procedure is in
 [`native-verification-checklist.md`](native-verification-checklist.md).
 
-## Legacy FreeCAD shell
+## FreeCAD compatibility subsystem
 
-The existing **DatumLoop DS** workbench remains available while the native
-shell is built. Its left panel provides project actions, workflow navigation,
+The existing **DatumLoop DS** workbench remains available for compatibility.
+Its left panel provides project actions, workflow navigation,
 and a mechanism tree. The right panel provides selection properties and
 engineering context. The lower panel reserves space for jobs, playback, plots,
 and evidence. Project creation, open, and save currently use native FreeCAD
 documents.
 
-The project targets FreeCAD 1.1.3 for its compatibility shell. A clean Release
-build and isolated install pass, as do the FreeCADCmd geometry/project smoke
-and GUI viewport smoke. See the [FreeCAD build profile](freecad-1.1.3-build-profile.md)
-for the tested toolchain and scope.
+FreeCAD is maintained for `.FCStd` migration, regression/reference checks,
+import/export assistance, and compatibility defects. New engineering features
+are implemented in native DatumLoop. The project targets FreeCAD 1.1.3 for
+compatibility. Hosted run [39028748447](https://github.com/ASI777/datumloopds/actions/runs/39028748447)
+built and installed the fork but failed during its core smoke. The smoke
+wrapper now prints command output on failure, and the isolated install's
+PySide wrapper path is included; a passing hosted compatibility run remains
+pending. See the [FreeCAD build profile](freecad-1.1.3-build-profile.md) for
+the tested toolchain and scope.
+The canonical repository and branch policy is in
+[`development-workflow.md`](development-workflow.md).
 
 ## Application identity
 

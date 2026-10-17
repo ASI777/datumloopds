@@ -43,6 +43,7 @@ freecad_cmd="$install_dir/bin/FreeCADCmd"
 freecad_gui="$install_dir/bin/FreeCAD"
 test -x "$freecad_cmd"
 test -x "$freecad_gui"
+export DATUMLOOPDS_FREECAD_EXTRA_PYTHON_PATHS="$install_dir/Ext"
 
 FREECADCMD_EXECUTABLE="$freecad_cmd" "$repo_root/scripts/check-freecad-core.sh"
 
