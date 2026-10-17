@@ -17,6 +17,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -164,6 +165,149 @@ QJsonObject encodeObject(const DatumObject& object)
     return result;
 }
 
+QJsonArray encodeVector(const Vector3& vector)
+{
+    QJsonArray result;
+    for (const double component : vector) {
+        result.append(component);
+    }
+    return result;
+}
+
+Vector3 decodeVector(const QJsonValue& value, const QString& description)
+{
+    if (!value.isArray() || value.toArray().size() != 3) {
+        fail(QStringLiteral("Project field '%1' must contain three coordinates.").arg(description));
+    }
+    const QJsonArray array = value.toArray();
+    return {
+        requiredFiniteNumber(array.at(0), description + QStringLiteral("[0]")),
+        requiredFiniteNumber(array.at(1), description + QStringLiteral("[1]")),
+        requiredFiniteNumber(array.at(2), description + QStringLiteral("[2]")),
+    };
+}
+
+QJsonObject encodeTopologyReference(const DatumTopologyReference& reference)
+{
+    QJsonArray adjacent;
+    for (const DatumTopologyNeighborSignature& neighbor : reference.geometrySignature.adjacent) {
+        adjacent.append(QJsonObject{
+            {QStringLiteral("subshapeType"), fromUtf8(datumSubshapeTypeName(neighbor.subshapeType))},
+            {QStringLiteral("geometryType"), fromUtf8(neighbor.geometryType)},
+            {QStringLiteral("measure"), neighbor.measure},
+        });
+    }
+    QJsonObject signature{
+        {QStringLiteral("geometryType"), fromUtf8(reference.geometrySignature.geometryType)},
+        {QStringLiteral("measure"), reference.geometrySignature.measure},
+        {QStringLiteral("centroidMm"), encodeVector(reference.geometrySignature.centroidMm)},
+        {QStringLiteral("direction"), reference.geometrySignature.direction.has_value()
+             ? QJsonValue(encodeVector(*reference.geometrySignature.direction))
+             : QJsonValue(QJsonValue::Null)},
+        {QStringLiteral("adjacent"), adjacent},
+    };
+    QJsonArray parents;
+    for (const std::string& parentId : reference.parentReferenceIds) {
+        parents.append(fromUtf8(parentId));
+    }
+    return {
+        {QStringLiteral("id"), fromUtf8(reference.id)},
+        {QStringLiteral("objectId"), fromUtf8(reference.objectId)},
+        {QStringLiteral("featureId"), reference.featureId.has_value()
+             ? QJsonValue(fromUtf8(*reference.featureId))
+             : QJsonValue(QJsonValue::Null)},
+        {QStringLiteral("subshapeType"), fromUtf8(datumSubshapeTypeName(reference.subshapeType))},
+        {QStringLiteral("topologySignature"), fromUtf8(reference.topologySignature)},
+        {QStringLiteral("geometrySignature"), signature},
+        {QStringLiteral("parentReferenceIds"), parents},
+        {QStringLiteral("transientIndexHint"), reference.transientIndexHint.has_value()
+             ? QJsonValue(static_cast<double>(*reference.transientIndexHint))
+             : QJsonValue(QJsonValue::Null)},
+    };
+}
+
+DatumTopologyReference decodeTopologyReference(const QJsonObject& object)
+{
+    DatumTopologyReference reference;
+    reference.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    reference.objectId = toUtf8(requiredString(object, QStringLiteral("objectId")));
+    const QJsonValue featureValue = object.value(QStringLiteral("featureId"));
+    if (featureValue.isString()) {
+        reference.featureId = toUtf8(featureValue.toString());
+    } else if (!featureValue.isNull() && !featureValue.isUndefined()) {
+        fail(QStringLiteral("Topology reference featureId must be a UUID or null."));
+    }
+    const auto subshapeType = datumSubshapeTypeFromName(
+        toUtf8(requiredString(object, QStringLiteral("subshapeType"))));
+    if (!subshapeType.has_value()) {
+        fail(QStringLiteral("Topology reference has an unsupported subshape type."));
+    }
+    reference.subshapeType = *subshapeType;
+    reference.topologySignature = toUtf8(requiredString(object, QStringLiteral("topologySignature")));
+
+    const QJsonValue signatureValue = object.value(QStringLiteral("geometrySignature"));
+    if (!signatureValue.isObject()) {
+        fail(QStringLiteral("Topology reference geometrySignature is missing or invalid."));
+    }
+    const QJsonObject signature = signatureValue.toObject();
+    reference.geometrySignature.geometryType =
+        toUtf8(requiredString(signature, QStringLiteral("geometryType")));
+    reference.geometrySignature.measure =
+        requiredFiniteNumber(signature.value(QStringLiteral("measure")), QStringLiteral("geometrySignature.measure"));
+    reference.geometrySignature.centroidMm =
+        decodeVector(signature.value(QStringLiteral("centroidMm")), QStringLiteral("geometrySignature.centroidMm"));
+    const QJsonValue directionValue = signature.value(QStringLiteral("direction"));
+    if (directionValue.isArray()) {
+        reference.geometrySignature.direction =
+            decodeVector(directionValue, QStringLiteral("geometrySignature.direction"));
+    } else if (!directionValue.isNull() && !directionValue.isUndefined()) {
+        fail(QStringLiteral("Topology reference direction must be a three-vector or null."));
+    }
+    const QJsonValue adjacentValue = signature.value(QStringLiteral("adjacent"));
+    if (!adjacentValue.isArray()) {
+        fail(QStringLiteral("Topology reference adjacency signature must be an array."));
+    }
+    for (const QJsonValue& neighborValue : adjacentValue.toArray()) {
+        if (!neighborValue.isObject()) {
+            fail(QStringLiteral("Topology reference adjacency entry is invalid."));
+        }
+        const QJsonObject neighborJson = neighborValue.toObject();
+        const auto neighborType = datumSubshapeTypeFromName(
+            toUtf8(requiredString(neighborJson, QStringLiteral("subshapeType"))));
+        if (!neighborType.has_value()) {
+            fail(QStringLiteral("Topology reference adjacency entry has an unsupported subshape type."));
+        }
+        reference.geometrySignature.adjacent.push_back({
+            *neighborType,
+            toUtf8(requiredString(neighborJson, QStringLiteral("geometryType"))),
+            requiredFiniteNumber(neighborJson.value(QStringLiteral("measure")),
+                                 QStringLiteral("geometrySignature.adjacent.measure")),
+        });
+    }
+    const QJsonValue parentsValue = object.value(QStringLiteral("parentReferenceIds"));
+    if (!parentsValue.isArray()) {
+        fail(QStringLiteral("Topology reference parentReferenceIds must be an array."));
+    }
+    for (const QJsonValue& parentValue : parentsValue.toArray()) {
+        if (!parentValue.isString()) {
+            fail(QStringLiteral("Topology reference parent id must be a string."));
+        }
+        reference.parentReferenceIds.push_back(toUtf8(parentValue.toString()));
+    }
+    const QJsonValue hintValue = object.value(QStringLiteral("transientIndexHint"));
+    if (hintValue.isDouble()) {
+        const double hint = hintValue.toDouble();
+        if (hint < 0.0 || hint > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) ||
+            std::floor(hint) != hint) {
+            fail(QStringLiteral("Topology reference transientIndexHint is invalid."));
+        }
+        reference.transientIndexHint = static_cast<std::uint32_t>(hint);
+    } else if (!hintValue.isNull() && !hintValue.isUndefined()) {
+        fail(QStringLiteral("Topology reference transientIndexHint must be an integer or null."));
+    }
+    return reference;
+}
+
 TopoDS_Shape decodeShape(const QJsonObject& geometry, const QString& objectName)
 {
     if (requiredString(geometry, QStringLiteral("format")) != QString::fromLatin1(GeometryFormat)) {
@@ -204,8 +348,8 @@ DatumDocument decodeProject(const QJsonObject& root)
         fail(QStringLiteral("The file is not a DatumLoop project."));
     }
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
-    if (!schemaValue.isDouble() ||
-        schemaValue.toDouble() != static_cast<double>(DldProjectStore::SchemaVersion)) {
+    const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
+    if (schemaNumber != 1.0 && schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
     const QJsonValue projectValue = root.value(QStringLiteral("project"));
@@ -292,6 +436,22 @@ DatumDocument decodeProject(const QJsonObject& root)
             document.setProperty(loaded.id, key, std::move(value));
         }
     }
+
+    const QJsonValue referencesValue = root.value(QStringLiteral("topologyReferences"));
+    if (schemaNumber == 1.0 && referencesValue.isUndefined()) {
+        // Schema 1 had no persistent topology references. Treat this as an
+        // empty collection and upgrade in memory; the next save writes v2.
+    } else {
+        if (!referencesValue.isArray()) {
+            fail(QStringLiteral("Project topologyReferences must be an array."));
+        }
+        for (const QJsonValue& referenceValue : referencesValue.toArray()) {
+            if (!referenceValue.isObject()) {
+                fail(QStringLiteral("Project topology reference entry is invalid."));
+            }
+            (void)document.addTopologyReference(decodeTopologyReference(referenceValue.toObject()));
+        }
+    }
     document.markSaved();
     return document;
 }
@@ -330,6 +490,10 @@ void DldProjectStore::save(DatumDocument& document, const QString& filePath)
     for (const DatumObject& object : document.objects()) {
         objects.append(encodeObject(object));
     }
+    QJsonArray topologyReferences;
+    for (const DatumTopologyReference& reference : document.topologyReferences()) {
+        topologyReferences.append(encodeTopologyReference(reference));
+    }
     const QJsonObject root{
         {QStringLiteral("format"), QString::fromLatin1(FormatName)},
         {QStringLiteral("schemaVersion"), SchemaVersion},
@@ -338,6 +502,7 @@ void DldProjectStore::save(DatumDocument& document, const QString& filePath)
             {QStringLiteral("name"), fromUtf8(document.name())},
         }},
         {QStringLiteral("objects"), objects},
+        {QStringLiteral("topologyReferences"), topologyReferences},
     };
     const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Indented);
     QSaveFile file(filePath);

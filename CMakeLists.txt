@@ -17,6 +17,9 @@ qt_policy(SET QTP0004 NEW)
 add_library(datumloop_core STATIC
     src/datumloop/core/DatumDocument.cpp
     src/datumloop/core/DatumCommand.cpp
+    src/datumloop/core/DatumUuid.cpp
+    src/datumloop/core/DatumTopologyReference.cpp
+    src/datumloop/topology/DatumTopologyResolver.cpp
     src/datumloop/geometry/OcctKernel.cpp
 )
 target_include_directories(datumloop_core PUBLIC src)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "datumloop/geometry/GeometryTypes.hpp"
+#include "datumloop/core/DatumTopologyReference.hpp"
 
 #include <TopoDS_Shape.hxx>
 
@@ -45,15 +46,21 @@ public:
                                               const Vector3& position = {0.0, 0.0, 0.0},
                                               std::optional<std::string> parentId = std::nullopt);
     [[nodiscard]] const std::vector<DatumObject>& objects() const noexcept { return objects_; }
+    [[nodiscard]] const std::vector<DatumTopologyReference>& topologyReferences() const noexcept
+    {
+        return topologyReferences_;
+    }
     [[nodiscard]] const DatumObject* object(const std::string& id) const noexcept;
     [[nodiscard]] bool setPosition(const std::string& id, const Vector3& position) noexcept;
     void setProperty(const std::string& id, std::string key, DatumPropertyValue value);
+    [[nodiscard]] const DatumTopologyReference& addTopologyReference(DatumTopologyReference reference);
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
 
 private:
     std::string name_;
     std::string projectId_;
     std::vector<DatumObject> objects_;
+    std::vector<DatumTopologyReference> topologyReferences_;
     std::uint64_t revision_ = 0;
     bool dirty_ = true;
 };

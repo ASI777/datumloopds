@@ -5,10 +5,11 @@
 The standalone C++20 / Qt 6 application with direct OCCT APIs is DatumLoop DS's
 primary architecture. It owns its native workspace, document objects, stable
 object IDs, hierarchy, typed scalar properties, selection, commands, dirty
-tracking, and the provisional `.dld` project format. Exact `TopoDS_Shape` values
-remain in the native document; the viewport receives derived display triangles.
-Feature graphs, persistent topology, and higher-level engineering workflows
-remain later milestones.
+tracking, initial topology references, and the provisional `.dld` project
+format. Exact `TopoDS_Shape` values remain in the native document; the viewport
+receives derived display triangles. The first topology-signature matcher is in
+place, while reliable persistent naming through arbitrary feature edits and
+feature provenance remain later milestones.
 
 FreeCAD is retained as a compatibility subsystem for the existing Python
 workbench and `.FCStd` projects. It owns document lifecycle, its center
@@ -100,9 +101,11 @@ triangle counts as approximate display comparisons.
 The standalone application uses C++20, Qt 6 Quick/QML, and direct OCCT APIs.
 `DatumDocument` owns each exact `TopoDS_Shape`, project and object UUIDs, object
 hierarchy, typed scalar properties, shape metrics, translation, dirty state, and
-revision count. `DldProjectStore` reads and writes the version-one `.dld`
-manifest using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates
-display tessellation after load. The `DocumentViewModel` provides Save/Open,
+revision count, and topology reference signatures. `DldProjectStore` reads and
+writes the version-two `.dld` manifest using Qt Core and OCCT; it persists exact
+B-Rep geometry and regenerates display tessellation after load. Schema v1
+projects migrate to v2 with an empty topology-reference collection.
+`DocumentViewModel` provides Save/Open,
 resets history after a successful open, and exposes dirty state to the shell.
 See [`native-project-format.md`](native-project-format.md) for the supported
 fields and current limitations.
@@ -114,13 +117,15 @@ behind `IViewportRenderer`; its current `QtQuick3DRenderer` adapter forwards
 only `TriangleMesh` display data. The exact B-Rep stays in the document and is
 not reconstructed from that mesh. `PickingService` maps a renderer hit to the
 selected document object by stable ID. Picking is currently object-level;
-persistent face, edge, and vertex references remain future work.
+face, edge, and vertex references can be stored and resolved against regenerated
+shapes, but subshape picking and selection remain future work.
 
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native
-application. Version 1 writes empty feature-definition and reference arrays;
-parametric features, persistent topology references, schema migrations,
-rotations, and engineering objects are not implemented.
+application. The initial topology matcher can leave changed or ambiguous
+references unresolved. Parametric feature definitions, object-to-object
+references, general schema migrations, rotations, and engineering objects are
+not implemented.
 
 ```text
 Qt Quick / QML workspace and editor components
@@ -140,7 +145,7 @@ FreeCAD Python workbench -> separate compatibility path
 
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object selection,
-basic camera navigation, previewable Move with undo/redo, and version-one `.dld`
+basic camera navigation, previewable Move with undo/redo, version-two `.dld`
 save/open. The renderer boundary, display-mesh architecture check, native
 independence check, and pointer-driven UI check are included. Further editors
 and engineering workflows are later work.
@@ -189,10 +194,10 @@ but those do not complete the branded application gate by themselves.
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
   FreeCAD, Coin, SoQt, or PySide.
-- The native document owns its stable IDs, geometry, commands, and version-one
-  `.dld` persistence. The previous FreeCAD document model remains the
-  compatibility path until native import/export and project workflows are
-  verified.
+- The native document owns its stable IDs, geometry, commands, and version-two
+  `.dld` persistence, including initial face, edge, and vertex reference
+  signatures. The previous FreeCAD document model remains the compatibility
+  path until native import/export and project workflows are verified.
 - Keep all solver work out of the GUI process. No simulation code is introduced
   in this shell slice.
 

@@ -1,39 +1,15 @@
 #include "datumloop/core/DatumDocument.hpp"
 
+#include "datumloop/core/DatumUuid.hpp"
 #include "datumloop/geometry/OcctKernel.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <iomanip>
-#include <random>
-#include <sstream>
 #include <stdexcept>
 #include <utility>
 
 namespace datumloop {
 namespace {
-
-std::string makeId()
-{
-    std::array<unsigned char, 16> bytes{};
-    std::random_device random;
-    for (unsigned char& byte : bytes) {
-        byte = static_cast<unsigned char>(random());
-    }
-    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0fU) | 0x40U);
-    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3fU) | 0x80U);
-
-    std::ostringstream id;
-    id << std::hex << std::setfill('0');
-    for (std::size_t index = 0; index < bytes.size(); ++index) {
-        id << std::setw(2) << static_cast<unsigned int>(bytes[index]);
-        if (index == 3 || index == 5 || index == 7 || index == 9) {
-            id << '-';
-        }
-    }
-    return id.str();
-}
 
 bool finite(const Vector3& value)
 {
@@ -42,36 +18,15 @@ bool finite(const Vector3& value)
     });
 }
 
-bool validUuid(const std::string& value)
-{
-    if (value.size() != 36) {
-        return false;
-    }
-    for (std::size_t index = 0; index < value.size(); ++index) {
-        const bool separator = index == 8 || index == 13 || index == 18 || index == 23;
-        const char character = value[index];
-        if (separator) {
-            if (character != '-') {
-                return false;
-            }
-        } else if (!((character >= '0' && character <= '9') ||
-                     (character >= 'a' && character <= 'f') ||
-                     (character >= 'A' && character <= 'F'))) {
-            return false;
-        }
-    }
-    return true;
-}
-
 }  // namespace
 
 DatumDocument::DatumDocument(std::string name, std::string projectId)
-    : name_(std::move(name)), projectId_(projectId.empty() ? makeId() : std::move(projectId))
+    : name_(std::move(name)), projectId_(projectId.empty() ? createDatumUuidV4() : std::move(projectId))
 {
     if (name_.find_first_not_of(" \t\n\r") == std::string::npos) {
         throw std::invalid_argument("project name must not be empty");
     }
-    if (!validUuid(projectId_)) {
+    if (!isDatumUuid(projectId_)) {
         throw std::invalid_argument("project id must be a UUID");
     }
 }
@@ -94,8 +49,9 @@ void DatumDocument::clear(std::string name)
         throw std::invalid_argument("project name must not be empty");
     }
     name_ = std::move(name);
-    projectId_ = makeId();
+    projectId_ = createDatumUuidV4();
     objects_.clear();
+    topologyReferences_.clear();
     ++revision_;
     dirty_ = true;
 }
@@ -105,6 +61,7 @@ void DatumDocument::replaceWith(DatumDocument replacement)
     name_ = std::move(replacement.name_);
     projectId_ = std::move(replacement.projectId_);
     objects_ = std::move(replacement.objects_);
+    topologyReferences_ = std::move(replacement.topologyReferences_);
     ++revision_;
     dirty_ = replacement.dirty_;
 }
@@ -115,7 +72,7 @@ const DatumObject& DatumDocument::createBox(std::string name, const Vector3& dim
         throw std::invalid_argument("object name must not be empty");
     }
 
-    return addObject(makeId(), std::move(name), OcctKernel::box(dimensions));
+    return addObject(createDatumUuidV4(), std::move(name), OcctKernel::box(dimensions));
 }
 
 const DatumObject& DatumDocument::addObject(std::string id,
@@ -124,20 +81,23 @@ const DatumObject& DatumDocument::addObject(std::string id,
                                             const Vector3& position,
                                             std::optional<std::string> parentId)
 {
-    if (!validUuid(id)) {
+    if (!isDatumUuid(id)) {
         throw std::invalid_argument("object id must be a UUID");
     }
     if (name.find_first_not_of(" \t\n\r") == std::string::npos) {
         throw std::invalid_argument("object name must not be empty");
     }
-    if (object(id) != nullptr) {
+    if (object(id) != nullptr ||
+        std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&id](const auto& reference) {
+            return reference.id == id;
+        })) {
         throw std::invalid_argument("object id must be unique within a project");
     }
     if (id == projectId_) {
         throw std::invalid_argument("object id must be distinct from the project id");
     }
     if (parentId.has_value()) {
-        if (!validUuid(*parentId) || object(*parentId) == nullptr) {
+        if (!isDatumUuid(*parentId) || object(*parentId) == nullptr) {
             throw std::invalid_argument("object parent must reference an existing object UUID");
         }
     }
@@ -208,6 +168,75 @@ void DatumDocument::setProperty(const std::string& id, std::string key, DatumPro
         ++revision_;
         dirty_ = true;
     }
+}
+
+const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyReference reference)
+{
+    if (!isDatumUuid(reference.id) || !isDatumUuid(reference.objectId)) {
+        throw std::invalid_argument("topology reference and owner ids must be UUIDs");
+    }
+    if (reference.id == projectId_ || object(reference.id) != nullptr ||
+        std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&](const auto& existing) {
+            return existing.id == reference.id;
+        })) {
+        throw std::invalid_argument("topology reference id must be unique within a project");
+    }
+    if (object(reference.objectId) == nullptr) {
+        throw std::invalid_argument("topology reference must belong to an existing object");
+    }
+    if (reference.featureId.has_value() && !isDatumUuid(*reference.featureId)) {
+        throw std::invalid_argument("topology reference feature id must be a UUID");
+    }
+    try {
+        (void)datumSubshapeTypeName(reference.subshapeType);
+    } catch (const std::invalid_argument&) {
+        throw std::invalid_argument("topology reference subshape type is invalid");
+    }
+    if (reference.topologySignature.empty() || reference.geometrySignature.geometryType.empty() ||
+        !std::isfinite(reference.geometrySignature.measure) || reference.geometrySignature.measure < 0.0 ||
+        !finite(reference.geometrySignature.centroidMm)) {
+        throw std::invalid_argument("topology reference signature data is incomplete or invalid");
+    }
+    if (reference.geometrySignature.direction.has_value()) {
+        if (!finite(*reference.geometrySignature.direction)) {
+            throw std::invalid_argument("topology reference direction must be finite");
+        }
+        const double lengthSquared = (*reference.geometrySignature.direction)[0] * (*reference.geometrySignature.direction)[0] +
+                                     (*reference.geometrySignature.direction)[1] * (*reference.geometrySignature.direction)[1] +
+                                     (*reference.geometrySignature.direction)[2] * (*reference.geometrySignature.direction)[2];
+        if (lengthSquared <= 1e-24) {
+            throw std::invalid_argument("topology reference direction must be non-zero");
+        }
+    }
+    for (const DatumTopologyNeighborSignature& neighbor : reference.geometrySignature.adjacent) {
+        if (neighbor.geometryType.empty() || !std::isfinite(neighbor.measure) || neighbor.measure < 0.0) {
+            throw std::invalid_argument("topology reference adjacency data is invalid");
+        }
+        try {
+            (void)datumSubshapeTypeName(neighbor.subshapeType);
+        } catch (const std::invalid_argument&) {
+            throw std::invalid_argument("topology reference adjacency type is invalid");
+        }
+    }
+    std::vector<std::string> uniqueParents;
+    uniqueParents.reserve(reference.parentReferenceIds.size());
+    for (const std::string& parentId : reference.parentReferenceIds) {
+        if (!isDatumUuid(parentId) || parentId == reference.id ||
+            std::find(uniqueParents.begin(), uniqueParents.end(), parentId) != uniqueParents.end()) {
+            throw std::invalid_argument("topology reference parent ids must be unique UUIDs");
+        }
+        const auto parent = std::find_if(topologyReferences_.begin(), topologyReferences_.end(),
+                                         [&parentId](const auto& existing) { return existing.id == parentId; });
+        if (parent == topologyReferences_.end() || parent->objectId != reference.objectId ||
+            parent->featureId != reference.featureId) {
+            throw std::invalid_argument("topology reference parent must already exist on the same owner and feature");
+        }
+        uniqueParents.push_back(parentId);
+    }
+    topologyReferences_.push_back(std::move(reference));
+    ++revision_;
+    dirty_ = true;
+    return topologyReferences_.back();
 }
 
 }  // namespace datumloop

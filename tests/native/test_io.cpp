@@ -1,6 +1,7 @@
 #include "datumloop/core/DatumDocument.hpp"
 #include "datumloop/geometry/OcctKernel.hpp"
 #include "datumloop/io/DldProjectStore.hpp"
+#include "datumloop/topology/DatumTopologyResolver.hpp"
 
 #include <TopTools_FormatVersion.hxx>
 
@@ -12,9 +13,11 @@
 #include <QTemporaryDir>
 #include <QUuid>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -35,15 +38,6 @@ bool close(double left, double right, double tolerance = 1e-8)
 QString uuid()
 {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
-
-QJsonObject readObject(const QString& path)
-{
-    QFile file(path);
-    require(file.open(QIODevice::ReadOnly), "could not open test project JSON");
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
-    require(document.isObject(), "test project JSON root is not an object");
-    return document.object();
 }
 
 void writeObject(const QString& path, const QJsonObject& object)
@@ -83,6 +77,60 @@ int main(int argc, char* argv[])
         const std::string childId = uuid().toStdString();
         (void)document.addObject(childId, "Carriage", datumloop::OcctKernel::box({12.0, 8.0, 4.0}),
                                  {12.5, -3.25, 9.0}, parentId);
+        const auto capturedReferences = datumloop::DatumTopologyResolver::captureAll(
+            parentId, document.object(parentId)->shape);
+        require(capturedReferences.size() == 26,
+                "box topology capture should include its faces, edges, and vertices");
+        for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
+            (void)document.addTopologyReference(reference);
+        }
+        datumloop::DatumTopologyReference persistedFeatureReference = capturedReferences.front();
+        persistedFeatureReference.id = uuid().toStdString();
+        persistedFeatureReference.featureId = uuid().toStdString();
+        (void)document.addTopologyReference(persistedFeatureReference);
+        const TopoDS_Shape regeneratedBox = datumloop::OcctKernel::box({40.0, 30.0, 20.0});
+        for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
+            const auto resolution = datumloop::DatumTopologyResolver::resolve(reference, parentId, regeneratedBox);
+            require(resolution.status == datumloop::DatumTopologyResolutionStatus::Resolved &&
+                        !resolution.subshape.IsNull(),
+                    "deterministic topology matching failed on identical regenerated box geometry");
+        }
+        auto ownerMismatch = datumloop::DatumTopologyResolver::resolve(
+            capturedReferences.front(), childId, regeneratedBox);
+        require(ownerMismatch.status == datumloop::DatumTopologyResolutionStatus::OwnerMismatch,
+                "topology resolver accepted a reference from a different object");
+        datumloop::DatumTopologyReference featureReference = capturedReferences.front();
+        featureReference.featureId = uuid().toStdString();
+        require(datumloop::DatumTopologyResolver::resolve(featureReference, parentId, regeneratedBox).status ==
+                    datumloop::DatumTopologyResolutionStatus::UnsupportedFeature,
+                "topology resolver pretended to resolve unsupported feature provenance");
+
+        const std::string cubeId = uuid().toStdString();
+        auto cubeReferences = datumloop::DatumTopologyResolver::captureAll(
+            cubeId, datumloop::OcctKernel::box({10.0, 10.0, 10.0}));
+        datumloop::DatumTopologyReference deliberatelyAmbiguous = cubeReferences.front();
+        deliberatelyAmbiguous.geometrySignature.centroidMm = {0.0, 0.0, 0.0};
+        deliberatelyAmbiguous.geometrySignature.direction.reset();
+        datumloop::DatumTopologyResolveOptions permissiveAmbiguityCheck;
+        permissiveAmbiguityCheck.maximumCentroidDistanceRatio = 1.0;
+        permissiveAmbiguityCheck.maximumScore = 1.0;
+        deliberatelyAmbiguous.transientIndexHint = 0;
+        require(datumloop::DatumTopologyResolver::resolve(
+                    deliberatelyAmbiguous, cubeId,
+                    datumloop::OcctKernel::box({10.0, 10.0, 10.0}), permissiveAmbiguityCheck).status ==
+                    datumloop::DatumTopologyResolutionStatus::Ambiguous,
+                "topology resolver guessed a face when geometric signatures tied");
+        auto invalidResolveOptions = permissiveAmbiguityCheck;
+        invalidResolveOptions.maximumScore = std::numeric_limits<double>::quiet_NaN();
+        bool invalidResolveOptionsRejected = false;
+        try {
+            (void)datumloop::DatumTopologyResolver::resolve(
+                deliberatelyAmbiguous, cubeId, datumloop::OcctKernel::box({10.0, 10.0, 10.0}),
+                invalidResolveOptions);
+        } catch (const std::invalid_argument&) {
+            invalidResolveOptionsRejected = true;
+        }
+        require(invalidResolveOptionsRejected, "topology resolver accepted non-finite matching tolerances");
 
         require(document.isDirty(), "new or edited document should be dirty before saving");
         datumloop::DldProjectStore::save(document, projectPath);
@@ -92,12 +140,15 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 1,
-                "saved project did not include the version-one schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 2,
+                "saved project did not include the version-two schema");
+        require(root.value(QStringLiteral("topologyReferences")).toArray().size() ==
+                    static_cast<qsizetype>(capturedReferences.size() + 1),
+                "saved project omitted its persistent topology references");
         const QJsonArray savedObjects = root.value(QStringLiteral("objects")).toArray();
         require(savedObjects.at(0).toObject().value(QStringLiteral("featureDefinitions")).toArray().isEmpty() &&
                     savedObjects.at(0).toObject().value(QStringLiteral("references")).toArray().isEmpty(),
-                "version-one reserved feature/reference arrays should be empty");
+                "reserved feature and non-topological reference arrays should be empty");
         require(savedObjects.at(0).toObject().value(QStringLiteral("geometry")).toObject()
                     .value(QStringLiteral("occtFormatVersion")).toInt() == TopTools_FormatVersion_CURRENT,
                 "saved B-Rep omitted its OCCT stream version");
@@ -130,6 +181,46 @@ int main(int argc, char* argv[])
                 "floating-point property did not survive round-trip");
         require(std::get<std::string>(loadedParent->properties.at("material")) == "6061-T6",
                 "string property did not survive round-trip");
+        require(loaded.topologyReferences().size() == capturedReferences.size() + 1,
+                "persistent topology references did not survive project round-trip");
+        for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
+            const auto loadedReference = std::find_if(
+                loaded.topologyReferences().begin(), loaded.topologyReferences().end(),
+                [&reference](const auto& candidate) { return candidate.id == reference.id; });
+            require(loadedReference != loaded.topologyReferences().end(),
+                    "persistent topology reference UUID did not survive round-trip");
+            require(loadedReference->objectId == parentId &&
+                        loadedReference->subshapeType == reference.subshapeType &&
+                        loadedReference->topologySignature == reference.topologySignature &&
+                        loadedReference->geometrySignature == reference.geometrySignature &&
+                        loadedReference->parentReferenceIds == reference.parentReferenceIds,
+                    "persistent topology signature or parent relationship changed during round-trip");
+        }
+        const auto loadedFeatureReference = std::find_if(
+            loaded.topologyReferences().begin(), loaded.topologyReferences().end(),
+            [&persistedFeatureReference](const auto& candidate) {
+                return candidate.id == persistedFeatureReference.id;
+            });
+        require(loadedFeatureReference != loaded.topologyReferences().end() &&
+                    loadedFeatureReference->featureId == persistedFeatureReference.featureId,
+                "persistent topology feature provenance did not survive project round-trip");
+
+        QJsonObject versionOne = root;
+        versionOne.insert(QStringLiteral("schemaVersion"), 1);
+        versionOne.remove(QStringLiteral("topologyReferences"));
+        const QString versionOnePath = temporaryDirectory.filePath(QStringLiteral("schema-v1.dld"));
+        writeObject(versionOnePath, versionOne);
+        datumloop::DatumDocument migratedVersionOne = datumloop::DldProjectStore::load(versionOnePath);
+        require(migratedVersionOne.topologyReferences().empty() && !migratedVersionOne.isDirty(),
+                "schema-v1 project did not migrate to an empty topology-reference collection");
+        datumloop::DldProjectStore::save(migratedVersionOne, versionOnePath);
+        QFile migratedManifest(versionOnePath);
+        require(migratedManifest.open(QIODevice::ReadOnly), "migrated project could not be reopened");
+        const QJsonObject migratedRoot = QJsonDocument::fromJson(migratedManifest.readAll()).object();
+        require(migratedRoot.value(QStringLiteral("schemaVersion")).toInt() ==
+                    datumloop::DldProjectStore::SchemaVersion &&
+                    migratedRoot.value(QStringLiteral("topologyReferences")).toArray().isEmpty(),
+                "saving a schema-v1 project did not write the current schema");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");
@@ -225,6 +316,16 @@ int main(int argc, char* argv[])
         writeObject(missingParentPath, broken);
         require(loadFails(missingParentPath), "object with a missing parent was accepted");
 
+        const QString missingTopologyParentPath = temporaryDirectory.filePath(QStringLiteral("missing-topology-parent.dld"));
+        broken = root;
+        QJsonArray topologyReferences = broken.value(QStringLiteral("topologyReferences")).toArray();
+        QJsonObject edgeReference = topologyReferences.at(6).toObject();
+        edgeReference.insert(QStringLiteral("parentReferenceIds"), QJsonArray{uuid()});
+        topologyReferences.replace(6, edgeReference);
+        broken.insert(QStringLiteral("topologyReferences"), topologyReferences);
+        writeObject(missingTopologyParentPath, broken);
+        require(loadFails(missingTopologyParentPath), "topology reference with a missing parent was accepted");
+
         loaded.setName("Save failure should stay dirty");
         bool failedSaveWasRejected = false;
         try {
@@ -236,7 +337,7 @@ int main(int argc, char* argv[])
         require(failedSaveWasRejected && loaded.isDirty(),
                 "failed save should be rejected without clearing document dirty state");
 
-        std::cout << "Native .dld checks passed: exact B-Rep round-trip, identity, hierarchy, transforms, typed properties, dirty tracking, regenerated display mesh, and malformed-file rejection.\n";
+        std::cout << "Native .dld and topology checks passed: exact B-Rep round-trip, typed properties, hierarchy, schema-v1 migration, persistent topology matching, ambiguity rejection, and malformed-file rejection.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native .dld check failed: " << error.what() << '\n';

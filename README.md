@@ -40,11 +40,12 @@ make native-independence-check
 ./build/native/apps/datumloop-desktop/DatumLoopDS
 ```
 
-The native shell can open and save version-one `.dld` projects. The provisional
+The native shell can open and save version-two `.dld` projects. The provisional
 format stores project/object UUIDs, hierarchy, typed scalar properties,
-translations in millimetres, and exact OCCT B-Rep shapes. It does not yet store
-parametric feature definitions, persistent topology references, rotations, or
-simulation state; see [`docs/native-project-format.md`](docs/native-project-format.md).
+translations in millimetres, exact OCCT B-Rep shapes, and initial persistent
+face/edge/vertex references. Parametric feature definitions, object-to-object
+references, rotations, and simulation state remain unsupported; see
+[`docs/native-project-format.md`](docs/native-project-format.md).
 
 `make native-smoke` starts the native window and verifies that Qt Quick
 presented a frame; run it from a desktop session with a working graphics
