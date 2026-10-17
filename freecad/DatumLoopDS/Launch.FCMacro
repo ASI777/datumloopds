@@ -1,0 +1,6 @@
+"""Start the DatumLoop DS workbench in FreeCAD."""
+
+import FreeCADGui as Gui
+
+Gui.activateWorkbench("DatumLoopWorkbench")
+
