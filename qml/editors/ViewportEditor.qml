@@ -102,8 +102,20 @@ Item {
         onClicked: function(mouse) {
             if (mouse.button === Qt.LeftButton) {
                 const result = viewport.pick(mouse.x, mouse.y)
-                if (result && result.objectHit === solidModel)
-                    pickingService.resolveObjectHit(solidModel.datumObjectId)
+                if (result && result.objectHit === solidModel) {
+                    if (pickingService.selectionMode === "Object") {
+                        pickingService.resolveObjectHit(solidModel.datumObjectId)
+                    } else {
+                        const hitDepth = Math.max(0.1, result.distance)
+                        const worldPerPixel = 2 * hitDepth * Math.tan(camera.fieldOfView * Math.PI / 360)
+                                                   / Math.max(1, viewport.height)
+                        const pickToleranceMm = Math.max(0.05, worldPerPixel * 8)
+                        pickingService.resolveSubshapeHit(solidModel.datumObjectId,
+                                                          result.position,
+                                                          result.normal,
+                                                          pickToleranceMm)
+                    }
+                }
             }
         }
         onWheel: function(wheel) {
@@ -130,6 +142,29 @@ Item {
             Text { text: "DESIGN / PART"; color: editor.theme.textSecondary; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall; font.weight: Font.DemiBold }
             Item { Layout.fillWidth: true }
             Text { text: "●"; color: editor.theme.engineeringNominal; font.pixelSize: editor.theme.fontSizeSmall }
+        }
+    }
+
+    Rectangle {
+        objectName: "selectionModeToolbar"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: editor.theme.space3
+        width: 300
+        height: 42
+        radius: editor.theme.panelRadius
+        color: editor.theme.surfacePrimary
+        border.color: editor.theme.borderSubtle
+        border.width: editor.theme.borderWidth
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: editor.theme.space1
+            spacing: editor.theme.space1
+            DlButton { theme: editor.theme; objectName: "selectionModeObjectButton"; text: "Object"; highlighted: pickingService.selectionMode === "Object"; Layout.fillWidth: true; onClicked: pickingService.setSelectionMode("Object") }
+            DlButton { theme: editor.theme; objectName: "selectionModeFaceButton"; text: "Face"; highlighted: pickingService.selectionMode === "Face"; Layout.fillWidth: true; onClicked: pickingService.setSelectionMode("Face") }
+            DlButton { theme: editor.theme; objectName: "selectionModeEdgeButton"; text: "Edge"; highlighted: pickingService.selectionMode === "Edge"; Layout.fillWidth: true; onClicked: pickingService.setSelectionMode("Edge") }
+            DlButton { theme: editor.theme; objectName: "selectionModeVertexButton"; text: "Vertex"; highlighted: pickingService.selectionMode === "Vertex"; Layout.fillWidth: true; onClicked: pickingService.setSelectionMode("Vertex") }
         }
     }
 
@@ -289,6 +324,13 @@ Item {
             Text { text: "Z"; color: editor.theme.axisZ; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall; font.weight: Font.Bold }
             Item { Layout.fillWidth: true }
             Text { text: "mm"; color: editor.theme.textMuted; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall }
+        }
+    }
+
+    Connections {
+        target: pickingService
+        function onUnresolvedHit(objectId, reason) {
+            documentModel.reportInteractionStatus(reason)
         }
     }
 

@@ -14,7 +14,7 @@
 - The Python geometry contract defines portable shape/value types, capabilities, typed unsupported-operation errors, and backend adapters. Its FreeCAD Part adapter remains the compatibility CAD path. The native C++ application with direct OCCT APIs is the primary architecture; SMLib remains optional.
 - Exact cross-kernel conversion goes through STEP. Tessellation remains a display and analysis representation, not an exact modeling source.
 - The deterministic seven-case OCCT / SMLib benchmark matched volume, area, bounds, center of mass, and validity tolerances in all seven cases for FreeCAD 1.1.1 / SMLib 0.3.4. Exact topology counts are reported separately because the kernels may split the same geometry differently. See [the comparison report](../reports/geometry-benchmark/comparison.md) and its JSON reports.
-- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates an exact OCCT solid, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object picks through stable IDs, and supports camera navigation and a previewable Move command. Display triangles remain derived from the exact shape. Native `.dld` schema-v2 persistence now stores exact OCCT B-Reps and initial face, edge, and vertex references. The matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Interactive subshape picking remains unimplemented.
+- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates exact OCCT solids, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object/face/edge/vertex picks through stable IDs, and supports camera navigation and a previewable Move command. Display triangles remain derived from the exact shape. Native `.dld` schema-v2 persistence stores exact OCCT B-Reps and initial face, edge, and vertex references. The matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Large-model acceleration and distinct subshape highlight geometry remain open.
 
 ## Checks run
 
@@ -22,7 +22,7 @@
 - `make native-qml-smoke` — workspace, common host, three editors, and OCCT-derived mesh data initialize. Qt Quick 3D cannot render in the offscreen plugin, as expected.
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
-- `make native-pointer-smoke` — XTest clicks the viewport to select the solid, orbits and zooms the camera, then exercises Move cancel, confirm, undo, and redo.
+- `make native-pointer-smoke` — XTest clicks the viewport to select the solid and a face by persistent UUID, orbits and zooms the camera, then exercises Move cancel, confirm, undo, and redo.
 - `make check` — 18 tests run: 17 pass and the optional smlibpy integration test is skipped because smlibpy is not installed in the default Python environment. The SMLib-enabled suite previously passed all 16 integration tests, including STEP and USD B-Rep round trips.
 - `make freecad-check` — the compatibility smoke passes geometry operations and project save/reopen with the locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
 - `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, docks, project metadata, and a visible viewport solid pass under Xvfb with software OpenGL.
@@ -34,7 +34,7 @@
 
 - Repeat the FreeCAD 1.1.3 configure and build from an empty build directory with matching Pivy, yaml-cpp, and other development dependencies, so the pinned fork's build is reproducible from a clean checkout.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
-- Extend topology resolution with feature provenance and subshape picking; the current signature matcher is only an initial strategy.
+- Extend topology resolution with feature provenance, large-model acceleration, and subshape highlighting; the current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.
 - Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.
 - Continue replacing FreeCAD-owned document, selection, command, and persistence behavior with tested native equivalents before retiring the compatibility workbench.

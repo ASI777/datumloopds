@@ -104,7 +104,8 @@ hierarchy, typed scalar properties, shape metrics, translation, dirty state, and
 revision count, and topology reference signatures. `DldProjectStore` reads and
 writes the version-two `.dld` manifest using Qt Core and OCCT; it persists exact
 B-Rep geometry and regenerates display tessellation after load. Schema v1
-projects migrate to v2 with an empty topology-reference collection.
+projects migrate to v2 with initial face, edge, and vertex references for
+objects that do not already have them.
 `DocumentViewModel` provides Save/Open,
 resets history after a successful open, and exposes dirty state to the shell.
 See [`native-project-format.md`](native-project-format.md) for the supported
@@ -116,9 +117,12 @@ Outliner, Viewport, and Properties editors. The viewport implementation is
 behind `IViewportRenderer`; its current `QtQuick3DRenderer` adapter forwards
 only `TriangleMesh` display data. The exact B-Rep stays in the document and is
 not reconstructed from that mesh. `PickingService` maps a renderer hit to the
-selected document object by stable ID. Picking is currently object-level;
-face, edge, and vertex references can be stored and resolved against regenerated
-shapes, but subshape picking and selection remain future work.
+selected document object or topology reference by persistent ID. The native
+viewport supports Object, Face, Edge, and Vertex modes. A Qt Quick 3D local hit
+point and normal are resolved against the exact OCCT shape, then matched to a
+stored topology UUID; ambiguous and unsupported feature-based results remain
+unresolved. Large-model acceleration and distinct subshape highlight geometry
+remain future work.
 
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native
@@ -144,11 +148,11 @@ FreeCAD Python workbench -> separate compatibility path
 ```
 
 The native application provides the Design workspace, exact OCCT solids,
-resizable Viewport/Outliner/Properties editors, stable-ID object selection,
-basic camera navigation, previewable Move with undo/redo, version-two `.dld`
-save/open. The renderer boundary, display-mesh architecture check, native
-independence check, and pointer-driven UI check are included. Further editors
-and engineering workflows are later work.
+resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
+selection, basic camera navigation, previewable Move with undo/redo, and
+version-two `.dld` save/open. The renderer boundary, display-mesh architecture
+check, native independence check, and pointer-driven UI check are included.
+Further editors and engineering workflows are later work.
 
 ### Current native implementation status
 
@@ -156,13 +160,13 @@ The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
 workspace without loading FreeCAD. Core, persistence, and UI-model checks cover
 geometry measures, `.dld` round-trip, typed properties, hierarchy, dirty state,
-stable-ID picking, preview/cancel/commit behavior, input validation, and move
-undo/redo. The headless QML smoke checks the common host and all three editor
-components. `make native-independence-check` finds no FreeCAD, Coin, or SoQt
-dynamic dependencies or native include bindings. The offscreen platform cannot
-render Qt Quick 3D; Xvfb presents the app and the XTest pointer smoke checks
-viewport picking, camera orbit and zoom, and Move cancel/confirm/undo/redo.
-Hardware-GPU behavior remains unverified.
+stable-ID object and subshape picking, preview/cancel/commit behavior, input
+validation, and move undo/redo. The headless QML smoke checks the common host
+and all three editor components. `make native-independence-check` finds no
+FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The
+offscreen platform cannot render Qt Quick 3D; Xvfb presents the app and the
+XTest pointer smoke checks viewport object/face picking, camera orbit and zoom,
+and Move cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified.
 The manual native viewport and `.dld` verification procedure is in
 [`native-verification-checklist.md`](native-verification-checklist.md).
 

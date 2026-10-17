@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -77,13 +78,13 @@ int main(int argc, char* argv[])
         const std::string childId = uuid().toStdString();
         (void)document.addObject(childId, "Carriage", datumloop::OcctKernel::box({12.0, 8.0, 4.0}),
                                  {12.5, -3.25, 9.0}, parentId);
-        const auto capturedReferences = datumloop::DatumTopologyResolver::captureAll(
-            parentId, document.object(parentId)->shape);
+        std::vector<datumloop::DatumTopologyReference> capturedReferences;
+        std::copy_if(document.topologyReferences().begin(), document.topologyReferences().end(),
+                     std::back_inserter(capturedReferences), [&parentId](const auto& reference) {
+                         return reference.objectId == parentId;
+                     });
         require(capturedReferences.size() == 26,
                 "box topology capture should include its faces, edges, and vertices");
-        for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
-            (void)document.addTopologyReference(reference);
-        }
         datumloop::DatumTopologyReference persistedFeatureReference = capturedReferences.front();
         persistedFeatureReference.id = uuid().toStdString();
         persistedFeatureReference.featureId = uuid().toStdString();
@@ -94,6 +95,16 @@ int main(int argc, char* argv[])
             require(resolution.status == datumloop::DatumTopologyResolutionStatus::Resolved &&
                         !resolution.subshape.IsNull(),
                     "deterministic topology matching failed on identical regenerated box geometry");
+            const std::optional<datumloop::Vector3> hitNormal =
+                reference.subshapeType == datumloop::DatumSubshapeType::Face
+                    ? reference.geometrySignature.direction
+                    : std::nullopt;
+            const auto hit = datumloop::DatumTopologyResolver::resolveHitAtPoint(
+                capturedReferences, parentId, regeneratedBox, reference.subshapeType,
+                reference.geometrySignature.centroidMm, hitNormal, 0.5);
+            require(hit.status == datumloop::DatumTopologyResolutionStatus::Resolved &&
+                        hit.referenceId == reference.id,
+                    "exact point picking did not resolve to the persistent face, edge, or vertex identity");
         }
         auto ownerMismatch = datumloop::DatumTopologyResolver::resolve(
             capturedReferences.front(), childId, regeneratedBox);
@@ -143,7 +154,7 @@ int main(int argc, char* argv[])
         require(root.value(QStringLiteral("schemaVersion")).toInt() == 2,
                 "saved project did not include the version-two schema");
         require(root.value(QStringLiteral("topologyReferences")).toArray().size() ==
-                    static_cast<qsizetype>(capturedReferences.size() + 1),
+                    static_cast<qsizetype>(document.topologyReferences().size()),
                 "saved project omitted its persistent topology references");
         const QJsonArray savedObjects = root.value(QStringLiteral("objects")).toArray();
         require(savedObjects.at(0).toObject().value(QStringLiteral("featureDefinitions")).toArray().isEmpty() &&
@@ -181,7 +192,7 @@ int main(int argc, char* argv[])
                 "floating-point property did not survive round-trip");
         require(std::get<std::string>(loadedParent->properties.at("material")) == "6061-T6",
                 "string property did not survive round-trip");
-        require(loaded.topologyReferences().size() == capturedReferences.size() + 1,
+        require(loaded.topologyReferences().size() == document.topologyReferences().size(),
                 "persistent topology references did not survive project round-trip");
         for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
             const auto loadedReference = std::find_if(
@@ -211,15 +222,15 @@ int main(int argc, char* argv[])
         const QString versionOnePath = temporaryDirectory.filePath(QStringLiteral("schema-v1.dld"));
         writeObject(versionOnePath, versionOne);
         datumloop::DatumDocument migratedVersionOne = datumloop::DldProjectStore::load(versionOnePath);
-        require(migratedVersionOne.topologyReferences().empty() && !migratedVersionOne.isDirty(),
-                "schema-v1 project did not migrate to an empty topology-reference collection");
+        require(migratedVersionOne.topologyReferences().size() == 52 && !migratedVersionOne.isDirty(),
+                "schema-v1 project did not receive initial persistent topology references");
         datumloop::DldProjectStore::save(migratedVersionOne, versionOnePath);
         QFile migratedManifest(versionOnePath);
         require(migratedManifest.open(QIODevice::ReadOnly), "migrated project could not be reopened");
         const QJsonObject migratedRoot = QJsonDocument::fromJson(migratedManifest.readAll()).object();
         require(migratedRoot.value(QStringLiteral("schemaVersion")).toInt() ==
                     datumloop::DldProjectStore::SchemaVersion &&
-                    migratedRoot.value(QStringLiteral("topologyReferences")).toArray().isEmpty(),
+                    migratedRoot.value(QStringLiteral("topologyReferences")).toArray().size() == 52,
                 "saving a schema-v1 project did not write the current schema");
 
         loaded.setName("Edited assembly");

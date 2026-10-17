@@ -13,6 +13,7 @@ class DocumentViewModel final : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int selectedRow READ selectedRow NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedObjectId READ selectedObjectId NOTIFY selectionChanged)
+    Q_PROPERTY(QString selectedTopologyReferenceId READ selectedTopologyReferenceId NOTIFY selectionChanged)
     Q_PROPERTY(QString displayObjectId READ displayObjectId NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedName READ selectedName NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedType READ selectedType NOTIFY selectionChanged)
@@ -48,6 +49,7 @@ public:
 
     [[nodiscard]] int selectedRow() const noexcept { return selectedRow_; }
     [[nodiscard]] QString selectedObjectId() const;
+    [[nodiscard]] QString selectedTopologyReferenceId() const { return selectedTopologyReferenceId_; }
     [[nodiscard]] QString displayObjectId() const;
     [[nodiscard]] QString selectedName() const;
     [[nodiscard]] QString selectedType() const;
@@ -66,6 +68,7 @@ public:
 
     Q_INVOKABLE void selectRow(int row);
     Q_INVOKABLE bool selectObjectId(const QString& objectId);
+    Q_INVOKABLE bool selectTopologyReference(const QString& objectId, const QString& referenceId);
     Q_INVOKABLE void beginMove();
     Q_INVOKABLE void setMoveAxis(const QString& axis);
     Q_INVOKABLE void setMoveValue(const QString& value);
@@ -77,6 +80,7 @@ public:
     Q_INVOKABLE void saveProject();
     Q_INVOKABLE void saveProjectAs(const QUrl& fileUrl);
     Q_INVOKABLE void openProject(const QUrl& fileUrl);
+    Q_INVOKABLE void reportInteractionStatus(const QString& message);
 
 signals:
     void selectionChanged();
@@ -91,12 +95,14 @@ signals:
 
 private:
     [[nodiscard]] const DatumObject* selectedObject() const noexcept;
+    [[nodiscard]] const DatumTopologyReference* selectedTopologyReference() const noexcept;
     [[nodiscard]] Vector3 previewDelta() const noexcept;
     void updateStatus();
     void notifyObjectRows();
 
     DatumDocument* document_ = nullptr;
     int selectedRow_ = -1;
+    QString selectedTopologyReferenceId_;
     bool moveActive_ = false;
     QString moveAxis_ = QStringLiteral("X");
     QString moveValue_ = QStringLiteral("0");

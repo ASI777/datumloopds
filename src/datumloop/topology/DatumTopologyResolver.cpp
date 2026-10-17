@@ -4,7 +4,9 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepGProp.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
@@ -584,6 +586,201 @@ DatumTopologyResolution DatumTopologyResolver::resolve(
     result.subshape = scored.front().shape;
     result.transientIndex = scored.front().index;
     result.score = scored.front().score;
+    return result;
+}
+
+DatumTopologyHitResolution DatumTopologyResolver::resolveHitAtPoint(
+    const std::vector<DatumTopologyReference>& references,
+    const std::string& objectId,
+    const TopoDS_Shape& shape,
+    DatumSubshapeType subshapeType,
+    const Vector3& localPointMm,
+    const std::optional<Vector3>& localNormal,
+    double toleranceMm,
+    const DatumTopologyResolveOptions& options)
+{
+    if (!isDatumUuid(objectId)) {
+        throw std::invalid_argument("topology hit resolution requires a valid object UUID");
+    }
+    if (!finiteVector(localPointMm)) {
+        throw std::invalid_argument("topology hit position must contain finite millimetre values");
+    }
+    if (!std::isfinite(toleranceMm) || toleranceMm <= 0.0) {
+        throw std::invalid_argument("topology hit tolerance must be finite and greater than zero");
+    }
+    if (localNormal.has_value()) {
+        if (!finiteVector(*localNormal)) {
+            throw std::invalid_argument("topology hit normal must contain finite values");
+        }
+        const double lengthSquared = (*localNormal)[0] * (*localNormal)[0] +
+                                     (*localNormal)[1] * (*localNormal)[1] +
+                                     (*localNormal)[2] * (*localNormal)[2];
+        if (lengthSquared <= 1e-24) {
+            throw std::invalid_argument("topology hit normal must be non-zero");
+        }
+    }
+    if (!std::isfinite(options.maximumRelativeMeasureError) || options.maximumRelativeMeasureError < 0.0 ||
+        !std::isfinite(options.maximumCentroidDistanceRatio) || options.maximumCentroidDistanceRatio < 0.0 ||
+        !std::isfinite(options.maximumScore) || options.maximumScore < 0.0 ||
+        !std::isfinite(options.ambiguityTolerance) || options.ambiguityTolerance < 0.0) {
+        throw std::invalid_argument("topology resolver tolerances must be finite and non-negative");
+    }
+
+    DatumTopologyHitResolution result;
+    if (shape.IsNull()) {
+        result.status = DatumTopologyResolutionStatus::NotFound;
+        return result;
+    }
+    TopAbs_ShapeEnum shapeType = TopAbs_SHAPE;
+    switch (subshapeType) {
+    case DatumSubshapeType::Face:
+        shapeType = TopAbs_FACE;
+        break;
+    case DatumSubshapeType::Edge:
+        shapeType = TopAbs_EDGE;
+        break;
+    case DatumSubshapeType::Vertex:
+        shapeType = TopAbs_VERTEX;
+        break;
+    default:
+        throw std::invalid_argument("topology hit resolution received an unsupported subshape type");
+    }
+
+    bool hasUnsupportedFeatureReference = false;
+    std::vector<const DatumTopologyReference*> objectReferences;
+    for (const DatumTopologyReference& reference : references) {
+        if (reference.objectId != objectId || reference.subshapeType != subshapeType) {
+            continue;
+        }
+        if (reference.featureId.has_value()) {
+            hasUnsupportedFeatureReference = true;
+        } else {
+            objectReferences.push_back(&reference);
+        }
+    }
+    if (objectReferences.empty()) {
+        result.status = hasUnsupportedFeatureReference
+            ? DatumTopologyResolutionStatus::UnsupportedFeature
+            : DatumTopologyResolutionStatus::NotFound;
+        return result;
+    }
+
+    TopTools_IndexedMapOfShape candidates;
+    TopExp::MapShapes(shape, shapeType, candidates);
+    if (candidates.IsEmpty()) {
+        result.status = DatumTopologyResolutionStatus::NotFound;
+        return result;
+    }
+    std::vector<DatumTopologyReference> candidateReferences;
+    for (DatumTopologyReference& candidate : captureAll(objectId, shape)) {
+        if (candidate.subshapeType == subshapeType) {
+            candidateReferences.push_back(std::move(candidate));
+        }
+    }
+    if (candidateReferences.size() != static_cast<std::size_t>(candidates.Extent())) {
+        throw std::logic_error("OCCT topology candidate order did not match its generated signatures");
+    }
+
+    const TopoDS_Vertex hitVertex = BRepBuilderAPI_MakeVertex(
+        gp_Pnt(localPointMm[0], localPointMm[1], localPointMm[2])).Vertex();
+    struct ScoredHit {
+        std::size_t index;
+        double distanceMm;
+        double score;
+    };
+    std::vector<ScoredHit> hits;
+    hits.reserve(candidateReferences.size());
+    for (std::size_t index = 0; index < candidateReferences.size(); ++index) {
+        BRepExtrema_DistShapeShape distanceQuery(hitVertex,
+            candidates(static_cast<Standard_Integer>(index + 1)));
+        distanceQuery.Perform();
+        if (!distanceQuery.IsDone()) {
+            continue;
+        }
+        const double distanceMm = distanceQuery.Value();
+        if (!std::isfinite(distanceMm) || distanceMm > toleranceMm) {
+            continue;
+        }
+        double score = distanceMm / toleranceMm;
+        const DatumTopologyGeometrySignature& geometry = candidateReferences[index].geometrySignature;
+        if (subshapeType == DatumSubshapeType::Face && localNormal.has_value() &&
+            geometry.geometryType == "plane") {
+            score += directionMismatch(geometry.direction, localNormal) * 0.5;
+        }
+        hits.push_back({index, distanceMm, score});
+    }
+    if (hits.empty()) {
+        result.status = DatumTopologyResolutionStatus::NotFound;
+        return result;
+    }
+    std::sort(hits.begin(), hits.end(), [](const ScoredHit& left, const ScoredHit& right) {
+        return left.score < right.score;
+    });
+    const double hitAmbiguityTolerance = std::max(options.ambiguityTolerance, 1e-6);
+    if (hits.size() > 1 && std::abs(hits[0].score - hits[1].score) <= hitAmbiguityTolerance) {
+        result.status = DatumTopologyResolutionStatus::Ambiguous;
+        return result;
+    }
+    const std::size_t pickedCandidateIndex = hits.front().index;
+    result.transientIndex = pickedCandidateIndex;
+    result.distanceMm = hits.front().distanceMm;
+
+    const double diagonal = boundingDiagonal(shape);
+    const double matchAmbiguityTolerance = std::max(options.ambiguityTolerance, 1e-8);
+    bool ambiguousReferenceMatch = false;
+    std::vector<std::string> matchingReferenceIds;
+    for (const DatumTopologyReference* reference : objectReferences) {
+        std::vector<std::pair<std::size_t, double>> scores;
+        scores.reserve(candidateReferences.size());
+        for (std::size_t index = 0; index < candidateReferences.size(); ++index) {
+            const DatumTopologyReference& candidate = candidateReferences[index];
+            if (candidate.geometrySignature.geometryType != reference->geometrySignature.geometryType) {
+                continue;
+            }
+            const double measureError = relativeError(reference->geometrySignature.measure,
+                                                      candidate.geometrySignature.measure);
+            const double centroidRatio = distance(reference->geometrySignature.centroidMm,
+                                                  candidate.geometrySignature.centroidMm) / diagonal;
+            if (measureError > options.maximumRelativeMeasureError ||
+                centroidRatio > options.maximumCentroidDistanceRatio) {
+                continue;
+            }
+            const double score = candidateScore(*reference, candidate.geometrySignature, diagonal,
+                                                candidate.topologySignature);
+            if (score <= options.maximumScore) {
+                scores.emplace_back(index, score);
+            }
+        }
+        std::sort(scores.begin(), scores.end(), [](const auto& left, const auto& right) {
+            return left.second < right.second;
+        });
+        if (scores.empty()) {
+            continue;
+        }
+        if (scores.size() > 1 && std::abs(scores[0].second - scores[1].second) <= matchAmbiguityTolerance) {
+            for (const auto& [index, score] : scores) {
+                if (score - scores[0].second > matchAmbiguityTolerance) {
+                    break;
+                }
+                if (index == pickedCandidateIndex) {
+                    ambiguousReferenceMatch = true;
+                    break;
+                }
+            }
+            continue;
+        }
+        if (scores[0].first == pickedCandidateIndex) {
+            matchingReferenceIds.push_back(reference->id);
+        }
+    }
+    if (matchingReferenceIds.size() == 1 && !ambiguousReferenceMatch) {
+        result.status = DatumTopologyResolutionStatus::Resolved;
+        result.referenceId = std::move(matchingReferenceIds.front());
+    } else if (matchingReferenceIds.size() > 1 || ambiguousReferenceMatch) {
+        result.status = DatumTopologyResolutionStatus::Ambiguous;
+    } else {
+        result.status = DatumTopologyResolutionStatus::NotFound;
+    }
     return result;
 }
 

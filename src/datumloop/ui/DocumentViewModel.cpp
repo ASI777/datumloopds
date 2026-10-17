@@ -116,7 +116,16 @@ QString DocumentViewModel::selectedName() const
 
 QString DocumentViewModel::selectedType() const
 {
-    return selectedObject() == nullptr ? QStringLiteral("—") : QStringLiteral("OCCT B-Rep Solid");
+    if (selectedObject() == nullptr) {
+        return QStringLiteral("—");
+    }
+    const DatumTopologyReference* reference = selectedTopologyReference();
+    if (reference == nullptr) {
+        return QStringLiteral("OCCT B-Rep Solid");
+    }
+    const QString type = QString::fromStdString(datumSubshapeTypeName(reference->subshapeType));
+    return QStringLiteral("OCCT B-Rep %1")
+        .arg(type.left(1).toUpper() + type.mid(1));
 }
 
 QString DocumentViewModel::selectedPositionText() const
@@ -167,20 +176,25 @@ void DocumentViewModel::selectRow(int row)
     if (row < 0 || row >= static_cast<int>(document_->objects().size())) {
         row = -1;
     }
-    if (selectedRow_ == row) {
+    const bool rowChanged = selectedRow_ != row;
+    const bool topologySelectionChanged = !selectedTopologyReferenceId_.isEmpty();
+    if (!rowChanged && !topologySelectionChanged) {
         return;
     }
     const int previous = selectedRow_;
     selectedRow_ = row;
-    if (previous >= 0) {
+    selectedTopologyReferenceId_.clear();
+    if (rowChanged && previous >= 0) {
         emit dataChanged(index(previous), index(previous), {IsSelectedRole});
     }
-    if (selectedRow_ >= 0) {
+    if (rowChanged && selectedRow_ >= 0) {
         emit dataChanged(index(selectedRow_), index(selectedRow_), {IsSelectedRole});
     }
     emit selectionChanged();
-    emit displayPositionChanged();
-    if (moveActive_) {
+    if (rowChanged) {
+        emit displayPositionChanged();
+    }
+    if (rowChanged && moveActive_) {
         cancelMove();
     }
 }
@@ -199,6 +213,42 @@ bool DocumentViewModel::selectObjectId(const QString& objectId)
         return false;
     }
     selectRow(static_cast<int>(std::distance(objects.begin(), found)));
+    return true;
+}
+
+bool DocumentViewModel::selectTopologyReference(const QString& objectId, const QString& referenceId)
+{
+    if (document_ == nullptr || objectId.isEmpty() || referenceId.isEmpty()) {
+        return false;
+    }
+    const std::string stableObjectId = objectId.toStdString();
+    const std::string stableReferenceId = referenceId.toStdString();
+    const auto objectIterator = std::find_if(
+        document_->objects().begin(), document_->objects().end(), [&stableObjectId](const DatumObject& object) {
+            return object.id == stableObjectId;
+        });
+    const auto referenceIterator = std::find_if(
+        document_->topologyReferences().begin(), document_->topologyReferences().end(),
+        [&stableObjectId, &stableReferenceId](const DatumTopologyReference& reference) {
+            return reference.id == stableReferenceId && reference.objectId == stableObjectId;
+        });
+    if (objectIterator == document_->objects().end() ||
+        referenceIterator == document_->topologyReferences().end()) {
+        return false;
+    }
+
+    const int row = static_cast<int>(std::distance(document_->objects().begin(), objectIterator));
+    if (selectedRow_ != row) {
+        selectRow(row);
+    }
+    if (selectedTopologyReferenceId_ != referenceId) {
+        selectedTopologyReferenceId_ = referenceId;
+        emit selectionChanged();
+    }
+    const QString type = QString::fromStdString(datumSubshapeTypeName(referenceIterator->subshapeType));
+    statusText_ = QStringLiteral("Selected %1  |  %2")
+        .arg(type.left(1).toUpper() + type.mid(1), QString::fromStdString(objectIterator->name));
+    emit statusTextChanged();
     return true;
 }
 
@@ -403,6 +453,7 @@ void DocumentViewModel::openProject(const QUrl& fileUrl)
         beginResetModel();
         document_->replaceWith(std::move(replacement));
         selectedRow_ = document_->objects().empty() ? -1 : 0;
+        selectedTopologyReferenceId_.clear();
         history_.clear();
         endResetModel();
         projectPath_ = path;
@@ -418,6 +469,14 @@ void DocumentViewModel::openProject(const QUrl& fileUrl)
     emit statusTextChanged();
 }
 
+void DocumentViewModel::reportInteractionStatus(const QString& message)
+{
+    if (!message.isEmpty() && statusText_ != message) {
+        statusText_ = message;
+        emit statusTextChanged();
+    }
+}
+
 const DatumObject* DocumentViewModel::selectedObject() const noexcept
 {
     if (document_ == nullptr || selectedRow_ < 0 ||
@@ -425,6 +484,20 @@ const DatumObject* DocumentViewModel::selectedObject() const noexcept
         return nullptr;
     }
     return &document_->objects()[static_cast<std::size_t>(selectedRow_)];
+}
+
+const DatumTopologyReference* DocumentViewModel::selectedTopologyReference() const noexcept
+{
+    if (document_ == nullptr || selectedTopologyReferenceId_.isEmpty()) {
+        return nullptr;
+    }
+    const std::string referenceId = selectedTopologyReferenceId_.toStdString();
+    const auto found = std::find_if(document_->topologyReferences().begin(),
+                                    document_->topologyReferences().end(),
+                                    [&referenceId](const DatumTopologyReference& reference) {
+                                        return reference.id == referenceId;
+                                    });
+    return found == document_->topologyReferences().end() ? nullptr : &*found;
 }
 
 Vector3 DocumentViewModel::previewDelta() const noexcept

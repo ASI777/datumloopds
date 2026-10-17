@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
     if (interactionSmokeMode) {
         documentModel.selectRow(-1);
     }
-    datumloop::PickingService pickingService(&documentModel);
+    datumloop::PickingService pickingService(&documentModel, &document);
 
     qmlRegisterType<datumloop::ExactShapeGeometry>(
         "DatumLoop.Native", 1, 0, "ExactShapeGeometry");
@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
     if (interactionSmokeMode) {
         const QStringList targetNames{
             QStringLiteral("cadViewport"),
+            QStringLiteral("selectionModeFaceButton"),
             QStringLiteral("moveAxisZButton"),
             QStringLiteral("moveDistanceField"),
             QStringLiteral("cancelMoveButton"),
@@ -149,6 +150,7 @@ int main(int argc, char* argv[])
             !hasItem(QStringLiteral("datumArea")) ||
             !hasItem(QStringLiteral("outlinerEditor")) ||
             !hasItem(QStringLiteral("viewportEditor")) ||
+            !hasItem(QStringLiteral("selectionModeToolbar")) ||
             !hasItem(QStringLiteral("propertiesEditor")) ||
             !demoPart.metrics.valid || displayMesh.triangleCount() == 0) {
             qCritical() << "DatumLoop workspace, editor components, or OCCT-derived viewport data did not initialize.";
@@ -168,10 +170,13 @@ int main(int argc, char* argv[])
              std::abs(camera->property("orbitDistance").toReal() - 112.0) > 0.1);
         const bool pointerWorkflowPassed = documentModel.selectedRow() == 0 &&
             !documentModel.moveActive() && documentModel.canUndo() && !documentModel.canRedo() &&
+            documentModel.selectedType() == QStringLiteral("OCCT B-Rep Face") &&
+            !documentModel.selectedTopologyReferenceId().isEmpty() &&
+            pickingService.selectionMode() == QStringLiteral("Face") &&
             movedObject != nullptr && std::abs(movedObject->position[2] - 4.5) < 1e-8 &&
             cameraInputPassed;
         if (!pointerWorkflowPassed) {
-            qCritical() << "Pointer-driven viewport selection, move cancel/confirm, or undo/redo failed."
+            qCritical() << "Pointer-driven object/subshape selection, move cancel/confirm, or undo/redo failed."
                         << "selected row =" << documentModel.selectedRow()
                         << "move active =" << documentModel.moveActive()
                         << "status =" << documentModel.statusText()
@@ -181,7 +186,7 @@ int main(int argc, char* argv[])
                         << "camera input passed =" << cameraInputPassed;
             return 7;
         }
-        qInfo() << "Pointer-driven viewport pick, camera navigation, and Move cancel/confirm/undo/redo passed.";
+        qInfo() << "Pointer-driven object/face pick, camera navigation, and Move cancel/confirm/undo/redo passed.";
     }
     return exitCode;
 }

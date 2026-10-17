@@ -33,6 +33,13 @@ struct DatumTopologyResolution {
     double score = 0.0;
 };
 
+struct DatumTopologyHitResolution {
+    DatumTopologyResolutionStatus status = DatumTopologyResolutionStatus::NotFound;
+    std::string referenceId;
+    std::size_t transientIndex = 0;
+    double distanceMm = 0.0;
+};
+
 class DatumTopologyResolver final {
 public:
     // Captures faces first, then edges and vertices. Parent IDs describe
@@ -48,6 +55,20 @@ public:
         const DatumTopologyReference& reference,
         const std::string& currentObjectId,
         const TopoDS_Shape& currentShape,
+        const DatumTopologyResolveOptions& options = {});
+
+    // Maps an exact renderer hit in object-local millimetres to a unique
+    // persisted reference. Transient ordering is used only to pair candidates
+    // created during this call with their OCCT subshapes, never to identify a
+    // stored reference.
+    [[nodiscard]] static DatumTopologyHitResolution resolveHitAtPoint(
+        const std::vector<DatumTopologyReference>& references,
+        const std::string& objectId,
+        const TopoDS_Shape& shape,
+        DatumSubshapeType subshapeType,
+        const Vector3& localPointMm,
+        const std::optional<Vector3>& localNormal = std::nullopt,
+        double toleranceMm = 1.0,
         const DatumTopologyResolveOptions& options = {});
 };
 

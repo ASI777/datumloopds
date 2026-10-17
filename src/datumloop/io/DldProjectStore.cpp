@@ -1,4 +1,5 @@
 #include "datumloop/io/DldProjectStore.hpp"
+#include "datumloop/topology/DatumTopologyResolver.hpp"
 
 #include "datumloop/geometry/OcctKernel.hpp"
 
@@ -14,6 +15,7 @@
 #include <QJsonObject>
 #include <QSaveFile>
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -431,7 +433,7 @@ DatumDocument decodeProject(const QJsonObject& root)
         }
         TopoDS_Shape shape = decodeShape(geometryValue.toObject(), name);
         const DatumObject& loaded = document.addObject(toUtf8(id), toUtf8(name), std::move(shape), position,
-                                                       std::move(parentId));
+                                                       std::move(parentId), false);
         for (auto& [key, value] : properties) {
             document.setProperty(loaded.id, key, std::move(value));
         }
@@ -439,8 +441,8 @@ DatumDocument decodeProject(const QJsonObject& root)
 
     const QJsonValue referencesValue = root.value(QStringLiteral("topologyReferences"));
     if (schemaNumber == 1.0 && referencesValue.isUndefined()) {
-        // Schema 1 had no persistent topology references. Treat this as an
-        // empty collection and upgrade in memory; the next save writes v2.
+        // Schema 1 had no stored topology references. Generate initial
+        // object-level references below and write them on the next v2 save.
     } else {
         if (!referencesValue.isArray()) {
             fail(QStringLiteral("Project topologyReferences must be an array."));
@@ -450,6 +452,18 @@ DatumDocument decodeProject(const QJsonObject& root)
                 fail(QStringLiteral("Project topology reference entry is invalid."));
             }
             (void)document.addTopologyReference(decodeTopologyReference(referenceValue.toObject()));
+        }
+    }
+    for (const DatumObject& object : document.objects()) {
+        const bool hasObjectTopologyReferences = std::any_of(
+            document.topologyReferences().begin(), document.topologyReferences().end(),
+            [&object](const DatumTopologyReference& reference) {
+                return reference.objectId == object.id && !reference.featureId.has_value();
+            });
+        if (!hasObjectTopologyReferences) {
+            for (DatumTopologyReference& reference : DatumTopologyResolver::captureAll(object.id, object.shape)) {
+                (void)document.addTopologyReference(std::move(reference));
+            }
         }
     }
     document.markSaved();

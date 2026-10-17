@@ -51,9 +51,9 @@ references, rotations, and simulation state remain unsupported; see
 presented a frame; run it from a desktop session with a working graphics
 display. `make native-qml-smoke` verifies QML and OCCT-derived viewport data
 initialization in headless environments; it does not verify 3D rendering. The
-`make native-pointer-smoke` uses XTest under Xvfb to exercise viewport picking,
-camera navigation, and the Move cancel/confirm/undo/redo workflow. The app can
-also be built and run without FreeCAD.
+`make native-pointer-smoke` uses XTest under Xvfb to exercise object and face
+picking, camera navigation, and the Move cancel/confirm/undo/redo workflow. The
+app can also be built and run without FreeCAD.
 
 ## Exact geometry backends
 

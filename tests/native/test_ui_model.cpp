@@ -4,7 +4,9 @@
 #include <QCoreApplication>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QVector3D>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -34,7 +36,7 @@ int main(int argc, char* argv[])
         const std::string objectId = part.id;
         const std::string secondObjectId = document.createBox("Second Block", {10.0, 8.0, 6.0}).id;
         datumloop::DocumentViewModel model(&document);
-        datumloop::PickingService picking(&model);
+        datumloop::PickingService picking(&model, &document);
 
         require(model.rowCount() == 2, "outliner model did not expose its document objects");
         require(model.selectedRow() == 0, "the first document object was not selected");
@@ -52,6 +54,39 @@ int main(int argc, char* argv[])
                 "picking service accepted an unknown object id");
         require(model.selectedObjectId() == QString::fromStdString(secondObjectId),
                 "an unresolved hit changed document selection");
+
+        for (const auto& [type, label] : {
+                 std::pair{datumloop::DatumSubshapeType::Face, QStringLiteral("Face")},
+                 std::pair{datumloop::DatumSubshapeType::Edge, QStringLiteral("Edge")},
+                 std::pair{datumloop::DatumSubshapeType::Vertex, QStringLiteral("Vertex")}}) {
+            const auto reference = std::find_if(
+                document.topologyReferences().begin(), document.topologyReferences().end(),
+                [&objectId, type](const auto& candidate) {
+                    return candidate.objectId == objectId && candidate.subshapeType == type;
+                });
+            require(reference != document.topologyReferences().end(),
+                    "new object did not receive persistent subshape identities");
+            picking.setSelectionMode(label);
+            const auto& point = reference->geometrySignature.centroidMm;
+            const auto normal = reference->geometrySignature.direction.value_or(
+                datumloop::Vector3{0.0, 0.0, 1.0});
+            require(picking.resolveSubshapeHit(
+                        QString::fromStdString(objectId),
+                        QVector3D(static_cast<float>(point[0]), static_cast<float>(point[1]), static_cast<float>(point[2])),
+                        QVector3D(static_cast<float>(normal[0]), static_cast<float>(normal[1]), static_cast<float>(normal[2])),
+                        0.5),
+                    "picking service did not resolve a face, edge, or vertex hit");
+            require(model.selectedTopologyReferenceId() == QString::fromStdString(reference->id) &&
+                        model.selectedType() == QStringLiteral("OCCT B-Rep %1").arg(label),
+                    "subshape picking did not expose its persistent identity and type");
+        }
+        picking.setSelectionMode(QStringLiteral("Object"));
+        require(picking.resolveObjectHit(QString::fromStdString(objectId)) &&
+                    model.selectedTopologyReferenceId().isEmpty() &&
+                    model.selectedType() == QStringLiteral("OCCT B-Rep Solid"),
+                "object selection did not clear the subshape selection");
+        require(picking.resolveObjectHit(QString::fromStdString(secondObjectId)),
+                "could not restore the second object selection for command tests");
 
         model.beginMove();
         model.setMoveAxis(QStringLiteral("Z"));
@@ -103,12 +138,14 @@ int main(int argc, char* argv[])
         require(!model.dirty(), "opening a saved project should reset dirty state");
         require(model.rowCount() == 2 && model.selectedRow() == 0,
                 "opening a project did not reset the outliner model and selection");
+        require(model.selectedTopologyReferenceId().isEmpty(),
+                "opening a project retained the previous subshape selection");
         require(!model.canUndo() && !model.canRedo(),
                 "opening a project retained commands from the prior document");
         require(close(static_cast<float>(document.object(secondObjectId)->position[1]), -3.25F),
                 "view-model open did not restore saved exact-document placement");
 
-        std::cout << "Native DatumLoop UI model checks passed: stable-id picking, constrained preview, cancel, validation, commit, undo/redo, and project save/open.\n";
+        std::cout << "Native DatumLoop UI model checks passed: object/face/edge/vertex identity selection, constrained preview, cancel, validation, commit, undo/redo, and project save/open.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native DatumLoop UI model check failed: " << error.what() << '\n';

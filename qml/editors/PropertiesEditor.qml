@@ -20,7 +20,7 @@ Item {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 70
+            Layout.preferredHeight: documentModel.selectedTopologyReferenceId.length > 0 ? 90 : 70
             radius: editor.theme.panelRadius
             color: editor.theme.surfaceSecondary
             border.color: editor.theme.borderSubtle
@@ -31,6 +31,15 @@ Item {
                 spacing: editor.theme.space1
                 Text { text: documentModel.selectedName; color: editor.theme.textPrimary; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeHeading; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
                 Text { text: documentModel.selectedType; color: editor.theme.textMuted; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall }
+                Text {
+                    visible: documentModel.selectedTopologyReferenceId.length > 0
+                    text: "Ref · " + documentModel.selectedTopologyReferenceId
+                    color: editor.theme.textMuted
+                    font.family: editor.theme.fontFamily
+                    font.pixelSize: editor.theme.fontSizeSmall - 1
+                    elide: Text.ElideMiddle
+                    Layout.fillWidth: true
+                }
             }
         }
 

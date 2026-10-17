@@ -2,10 +2,13 @@
 
 #include "datumloop/core/DatumUuid.hpp"
 #include "datumloop/geometry/OcctKernel.hpp"
+#include "datumloop/topology/DatumTopologyResolver.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 namespace datumloop {
@@ -79,7 +82,8 @@ const DatumObject& DatumDocument::addObject(std::string id,
                                             std::string name,
                                             TopoDS_Shape shape,
                                             const Vector3& position,
-                                            std::optional<std::string> parentId)
+                                            std::optional<std::string> parentId,
+                                            bool captureTopologyReferences)
 {
     if (!isDatumUuid(id)) {
         throw std::invalid_argument("object id must be a UUID");
@@ -115,7 +119,31 @@ const DatumObject& DatumDocument::addObject(std::string id,
     if (!object.metrics.valid) {
         throw std::invalid_argument("object shape must be a valid OCCT B-Rep");
     }
+    std::vector<DatumTopologyReference> generatedReferences;
+    if (captureTopologyReferences) {
+        generatedReferences = DatumTopologyResolver::captureAll(object.id, object.shape);
+        std::unordered_set<std::string> reservedIds;
+        reservedIds.reserve(1 + objects_.size() + topologyReferences_.size() + generatedReferences.size());
+        reservedIds.insert(projectId_);
+        reservedIds.insert(object.id);
+        for (const DatumObject& existing : objects_) {
+            reservedIds.insert(existing.id);
+        }
+        for (const DatumTopologyReference& existing : topologyReferences_) {
+            reservedIds.insert(existing.id);
+        }
+        for (const DatumTopologyReference& reference : generatedReferences) {
+            if (!reservedIds.insert(reference.id).second) {
+                throw std::runtime_error("generated topology reference UUID is not unique within the document");
+            }
+        }
+    }
+    objects_.reserve(objects_.size() + 1);
+    topologyReferences_.reserve(topologyReferences_.size() + generatedReferences.size());
     objects_.push_back(std::move(object));
+    topologyReferences_.insert(topologyReferences_.end(),
+                               std::make_move_iterator(generatedReferences.begin()),
+                               std::make_move_iterator(generatedReferences.end()));
     ++revision_;
     dirty_ = true;
     return objects_.back();

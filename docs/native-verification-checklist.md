@@ -11,8 +11,12 @@ OCCT version, and graphics backend before running the checks.
 
 - Launch `DatumLoopDS` without FreeCAD installed or on `PATH`; confirm the
   native window presents and the OCCT-derived solid is visible.
-- Orbit, pan, zoom, and select the solid. Confirm the Outliner and Properties
-  selection follows the viewport pick.
+- Orbit, pan, and zoom. Select the solid in Object mode, then select a face,
+  edge, and vertex. Confirm the Properties editor shows the subshape type and
+  topology UUID while the Outliner retains the owning object.
+- Save and reopen the project, then reselect the same unchanged subshape. Confirm
+  its topology UUID is unchanged. Confirm an ambiguous match reports unresolved
+  instead of selecting by an enumeration index.
 - Start Move, preview each axis, enter a finite distance, cancel, then repeat
   and commit. Confirm undo and redo restore the displayed placement and
   property values.

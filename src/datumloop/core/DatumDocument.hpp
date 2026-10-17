@@ -44,7 +44,8 @@ public:
                                               std::string name,
                                               TopoDS_Shape shape,
                                               const Vector3& position = {0.0, 0.0, 0.0},
-                                              std::optional<std::string> parentId = std::nullopt);
+                                              std::optional<std::string> parentId = std::nullopt,
+                                              bool captureTopologyReferences = true);
     [[nodiscard]] const std::vector<DatumObject>& objects() const noexcept { return objects_; }
     [[nodiscard]] const std::vector<DatumTopologyReference>& topologyReferences() const noexcept
     {

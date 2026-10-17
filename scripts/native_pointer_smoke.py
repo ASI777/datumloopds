@@ -121,6 +121,7 @@ def collect_targets(lines: queue.Queue[str], process: subprocess.Popen[str]) -> 
     targets: dict[str, tuple[int, int]] = {}
     needed = {
         "cadViewport",
+        "selectionModeFaceButton",
         "moveAxisZButton",
         "moveDistanceField",
         "cancelMoveButton",
@@ -176,6 +177,8 @@ def main() -> int:
         pointer.click(*targets["cadViewport"])
         pointer.drag(*targets["cadViewport"], 28, 9, 2)
         pointer.wheel_up(*targets["cadViewport"])
+        pointer.click(*targets["selectionModeFaceButton"])
+        pointer.click(*targets["cadViewport"])
         # Start a constrained move with the visible viewport axis control.
         pointer.click(*targets["moveAxisZButton"])
         pointer.click(*targets["moveDistanceField"])
@@ -198,6 +201,7 @@ def main() -> int:
         reader.join(timeout=1.0)
         if return_code != 0:
             return return_code
+        print("XTest pointer smoke passed: object/face pick, camera navigation, and Move cancel/confirm/undo/redo.")
         return 0
     except Exception as error:
         print(f"Native pointer smoke failed: {error}", file=sys.stderr)

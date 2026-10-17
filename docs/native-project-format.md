@@ -80,8 +80,10 @@ replaces its document and clears the old command history. A failed load leaves
 the open document untouched. Saving uses `QSaveFile`; the document becomes
 clean only after the atomic file commit succeeds.
 
-Schema version 2 migrates version 1 projects by adding an empty topology
-reference collection. Unknown schema versions are rejected. Version 2 still
+Schema version 2 migrates version 1 projects by capturing initial face, edge,
+and vertex references from each exact B-Rep object. On load, an object missing
+object-level topology references receives an initial set. Unknown schema
+versions are rejected. Version 2 still
 does **not** implement parametric feature definitions, object-to-object
 references, rotational transforms, assemblies, engineering entities, simulation
 state, or a general migration framework. The per-object `featureDefinitions`
@@ -95,5 +97,6 @@ payloads into assets.
 
 The tests cover exact-shape round-trip, UUID identity, hierarchy, translation,
 all four property types, dirty tracking, schema-v1 migration, face/edge/vertex
-reference resolution, ambiguity rejection, parent relationships, display
-tessellation regeneration, and rejection of unsupported or malformed data.
+reference resolution and point picking, ambiguity rejection, parent
+relationships, display tessellation regeneration, and rejection of unsupported
+or malformed data.
