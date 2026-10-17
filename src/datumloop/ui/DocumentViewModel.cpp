@@ -37,6 +37,12 @@ int DocumentViewModel::rowCount(const QModelIndex& parent) const
     return static_cast<int>(document_->objects().size());
 }
 
+QString DocumentViewModel::selectedObjectId() const
+{
+    const DatumObject* object = selectedObject();
+    return object == nullptr ? QString{} : QString::fromStdString(object->id);
+}
+
 QVariant DocumentViewModel::data(const QModelIndex& modelIndex, int role) const
 {
     if (document_ == nullptr || !modelIndex.isValid() || modelIndex.row() < 0 ||
@@ -151,6 +157,23 @@ void DocumentViewModel::selectRow(int row)
     if (moveActive_) {
         cancelMove();
     }
+}
+
+bool DocumentViewModel::selectObjectId(const QString& objectId)
+{
+    if (document_ == nullptr || objectId.isEmpty()) {
+        return false;
+    }
+    const std::string stableId = objectId.toStdString();
+    const auto& objects = document_->objects();
+    const auto found = std::find_if(objects.begin(), objects.end(), [&](const DatumObject& object) {
+        return object.id == stableId;
+    });
+    if (found == objects.end()) {
+        return false;
+    }
+    selectRow(static_cast<int>(std::distance(objects.begin(), found)));
+    return true;
 }
 
 void DocumentViewModel::beginMove()

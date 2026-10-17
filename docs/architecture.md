@@ -1,25 +1,31 @@
 # Architecture and Migration
 
-## Current compatibility stack
+## Application architecture
 
-The existing application shell runs as a FreeCAD workbench. FreeCAD currently
-owns document lifecycle, the center viewport, `.FCStd` persistence, GUI
-selection, and the host undo stack. The repository owns project metadata,
-workbench panels, exact-geometry adapters, and engineering services. The
-`datumloopds.geometry` OCCT adapter wraps FreeCAD's `Part` API; the optional
-SMLib adapter is independent of FreeCAD. See the direct dependency inventory in
-[`native-migration-dependencies.md`](native-migration-dependencies.md).
+The standalone C++20 / Qt 6 application with direct OCCT APIs is DatumLoop DS's
+primary architecture. It owns its native workspace, document objects, stable
+object IDs, selection, and commands. Exact `TopoDS_Shape` values remain in the
+native document; the viewport receives derived display triangles. Native
+project persistence and higher-level engineering workflows are not implemented
+yet.
+
+FreeCAD is retained as a compatibility subsystem for the existing Python
+workbench and `.FCStd` projects. It owns document lifecycle, its center
+viewport, GUI selection, and host undo on that path. The `datumloopds.geometry`
+OCCT adapter wraps FreeCAD's `Part` API. Those Python modules do not form a
+runtime dependency of the standalone executable. See the direct dependency
+inventory in [`native-migration-dependencies.md`](native-migration-dependencies.md).
 
 Solver processes run in isolated, pinned environments. They communicate through
 versioned JSON-RPC over standard input and output; they never mutate a live
 application document.
 
-The FreeCAD GUI thread owns document changes. Workers return outputs and
-proposed changes; the GUI applies accepted changes as undoable transactions.
-Geometry adapters operate on exact shapes only. They do not create documents,
-touch the FreeCAD GUI, or change undo/redo state. Kernel-native values remain
-behind `GeometryShape`; portable bounds, vectors, and tessellation values cross
-the adapter boundary.
+Each host keeps document mutation on its GUI thread. The native UI applies
+accepted commands to the native document; the FreeCAD compatibility UI uses
+undoable FreeCAD transactions. Geometry adapters operate on exact shapes only.
+They do not create documents, touch a host GUI, or change undo/redo state.
+Kernel-native Python values remain behind `GeometryShape`; portable bounds,
+vectors, and tessellation values cross that adapter boundary.
 
 ## Geometry kernels
 
@@ -90,45 +96,60 @@ triangle counts as approximate display comparisons.
 
 ## Native target architecture
 
-The standalone application is being built with C++20, Qt 6 Quick/QML, a
-DatumLoop-owned workspace and editor model, and direct OCCT geometry APIs. The
-native core will own documents, stable object identities, commands and undo,
-selection, engineering metadata, and `.dld` persistence. The viewport renderer
-will display tessellation derived from exact OCCT shapes; that render mesh will
-not replace the exact B-Rep. SMLib remains an optional secondary geometry
-backend. FreeCAD remains behind the compatibility/migration boundary until
-native project and engineering workflows provide equivalent functionality.
+The standalone application uses C++20, Qt 6 Quick/QML, and direct OCCT APIs.
+`DatumDocument` owns each exact `TopoDS_Shape`, stable object identity, shape
+metrics, and object placement. `DocumentViewModel` exposes the native outliner,
+selection, camera framing, and previewable move command with undo and redo. The
+document format and long-term persistence layer are still open work.
+
+QML composes `DatumWorkspace`, `DatumArea`, reusable `DatumRegion` and
+`DatumEditor` bases, and a common `EditorHost`. The Design area loads explicit
+Outliner, Viewport, and Properties editors. The viewport implementation is
+behind `IViewportRenderer`; its current `QtQuick3DRenderer` adapter forwards
+only `TriangleMesh` display data. The exact B-Rep stays in the document and is
+not reconstructed from that mesh. `PickingService` maps a renderer hit to the
+selected document object by stable ID. Picking is currently object-level;
+persistent face, edge, and vertex references remain future work.
+
+SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
+in the compatibility subsystem and is not linked into the standalone native
+application.
 
 ```text
-Qt Quick / QML
+Qt Quick / QML workspace and editor components
     |
-DatumLoop workspace, editors, tools
+EditorHost -> Outliner / Viewport / Properties
     |
-Commands and view models
+Commands, PickingService, and DocumentViewModel
     |
-DatumLoop document and engineering core
+DatumDocument (stable IDs, exact TopoDS_Shape, placement)
+    |                                      \
+OCCT primary geometry                  optional SMLib adapter
     |
-OCCT primary geometry API ---- SMLib optional adapter
-    |
-Renderer and solver jobs
+TriangleMesh -> IViewportRenderer -> Qt Quick 3D display adapter
+
+FreeCAD Python workbench -> separate compatibility path
 ```
 
-The first implementation slice is limited to the Design workspace, a minimal
-document with one exact OCCT solid, resizable Viewport/Outliner/Properties
-editors, selection, basic camera navigation, and a previewable modal move
-command. Further editors and engineering workflows follow only after this slice
-has a runnable native executable and tests.
+The current implementation slice provides the Design workspace, an exact OCCT
+solid, resizable Viewport/Outliner/Properties editors, stable-ID object
+selection, basic camera navigation, and a previewable Move command. The
+renderer boundary, display-mesh architecture check, native independence check,
+and pointer-driven UI check are included. The native and compatibility checks
+for this slice pass. Further editors and engineering workflows are later work.
 
 ### Current native implementation status
 
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
-derives its display triangles, and loads the Qt Quick Design workspace without
-loading FreeCAD. Core and UI-model tests cover geometry measures, stable object
-IDs, preview/cancel/commit behavior, input validation, and move undo/redo. The
-headless QML smoke loads the component tree and OCCT display data. The offscreen
-platform cannot render Qt Quick 3D, so the frame smoke uses Xvfb; it presented
-three frames and visual inspection confirmed the solid and editor layout. A
-separate pointer-level interaction check is still pending.
+derives its display triangles, and loads the decomposed Qt Quick Design
+workspace without loading FreeCAD. Core and UI-model checks cover geometry
+measures, stable-ID picking, preview/cancel/commit behavior, input validation,
+and move undo/redo. The headless QML smoke checks the common host and all three
+editor components. `make native-independence-check` finds no FreeCAD, Coin, or
+SoQt dynamic dependencies or native include bindings. The offscreen platform
+cannot render Qt Quick 3D; Xvfb presents the app and the XTest pointer smoke
+checks viewport picking, camera orbit and zoom, and Move cancel/confirm/undo/redo.
+Hardware-GPU behavior remains unverified.
 
 ## Legacy FreeCAD shell
 
@@ -157,7 +178,7 @@ but those do not complete the branded application gate by themselves.
 
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
-  FreeCAD or PySide.
+  FreeCAD, Coin, SoQt, or PySide.
 - The native document will own its stable IDs, geometry, commands, and future
   `.dld` persistence. The previous FreeCAD document model remains the
   compatibility path until native import/export and project workflows are

@@ -40,6 +40,15 @@ int main()
         const datumloop::TriangleMesh mesh = datumloop::OcctKernel::tessellate(part.shape);
         require(mesh.triangleCount() > 0, "exact OCCT shape did not produce display triangles");
         require(mesh.vertices.size() == mesh.triangleCount() * 3, "display mesh is not a triangle list");
+        const double authoritativeVolume = part.metrics.volume;
+        const datumloop::TriangleMesh disposableDisplayMesh{};
+        require(disposableDisplayMesh.triangleCount() == 0,
+                "display mesh should be disposable independently of the exact shape");
+        const datumloop::TriangleMesh regeneratedMesh = datumloop::OcctKernel::tessellate(part.shape);
+        require(regeneratedMesh.triangleCount() == mesh.triangleCount(),
+                "display mesh could not be regenerated from the authoritative exact shape");
+        require(close(part.metrics.volume, authoritativeVolume),
+                "display tessellation changed exact-shape volume metrics");
 
         datumloop::CommandHistory history;
         history.execute(document, std::make_unique<datumloop::MoveObjectCommand>(

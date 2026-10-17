@@ -11,25 +11,31 @@
 
 ## Geometry and migration status
 
-- The Python geometry contract defines portable shape/value types, capabilities, typed unsupported-operation errors, and backend adapters. Its FreeCAD Part adapter remains the legacy CAD path. The native C++ application uses direct OCCT APIs as its long-term primary geometry path; SMLib remains optional.
+- The Python geometry contract defines portable shape/value types, capabilities, typed unsupported-operation errors, and backend adapters. Its FreeCAD Part adapter remains the compatibility CAD path. The native C++ application with direct OCCT APIs is the primary architecture; SMLib remains optional.
 - Exact cross-kernel conversion goes through STEP. Tessellation remains a display and analysis representation, not an exact modeling source.
 - The deterministic seven-case OCCT / SMLib benchmark matched volume, area, bounds, center of mass, and validity tolerances in all seven cases for FreeCAD 1.1.1 / SMLib 0.3.4. Exact topology counts are reported separately because the kernels may split the same geometry differently. See [the comparison report](../reports/geometry-benchmark/comparison.md) and its JSON reports.
-- The native C++/Qt 6 application builds and runs without FreeCAD. Its current Design slice creates an exact OCCT solid, shows it in the native viewport, and provides resizable Viewport / Outliner / Properties editors, selection, camera navigation, and a previewable Move command. The native migration document records the remaining work.
+- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates an exact OCCT solid, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object picks through stable IDs, and supports camera navigation and a previewable Move command. Display triangles remain derived from the exact shape. Native project persistence and persistent subshape selection are not implemented.
 
 ## Checks run
 
-- `make check` — 16 tests run, 15 pass, and the optional real SMLib integration test is skipped when smlibpy is absent from the default Python environment. The SMLib-enabled suite passes all 16 tests, including STEP and USD B-Rep round trips.
-- `make freecad-check` — project save/reopen and OCCT geometry operations pass in the installed FreeCADCmd 1.1.1 baseline.
-- `scripts/check-freecad-core.sh` against the fork's FreeCAD 1.1.3 FreeCADCmd — geometry operations and project save/reopen pass.
-- `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, all three docks, project metadata, and a valid Part box fitted into the central viewport pass under Xvfb with software OpenGL. This verifies the GUI viewport path; pointer-driven navigation and hardware-GPU behavior have not been separately tested.
+- `make native-check` — the app and both C++ test targets build; CTest passes 2/2.
+- `make native-qml-smoke` — workspace, common host, three editors, and OCCT-derived mesh data initialize. Qt Quick 3D cannot render in the offscreen plugin, as expected.
+- `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings.
+- `xvfb-run ... make native-smoke` — passes and presents five frames with software OpenGL. Visual inspection confirms the solid and editor layout.
+- `make native-pointer-smoke` — XTest clicks the viewport to select the solid, orbits and zooms the camera, then exercises Move cancel, confirm, undo, and redo.
+- `make check` — 18 tests run: 17 pass and the optional smlibpy integration test is skipped because smlibpy is not installed in the default Python environment. The SMLib-enabled suite previously passed all 16 integration tests, including STEP and USD B-Rep round trips.
+- `make freecad-check` — the FreeCAD 1.1.3 command-line compatibility smoke passes geometry operations and project save/reopen.
+- `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, docks, project metadata, and a visible viewport solid pass under Xvfb with software OpenGL.
 - The Release build compiled all targets from the FreeCAD fork's existing configured build tree and installed into a temporary prefix. A fresh configure has not been confirmed: rerunning CMake with the current Python 3.14 interpreter stops in the Pivy compatibility check because that interpreter cannot import Pivy. No system package or user installation was changed.
-- `make native-check`, `make native-qml-smoke`, and the native Xvfb frame smoke pass. The native app's solid and editor layout were visually inspected; pointer-level interaction automation is still pending.
 - `make build` builds the Python wheel. `make geometry-benchmark` completes the seven OCCT / SMLib comparisons within the documented measurement tolerances.
+- CMake still warns that some Qt QML plugin link targets are unavailable in the current scope; the application builds, loads its QML, and presents frames. The offscreen platform still cannot verify 3D rendering.
 
 ## Remaining work
 
 - Repeat the FreeCAD 1.1.3 configure and build from an empty build directory with matching Pivy, yaml-cpp, and other development dependencies, so the pinned fork's build is reproducible from a clean checkout.
-- Add automated pointer-level checks for the native viewport and modal move workflow.
+- Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
+- Implement native project persistence, persistent topology references, and engineering workflows before replacing corresponding compatibility paths.
+- Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.
 - Continue replacing FreeCAD-owned document, selection, command, and persistence behavior with tested native equivalents before retiring the compatibility workbench.
 
 ## Existing machine-part study

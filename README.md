@@ -1,16 +1,16 @@
 # DatumLoop DS
 
 DatumLoop DS is an open-source engineering application for designing and
-evaluating industrial mechanisms. The current Python workbench and geometry
-adapters run inside FreeCAD. The product is moving toward a standalone Qt 6 / QML
-application with DatumLoop-owned documents and commands and OCCT as its primary
-exact-geometry kernel. The FreeCAD workbench remains available as a compatibility
-and migration path until native workflows replace it.
+evaluating industrial mechanisms. Its primary architecture is a standalone
+C++20 / Qt 6 / QML application with DatumLoop-owned documents and commands and
+OCCT as its exact-geometry kernel. The FreeCAD Python workbench and geometry
+adapters remain available as a compatibility and migration path for existing
+`.FCStd` projects.
 
 ## Status
 
-The repository contains the FreeCAD compatibility workbench, geometry adapters,
-and the new native C++/Qt application slice. The public [DatumLoop DS repository](https://github.com/ASI777/datumloopds)
+The repository contains the native C++/Qt application and the retained FreeCAD
+compatibility workbench and Python geometry adapters. The public [DatumLoop DS repository](https://github.com/ASI777/datumloopds)
 contains both paths. The
 public [FreeCAD fork](https://github.com/ASI777/FreeCAD) and
 [smlibpy fork](https://github.com/ASI777/smlibpy) are available. The FreeCAD
@@ -36,6 +36,7 @@ Build and run the native application and its C++ core and UI-model checks with:
 
 ```sh
 make native-check
+make native-independence-check
 ./build/native/apps/datumloop-desktop/DatumLoopDS
 ```
 
@@ -43,7 +44,9 @@ make native-check
 presented a frame; run it from a desktop session with a working graphics
 display. `make native-qml-smoke` verifies QML and OCCT-derived viewport data
 initialization in headless environments; it does not verify 3D rendering. The
-app can also be built and run without FreeCAD.
+`make native-pointer-smoke` uses XTest under Xvfb to exercise viewport picking,
+camera navigation, and the Move cancel/confirm/undo/redo workflow. The app can
+also be built and run without FreeCAD.
 
 ## Exact geometry backends
 
@@ -67,9 +70,9 @@ python -m pip install '.[smlib]'
 
 Convert exact shapes between adapters through STEP with
 `datumloopds.geometry.convert_shape`; the conversion can change tolerances or
-topology and should be revalidated. FreeCAD owns document mutation in the GUI
-thread as before. The adapters themselves operate on shapes and do not mutate
-live documents.
+topology and should be revalidated. On the compatibility path, FreeCAD owns
+document mutation in its GUI thread. The adapters themselves operate on shapes
+and do not mutate live documents.
 
 Run the seven fixed comparison cases and write JSON plus Markdown reports with:
 
@@ -130,10 +133,13 @@ installation.
 - `docs/` — architecture and milestone decisions.
 - `tests/` — repeatable checks; the FreeCADCmd smoke also exercises real OCCT
   modeling operations without changing a project document.
-- `qml/` — native application workspaces, editor components, and design tokens.
+- `qml/` — native application workspaces, common editor hosts, viewport/outliner/properties
+  editors, reusable controls, and design tokens.
 
 ## License
 
-New application modules are licensed under GPL-3.0-or-later. FreeCAD and future
-solver forks retain their upstream licenses and notices. See `LICENSE` and the
-license notices in each dependency repository.
+This repository currently declares GPL-3.0-or-later in `LICENSE` and package
+metadata. The project's intended license and contributor ownership need a
+product-owner decision before any license change. No files were relicensed for
+the native migration. See [`docs/licensing-strategy.md`](docs/licensing-strategy.md)
+and preserve upstream licenses and notices for FreeCAD and optional dependencies.

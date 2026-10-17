@@ -1,4 +1,5 @@
 #include "datumloop/ui/DocumentViewModel.hpp"
+#include "datumloop/ui/PickingService.hpp"
 
 #include <QCoreApplication>
 
@@ -29,25 +30,38 @@ int main(int argc, char* argv[])
         datumloop::DatumDocument document;
         const datumloop::DatumObject& part = document.createBox("Test Block", {20.0, 16.0, 12.0});
         const std::string objectId = part.id;
+        const std::string secondObjectId = document.createBox("Second Block", {10.0, 8.0, 6.0}).id;
         datumloop::DocumentViewModel model(&document);
+        datumloop::PickingService picking(&model);
 
-        require(model.rowCount() == 1, "outliner model did not expose its document object");
+        require(model.rowCount() == 2, "outliner model did not expose its document objects");
         require(model.selectedRow() == 0, "the first document object was not selected");
         require(model.data(model.index(0), datumloop::DocumentViewModel::ObjectIdRole).toString()
                     == QString::fromStdString(objectId),
                 "outliner model did not expose the stable object id");
+        require(model.selectedObjectId() == QString::fromStdString(objectId),
+                "view model did not expose selection identity");
+        require(picking.resolveObjectHit(QString::fromStdString(secondObjectId)),
+                "picking service did not resolve a hit by stable object id");
+        require(model.selectedObjectId() == QString::fromStdString(secondObjectId) &&
+                    model.selectedRow() == 1,
+                "resolved pick did not update the corresponding outliner selection");
+        require(!picking.resolveObjectHit(QStringLiteral("missing-object")),
+                "picking service accepted an unknown object id");
+        require(model.selectedObjectId() == QString::fromStdString(secondObjectId),
+                "an unresolved hit changed document selection");
 
         model.beginMove();
         model.setMoveAxis(QStringLiteral("Z"));
         model.setMoveValue(QStringLiteral("5.5"));
         require(model.moveActive(), "move preview did not enter the active state");
         require(close(model.displayPosition().z(), 5.5F), "move preview did not constrain the Z axis");
-        require(close(static_cast<float>(document.object(objectId)->position[2]), 0.0F),
+        require(close(static_cast<float>(document.object(secondObjectId)->position[2]), 0.0F),
                 "move preview mutated the document before confirmation");
         model.cancelMove();
         require(!model.moveActive(), "cancel did not exit the move tool");
         require(close(model.displayPosition().z(), 0.0F), "cancel did not remove the preview transform");
-        require(close(static_cast<float>(document.object(objectId)->position[2]), 0.0F),
+        require(close(static_cast<float>(document.object(secondObjectId)->position[2]), 0.0F),
                 "cancel changed the document position");
 
         model.beginMove();
@@ -61,18 +75,20 @@ int main(int argc, char* argv[])
         require(close(model.displayPosition().y(), -3.25F), "move preview did not constrain the Y axis");
         model.confirmMove();
         require(!model.moveActive(), "confirm did not exit the move tool");
-        require(close(static_cast<float>(document.object(objectId)->position[1]), -3.25F),
+        require(close(static_cast<float>(document.object(secondObjectId)->position[1]), -3.25F),
                 "confirm did not commit the move to the document");
+        require(close(static_cast<float>(document.object(objectId)->position[1]), 0.0F),
+                "stable-id selection moved a different document object");
         require(model.canUndo() && !model.canRedo(), "committed move history state is incorrect");
 
         model.undo();
-        require(close(static_cast<float>(document.object(objectId)->position[1]), 0.0F),
+        require(close(static_cast<float>(document.object(secondObjectId)->position[1]), 0.0F),
                 "view-model undo did not restore the original position");
         model.redo();
-        require(close(static_cast<float>(document.object(objectId)->position[1]), -3.25F),
+        require(close(static_cast<float>(document.object(secondObjectId)->position[1]), -3.25F),
                 "view-model redo did not restore the committed position");
 
-        std::cout << "Native DatumLoop UI model checks passed: selection identity, constrained preview, cancel, validation, commit, undo, and redo.\n";
+        std::cout << "Native DatumLoop UI model checks passed: stable-id picking, constrained preview, cancel, validation, commit, undo, and redo.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native DatumLoop UI model check failed: " << error.what() << '\n';

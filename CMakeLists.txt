@@ -29,6 +29,7 @@ target_compile_options(datumloop_core PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_ui STATIC
     src/datumloop/ui/DocumentViewModel.cpp
+    src/datumloop/ui/PickingService.cpp
 )
 target_include_directories(datumloop_ui PUBLIC src)
 target_link_libraries(datumloop_ui PUBLIC datumloop_core Qt6::Core Qt6::Gui)
@@ -47,8 +48,24 @@ qt_add_qml_module(DatumLoopDS
     QML_FILES
         qml/Main.qml
         qml/DesignSystem.qml
+        qml/controls/DlButton.qml
+        qml/controls/EditorHeading.qml
+        qml/workspace/DatumRegion.qml
+        qml/workspace/DatumEditor.qml
+        qml/workspace/EditorHost.qml
+        qml/workspace/DatumArea.qml
+        qml/workspace/DatumWorkspace.qml
+        qml/workspace/WorkspaceHeader.qml
+        qml/editors/ViewportEditor.qml
+        qml/editors/OutlinerEditor.qml
+        qml/editors/PropertiesEditor.qml
+        qml/panels/StatusBar.qml
 )
-target_include_directories(DatumLoopDS PRIVATE src)
+target_sources(DatumLoopDS PRIVATE
+    src/datumloop/ui/viewport/QtQuick3DRenderer.cpp
+    src/datumloop/ui/workspace/DatumEditorType.hpp
+)
+target_include_directories(DatumLoopDS PRIVATE src src/datumloop/ui/workspace)
 target_link_libraries(DatumLoopDS PRIVATE
     datumloop_ui
     Qt6::Core
