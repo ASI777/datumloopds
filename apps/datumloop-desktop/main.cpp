@@ -48,8 +48,6 @@ int main(int argc, char* argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("documentModel"), &documentModel);
     engine.rootContext()->setContextProperty(QStringLiteral("pickingService"), &pickingService);
-    engine.rootContext()->setContextProperty(
-        QStringLiteral("primaryObjectId"), QString::fromStdString(demoPart.id));
     engine.loadFromModule("DatumLoop.App", "Main");
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "DatumLoop QML root did not load.";
@@ -64,6 +62,17 @@ int main(int argc, char* argv[])
     }
     datumloop::QtQuick3DRenderer renderer(geometry);
     renderer.setDisplayMesh(displayMesh);
+    const auto updateSelectedDisplayMesh = [&]() {
+        const datumloop::DatumObject* selected =
+            document.object(documentModel.displayObjectId().toStdString());
+        renderer.setDisplayMesh(selected == nullptr
+                                    ? datumloop::TriangleMesh{}
+                                    : datumloop::OcctKernel::tessellate(selected->shape));
+    };
+    QObject::connect(&documentModel, &datumloop::DocumentViewModel::documentContentChanged,
+                     &app, updateSelectedDisplayMesh);
+    QObject::connect(&documentModel, &datumloop::DocumentViewModel::selectionChanged,
+                     &app, updateSelectedDisplayMesh);
 
     auto* window = qobject_cast<QQuickWindow*>(root);
     if (window == nullptr) {

@@ -34,6 +34,7 @@ public:
     void execute(DatumDocument& document, std::unique_ptr<DatumCommand> command);
     [[nodiscard]] bool undo(DatumDocument& document);
     [[nodiscard]] bool redo(DatumDocument& document);
+    void clear() noexcept;
     [[nodiscard]] bool canUndo() const noexcept { return cursor_ > 0; }
     [[nodiscard]] bool canRedo() const noexcept { return cursor_ < commands_.size(); }
 

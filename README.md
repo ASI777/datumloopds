@@ -40,6 +40,12 @@ make native-independence-check
 ./build/native/apps/datumloop-desktop/DatumLoopDS
 ```
 
+The native shell can open and save version-one `.dld` projects. The provisional
+format stores project/object UUIDs, hierarchy, typed scalar properties,
+translations in millimetres, and exact OCCT B-Rep shapes. It does not yet store
+parametric feature definitions, persistent topology references, rotations, or
+simulation state; see [`docs/native-project-format.md`](docs/native-project-format.md).
+
 `make native-smoke` starts the native window and verifies that Qt Quick
 presented a frame; run it from a desktop session with a working graphics
 display. `make native-qml-smoke` verifies QML and OCCT-derived viewport data
@@ -124,7 +130,7 @@ installation.
 ## Repository layout
 
 - `apps/datumloop-desktop/` — standalone Qt 6 application entry point.
-- `src/datumloop/` — native DatumLoop core, document, workspace, OCCT, and UI models.
+- `src/datumloop/` — native DatumLoop core, document I/O, workspace, OCCT, and UI models.
 - `src/datumloopds/` — Python project metadata and retained FreeCAD compatibility code.
 - `src/datumloopds/geometry/` — backend-neutral geometry values, capabilities,
   OCCT and optional SMLib adapters, exact STEP conversion, and benchmark fixtures.

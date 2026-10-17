@@ -2,6 +2,8 @@
 #include "datumloop/ui/PickingService.hpp"
 
 #include <QCoreApplication>
+#include <QTemporaryDir>
+#include <QUrl>
 
 #include <cmath>
 #include <iostream>
@@ -88,7 +90,25 @@ int main(int argc, char* argv[])
         require(close(static_cast<float>(document.object(secondObjectId)->position[1]), -3.25F),
                 "view-model redo did not restore the committed position");
 
-        std::cout << "Native DatumLoop UI model checks passed: stable-id picking, constrained preview, cancel, validation, commit, undo, and redo.\n";
+        QTemporaryDir temporaryDirectory;
+        require(temporaryDirectory.isValid(), "could not create a temporary project directory");
+        const QUrl projectUrl = QUrl::fromLocalFile(temporaryDirectory.filePath(QStringLiteral("ui-project.dld")));
+        model.saveProjectAs(projectUrl);
+        require(!model.dirty(), "successful view-model save did not update dirty state");
+        document.setName("Unsaved edit");
+        require(model.dirty(), "document edits were not reflected by the view model");
+        model.openProject(projectUrl);
+        require(model.projectName() == QStringLiteral("Untitled Mechanism"),
+                "opening a project did not restore the saved project name");
+        require(!model.dirty(), "opening a saved project should reset dirty state");
+        require(model.rowCount() == 2 && model.selectedRow() == 0,
+                "opening a project did not reset the outliner model and selection");
+        require(!model.canUndo() && !model.canRedo(),
+                "opening a project retained commands from the prior document");
+        require(close(static_cast<float>(document.object(secondObjectId)->position[1]), -3.25F),
+                "view-model open did not restore saved exact-document placement");
+
+        std::cout << "Native DatumLoop UI model checks passed: stable-id picking, constrained preview, cancel, validation, commit, undo/redo, and project save/open.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native DatumLoop UI model check failed: " << error.what() << '\n';

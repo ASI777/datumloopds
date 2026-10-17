@@ -4,10 +4,11 @@
 
 The standalone C++20 / Qt 6 application with direct OCCT APIs is DatumLoop DS's
 primary architecture. It owns its native workspace, document objects, stable
-object IDs, selection, and commands. Exact `TopoDS_Shape` values remain in the
-native document; the viewport receives derived display triangles. Native
-project persistence and higher-level engineering workflows are not implemented
-yet.
+object IDs, hierarchy, typed scalar properties, selection, commands, dirty
+tracking, and the provisional `.dld` project format. Exact `TopoDS_Shape` values
+remain in the native document; the viewport receives derived display triangles.
+Feature graphs, persistent topology, and higher-level engineering workflows
+remain later milestones.
 
 FreeCAD is retained as a compatibility subsystem for the existing Python
 workbench and `.FCStd` projects. It owns document lifecycle, its center
@@ -97,10 +98,14 @@ triangle counts as approximate display comparisons.
 ## Native target architecture
 
 The standalone application uses C++20, Qt 6 Quick/QML, and direct OCCT APIs.
-`DatumDocument` owns each exact `TopoDS_Shape`, stable object identity, shape
-metrics, and object placement. `DocumentViewModel` exposes the native outliner,
-selection, camera framing, and previewable move command with undo and redo. The
-document format and long-term persistence layer are still open work.
+`DatumDocument` owns each exact `TopoDS_Shape`, project and object UUIDs, object
+hierarchy, typed scalar properties, shape metrics, translation, dirty state, and
+revision count. `DldProjectStore` reads and writes the version-one `.dld`
+manifest using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates
+display tessellation after load. The `DocumentViewModel` provides Save/Open,
+resets history after a successful open, and exposes dirty state to the shell.
+See [`native-project-format.md`](native-project-format.md) for the supported
+fields and current limitations.
 
 QML composes `DatumWorkspace`, `DatumArea`, reusable `DatumRegion` and
 `DatumEditor` bases, and a common `EditorHost`. The Design area loads explicit
@@ -113,7 +118,9 @@ persistent face, edge, and vertex references remain future work.
 
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native
-application.
+application. Version 1 writes empty feature-definition and reference arrays;
+parametric features, persistent topology references, schema migrations,
+rotations, and engineering objects are not implemented.
 
 ```text
 Qt Quick / QML workspace and editor components
@@ -131,25 +138,28 @@ TriangleMesh -> IViewportRenderer -> Qt Quick 3D display adapter
 FreeCAD Python workbench -> separate compatibility path
 ```
 
-The current implementation slice provides the Design workspace, an exact OCCT
-solid, resizable Viewport/Outliner/Properties editors, stable-ID object
-selection, basic camera navigation, and a previewable Move command. The
-renderer boundary, display-mesh architecture check, native independence check,
-and pointer-driven UI check are included. The native and compatibility checks
-for this slice pass. Further editors and engineering workflows are later work.
+The native application provides the Design workspace, exact OCCT solids,
+resizable Viewport/Outliner/Properties editors, stable-ID object selection,
+basic camera navigation, previewable Move with undo/redo, and version-one `.dld`
+save/open. The renderer boundary, display-mesh architecture check, native
+independence check, and pointer-driven UI check are included. Further editors
+and engineering workflows are later work.
 
 ### Current native implementation status
 
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
-workspace without loading FreeCAD. Core and UI-model checks cover geometry
-measures, stable-ID picking, preview/cancel/commit behavior, input validation,
-and move undo/redo. The headless QML smoke checks the common host and all three
-editor components. `make native-independence-check` finds no FreeCAD, Coin, or
-SoQt dynamic dependencies or native include bindings. The offscreen platform
-cannot render Qt Quick 3D; Xvfb presents the app and the XTest pointer smoke
-checks viewport picking, camera orbit and zoom, and Move cancel/confirm/undo/redo.
+workspace without loading FreeCAD. Core, persistence, and UI-model checks cover
+geometry measures, `.dld` round-trip, typed properties, hierarchy, dirty state,
+stable-ID picking, preview/cancel/commit behavior, input validation, and move
+undo/redo. The headless QML smoke checks the common host and all three editor
+components. `make native-independence-check` finds no FreeCAD, Coin, or SoQt
+dynamic dependencies or native include bindings. The offscreen platform cannot
+render Qt Quick 3D; Xvfb presents the app and the XTest pointer smoke checks
+viewport picking, camera orbit and zoom, and Move cancel/confirm/undo/redo.
 Hardware-GPU behavior remains unverified.
+The manual native viewport and `.dld` verification procedure is in
+[`native-verification-checklist.md`](native-verification-checklist.md).
 
 ## Legacy FreeCAD shell
 
@@ -179,7 +189,7 @@ but those do not complete the branded application gate by themselves.
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
   FreeCAD, Coin, SoQt, or PySide.
-- The native document will own its stable IDs, geometry, commands, and future
+- The native document owns its stable IDs, geometry, commands, and version-one
   `.dld` persistence. The previous FreeCAD document model remains the
   compatibility path until native import/export and project workflows are
   verified.

@@ -1,5 +1,7 @@
 #include "datumloop/ui/DocumentViewModel.hpp"
 
+#include "datumloop/io/DldProjectStore.hpp"
+
 #include <QLocale>
 
 #include <algorithm>
@@ -17,6 +19,11 @@ QString vectorText(const Vector3& value)
 {
     return QStringLiteral("%1, %2, %3 mm")
         .arg(number(value[0]), number(value[1]), number(value[2]));
+}
+
+QString exceptionText(const std::exception& error)
+{
+    return QString::fromUtf8(error.what());
 }
 
 }  // namespace
@@ -41,6 +48,22 @@ QString DocumentViewModel::selectedObjectId() const
 {
     const DatumObject* object = selectedObject();
     return object == nullptr ? QString{} : QString::fromStdString(object->id);
+}
+
+QString DocumentViewModel::displayObjectId() const
+{
+    const DatumObject* object = selectedObject();
+    if (object == nullptr && document_ != nullptr && !document_->objects().empty()) {
+        object = &document_->objects().front();
+    }
+    return object == nullptr ? QString{} : QString::fromStdString(object->id);
+}
+
+QString DocumentViewModel::projectName() const
+{
+    return document_ == nullptr ? QStringLiteral("Untitled Mechanism")
+                                : QString::fromUtf8(document_->name().data(),
+                                                    static_cast<qsizetype>(document_->name().size()));
 }
 
 QVariant DocumentViewModel::data(const QModelIndex& modelIndex, int role) const
@@ -124,6 +147,9 @@ QString DocumentViewModel::selectedVolumeText() const
 QVector3D DocumentViewModel::displayPosition() const
 {
     const DatumObject* object = selectedObject();
+    if (object == nullptr && document_ != nullptr && !document_->objects().empty()) {
+        object = &document_->objects().front();
+    }
     if (object == nullptr) {
         return {};
     }
@@ -260,6 +286,7 @@ void DocumentViewModel::confirmMove()
     emit selectionChanged();
     emit displayPositionChanged();
     emit historyChanged();
+    emit projectChanged();
     statusText_ = QStringLiteral("Move committed  |  %1 %2 mm").arg(moveAxis_, number(distance));
     emit statusTextChanged();
 }
@@ -290,6 +317,7 @@ void DocumentViewModel::undo()
         emit selectionChanged();
         emit displayPositionChanged();
         emit historyChanged();
+        emit projectChanged();
         statusText_ = QStringLiteral("Undo  |  Move Object");
         emit statusTextChanged();
     }
@@ -305,6 +333,7 @@ void DocumentViewModel::redo()
         emit selectionChanged();
         emit displayPositionChanged();
         emit historyChanged();
+        emit projectChanged();
         statusText_ = QStringLiteral("Redo  |  Move Object");
         emit statusTextChanged();
     }
@@ -318,6 +347,74 @@ void DocumentViewModel::frameSelected()
     }
     emit frameSelectedRequested(displayPosition());
     statusText_ = QStringLiteral("Framed  |  %1").arg(QString::fromStdString(object->name));
+    emit statusTextChanged();
+}
+
+void DocumentViewModel::saveProject()
+{
+    if (document_ == nullptr) {
+        return;
+    }
+    if (projectPath_.isEmpty()) {
+        emit saveAsRequested();
+        return;
+    }
+    saveProjectAs(QUrl::fromLocalFile(projectPath_));
+}
+
+void DocumentViewModel::saveProjectAs(const QUrl& fileUrl)
+{
+    if (document_ == nullptr) {
+        return;
+    }
+    if (!fileUrl.isLocalFile() || fileUrl.toLocalFile().trimmed().isEmpty()) {
+        statusText_ = QStringLiteral("Choose a local .dld project path.");
+        emit statusTextChanged();
+        return;
+    }
+    const QString path = fileUrl.toLocalFile();
+    try {
+        DldProjectStore::save(*document_, path);
+        projectPath_ = path;
+        emit projectChanged();
+        statusText_ = QStringLiteral("Saved  |  %1").arg(path);
+    } catch (const std::exception& error) {
+        statusText_ = QStringLiteral("Save failed  |  %1").arg(exceptionText(error));
+    }
+    emit statusTextChanged();
+}
+
+void DocumentViewModel::openProject(const QUrl& fileUrl)
+{
+    if (document_ == nullptr) {
+        return;
+    }
+    if (!fileUrl.isLocalFile() || fileUrl.toLocalFile().trimmed().isEmpty()) {
+        statusText_ = QStringLiteral("Choose a local .dld project file.");
+        emit statusTextChanged();
+        return;
+    }
+    const QString path = fileUrl.toLocalFile();
+    try {
+        DatumDocument replacement = DldProjectStore::load(path);
+        if (moveActive_) {
+            cancelMove();
+        }
+        beginResetModel();
+        document_->replaceWith(std::move(replacement));
+        selectedRow_ = document_->objects().empty() ? -1 : 0;
+        history_.clear();
+        endResetModel();
+        projectPath_ = path;
+        emit projectChanged();
+        emit selectionChanged();
+        emit displayPositionChanged();
+        emit historyChanged();
+        emit documentContentChanged();
+        statusText_ = QStringLiteral("Opened  |  %1").arg(path);
+    } catch (const std::exception& error) {
+        statusText_ = QStringLiteral("Open failed  |  %1").arg(exceptionText(error));
+    }
     emit statusTextChanged();
 }
 

@@ -55,4 +55,10 @@ bool CommandHistory::redo(DatumDocument& document)
     return true;
 }
 
+void CommandHistory::clear() noexcept
+{
+    commands_.clear();
+    cursor_ = 0;
+}
+
 }  // namespace datumloop

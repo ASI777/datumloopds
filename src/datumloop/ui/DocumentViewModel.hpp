@@ -4,6 +4,7 @@
 #include "datumloop/core/DatumDocument.hpp"
 
 #include <QAbstractListModel>
+#include <QUrl>
 #include <QVector3D>
 
 namespace datumloop {
@@ -12,6 +13,7 @@ class DocumentViewModel final : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int selectedRow READ selectedRow NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedObjectId READ selectedObjectId NOTIFY selectionChanged)
+    Q_PROPERTY(QString displayObjectId READ displayObjectId NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedName READ selectedName NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedType READ selectedType NOTIFY selectionChanged)
     Q_PROPERTY(QString selectedPositionText READ selectedPositionText NOTIFY displayPositionChanged)
@@ -24,6 +26,8 @@ class DocumentViewModel final : public QAbstractListModel {
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
+    Q_PROPERTY(QString projectName READ projectName NOTIFY projectChanged)
+    Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
 
 public:
     enum Role {
@@ -44,6 +48,7 @@ public:
 
     [[nodiscard]] int selectedRow() const noexcept { return selectedRow_; }
     [[nodiscard]] QString selectedObjectId() const;
+    [[nodiscard]] QString displayObjectId() const;
     [[nodiscard]] QString selectedName() const;
     [[nodiscard]] QString selectedType() const;
     [[nodiscard]] QString selectedPositionText() const;
@@ -56,6 +61,8 @@ public:
     [[nodiscard]] QString statusText() const { return statusText_; }
     [[nodiscard]] bool canUndo() const noexcept { return history_.canUndo(); }
     [[nodiscard]] bool canRedo() const noexcept { return history_.canRedo(); }
+    [[nodiscard]] QString projectName() const;
+    [[nodiscard]] bool dirty() const noexcept { return document_ != nullptr && document_->isDirty(); }
 
     Q_INVOKABLE void selectRow(int row);
     Q_INVOKABLE bool selectObjectId(const QString& objectId);
@@ -67,6 +74,9 @@ public:
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void frameSelected();
+    Q_INVOKABLE void saveProject();
+    Q_INVOKABLE void saveProjectAs(const QUrl& fileUrl);
+    Q_INVOKABLE void openProject(const QUrl& fileUrl);
 
 signals:
     void selectionChanged();
@@ -75,6 +85,9 @@ signals:
     void statusTextChanged();
     void historyChanged();
     void frameSelectedRequested(const QVector3D& position);
+    void projectChanged();
+    void saveAsRequested();
+    void documentContentChanged();
 
 private:
     [[nodiscard]] const DatumObject* selectedObject() const noexcept;
@@ -90,6 +103,7 @@ private:
     QString statusText_ = QStringLiteral("Ready  |  Design workspace  |  mm");
     Vector3 previewDelta_{0.0, 0.0, 0.0};
     CommandHistory history_;
+    QString projectPath_;
 };
 
 }  // namespace datumloop

@@ -4,6 +4,8 @@ import QtQuick.Layouts
 
 Rectangle {
     id: header
+    signal openProjectRequested()
+    signal saveProjectRequested()
     property var theme
     Layout.preferredHeight: theme.headerHeight
     color: theme.surfacePrimary
@@ -52,7 +54,7 @@ Rectangle {
         Item { Layout.fillWidth: true }
 
         Text {
-            text: "Untitled Mechanism"
+            text: documentModel.projectName + (documentModel.dirty ? " •" : "")
             color: header.theme.textSecondary
             font.family: header.theme.fontFamily
             font.pixelSize: header.theme.fontSizeBody
@@ -65,10 +67,19 @@ Rectangle {
         }
         DlButton {
             theme: header.theme
+            text: "Open"
+            Layout.preferredWidth: 72
+            onClicked: header.openProjectRequested()
+            ToolTip.visible: hovered
+            ToolTip.text: "Open a native DatumLoop .dld project"
+        }
+        DlButton {
+            theme: header.theme
             text: "Save"
             Layout.preferredWidth: 72
+            onClicked: header.saveProjectRequested()
             ToolTip.visible: hovered
-            ToolTip.text: "Native project persistence is being added during migration"
+            ToolTip.text: "Save the native DatumLoop .dld project"
         }
     }
 }

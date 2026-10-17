@@ -47,7 +47,7 @@ Item {
         Model {
             id: solidModel
             objectName: "datumLoopExactSolid"
-            property string datumObjectId: primaryObjectId
+            property string datumObjectId: documentModel.displayObjectId
             geometry: ExactShapeGeometry {
                 id: cadGeometry
                 objectName: "cadGeometry"

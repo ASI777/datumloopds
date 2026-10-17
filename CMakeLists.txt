@@ -27,12 +27,19 @@ target_link_libraries(datumloop_core PUBLIC
 )
 target_compile_options(datumloop_core PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(datumloop_io STATIC
+    src/datumloop/io/DldProjectStore.cpp
+)
+target_include_directories(datumloop_io PUBLIC src)
+target_link_libraries(datumloop_io PUBLIC datumloop_core Qt6::Core)
+target_compile_options(datumloop_io PRIVATE -Wall -Wextra -Wpedantic)
+
 add_library(datumloop_ui STATIC
     src/datumloop/ui/DocumentViewModel.cpp
     src/datumloop/ui/PickingService.cpp
 )
 target_include_directories(datumloop_ui PUBLIC src)
-target_link_libraries(datumloop_ui PUBLIC datumloop_core Qt6::Core Qt6::Gui)
+target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io Qt6::Core Qt6::Gui)
 target_compile_options(datumloop_ui PRIVATE -Wall -Wextra -Wpedantic)
 
 qt_add_executable(DatumLoopDS
@@ -83,6 +90,10 @@ if(BUILD_TESTING)
     add_executable(datumloop-core-tests tests/native/test_core.cpp)
     target_link_libraries(datumloop-core-tests PRIVATE datumloop_core)
     add_test(NAME datumloop-core-tests COMMAND datumloop-core-tests)
+
+    add_executable(datumloop-io-tests tests/native/test_io.cpp)
+    target_link_libraries(datumloop-io-tests PRIVATE datumloop_io Qt6::Core)
+    add_test(NAME datumloop-io-tests COMMAND datumloop-io-tests)
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)
     target_link_libraries(datumloop-ui-tests PRIVATE datumloop_ui)
