@@ -18,6 +18,42 @@ and adds the DatumLoop DS application branding.
 The fork retains upstream `pixi.toml` and `pixi.lock` as environment inputs.
 They do not pin every compiler, system library, or host package in this build.
 
+## Reproducible build image
+
+[`containers/freecad-1.1.3-build.Dockerfile`](../containers/freecad-1.1.3-build.Dockerfile)
+pins the Ubuntu 26.04 amd64 base by OCI digest and resolves the direct Qt 6
+build packages from the dated Ubuntu archive snapshot `20261017T000000Z`.
+Exact direct package versions are recorded in
+[`containers/freecad-1.1.3-build.lock`](../containers/freecad-1.1.3-build.lock);
+the immutable snapshot fixes the transitive package metadata. The package list
+follows the fork's `tools/build/Docker/ubuntuQt6.sh` and includes Xvfb, the Qt
+X11 plugin runtime, and Mesa software OpenGL for the GUI smoke.
+
+The clean build, isolated install, FreeCADCmd project round-trip smoke, and
+software-rendered GUI viewport smoke run in
+[`reproducible-freecad-build.yml`](../.github/workflows/reproducible-freecad-build.yml).
+The workflow checks out this source revision and recursively initializes the
+fork's submodules at commit `b6b11c9cabeeee14fd192856f5749af620ea7183`.
+To run the same check from a clean clone, place the FreeCAD checkout next to
+the DatumLoop DS checkout at that commit, initialize its submodules, and run:
+
+```sh
+docker build --platform linux/amd64 \
+  --file containers/freecad-1.1.3-build.Dockerfile \
+  --tag datumloopds-freecad:locked .
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  --volume "$PWD:/workspace:ro" \
+  --volume "$(dirname "$PWD")/FreeCAD:/freecad-source:ro" \
+  --env FREECAD_SOURCE_REVISION=b6b11c9cabeeee14fd192856f5749af620ea7183 \
+  datumloopds-freecad:locked
+```
+
+The FreeCAD checkout must contain the pinned branded fork commit and all
+submodules. The CI workflow verifies those source inputs before configuring.
+Hardware-GPU rendering remains a separate check; this automated GUI gate uses
+Xvfb and Mesa software OpenGL.
+
 ## Build profile
 
 The successful build started from an empty build directory and used Release

@@ -8,6 +8,7 @@
 - The public [ASI777/FreeCAD](https://github.com/ASI777/FreeCAD) fork has a FreeCAD 1.1.3-based `codex/datumloop-ds-1.1.3` branch with application branding, DatumLoop artwork, a desktop entry, and the DatumLoop start workbench. Its DatumLoopDS executable identity gives it a separate settings profile while retaining FreeCAD's CAD engine.
 - The public [ASI777/smlibpy](https://github.com/ASI777/smlibpy) fork is available and currently exposes the upstream-compatible smlibpy 0.3.4 API.
 - The compatibility workbench installer targets `$XDG_DATA_HOME/DatumLoopDS/v1-1/Mod` by default.
+- The standalone native application and the FreeCAD 1.1.3 fork now have separate locked build images. The FreeCAD image pins its Ubuntu base digest and direct Qt 6 build package versions against the dated Ubuntu snapshot; CI builds the pinned fork commit from a clean checkout and runs project and software-rendered GUI smokes. See the [FreeCAD build profile](freecad-1.1.3-build-profile.md) and [native build environment](native-build-environment.md).
 
 ## Geometry and migration status
 
@@ -33,17 +34,16 @@
 
 ## Remaining work
 
-- The native C++/Qt/OCCT application now has a repository-managed Ubuntu image,
-  dated APT snapshot, and direct package lock; the reproducible check builds,
-  runs CTest, and initializes the headless app shell. The lock is documented
-  in [`native-build-environment.md`](native-build-environment.md). The separate
-  FreeCAD 1.1.3 fork still needs its complete system-package closure pinned.
+- The native C++/Qt/OCCT application and FreeCAD 1.1.3 fork each have a
+  repository-managed Ubuntu image, dated APT snapshot, and direct package
+  lock. CI now exercises a clean FreeCAD fork build, isolated install, project
+  round-trip, and software-rendered viewport. A successful hosted run is still
+  needed to verify the new clean-container gate end to end.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.
 - Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.
 - Continue replacing FreeCAD-owned document, selection, command, and persistence behavior with tested native equivalents before retiring the compatibility workbench.
-- Extend the pinned native build environment to lock the full system-package closure for a clean FreeCAD 1.1.3 fork build. The fork's `pixi.lock` and the [FreeCAD build profile](freecad-1.1.3-build-profile.md) record environment inputs and successful host build evidence, but do not pin every system dependency.
 
 ## Existing machine-part study
 

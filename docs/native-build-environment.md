@@ -32,9 +32,10 @@ The same commands run in
 [`reproducible-native-build.yml`](../.github/workflows/reproducible-native-build.yml)
 on pushes and pull requests.
 
-This lock covers the standalone C++/Qt/OCCT application build. It does not yet
-pin the full system-package closure used by a clean FreeCAD 1.1.3 fork build;
-see the [FreeCAD build profile](freecad-1.1.3-build-profile.md). The container
-is a build and CI environment, not an application bundle. Any future release
-that redistributes its packages must separately assemble the required upstream
-license and notice files.
+The standalone C++/Qt/OCCT application and the FreeCAD 1.1.3 fork have separate
+locked build images. The FreeCAD image and clean-checkout build/smoke command
+are documented in the [FreeCAD build profile](freecad-1.1.3-build-profile.md).
+Both use dated Ubuntu snapshot metadata for transitive package resolution.
+These containers are build and CI environments, not application bundles. Any
+future release that redistributes their packages must separately assemble the
+required upstream license and notice files.

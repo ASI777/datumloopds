@@ -37,7 +37,7 @@ if [[ "${command_status:-0}" -ne 0 ]]; then
   echo "FreeCAD GUI smoke exited with status ${command_status}." >&2
   exit "$command_status"
 fi
-if ! rg -q "DATUMLOOP_GUI_SMOKE_PASS" "$log_file"; then
+if ! grep -Fq "DATUMLOOP_GUI_SMOKE_PASS" "$log_file"; then
   echo "FreeCAD GUI smoke did not report success." >&2
   exit 1
 fi
