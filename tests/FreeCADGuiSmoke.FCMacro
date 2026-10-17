@@ -1,0 +1,46 @@
+"""Headless-capable integration smoke for the workbench and CAD document."""
+
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtCore, QtWidgets
+
+from datumloopds.freecad import project_actions, shell
+
+
+def finish_check():
+    errors = []
+    try:
+        main_window = Gui.getMainWindow()
+        if main_window is None:
+            errors.append("FreeCAD main window is unavailable")
+        else:
+            for dock_name in shell.DOCK_OBJECT_NAMES:
+                if main_window.findChild(QtWidgets.QDockWidget, dock_name) is None:
+                    errors.append(f"missing workbench dock: {dock_name}")
+
+        doc = project_actions.create_project("DatumLoop GUI smoke")
+        gui_doc = Gui.activeDocument()
+        if gui_doc is None or gui_doc.activeView() is None:
+            errors.append("FreeCAD CAD viewport is unavailable")
+        else:
+            App.Console.PrintMessage("DATUMLOOP_VIEWPORT_PRESENT\n")
+
+        if doc.getObject(project_actions.PROJECT_OBJECT_NAME) is None:
+            errors.append("project metadata object was not created")
+
+        if errors:
+            App.Console.PrintError("DATUMLOOP_GUI_SMOKE_FAIL: " + "; ".join(errors) + "\n")
+        else:
+            App.Console.PrintMessage(
+                "DATUMLOOP_GUI_SMOKE_PASS: workbench, docks, project, viewport\n"
+            )
+    except Exception as exc:
+        App.Console.PrintError(
+            f"DATUMLOOP_GUI_SMOKE_FAIL: {type(exc).__name__}: {exc}\n"
+        )
+    finally:
+        QtWidgets.QApplication.instance().quit()
+
+
+Gui.activateWorkbench("DatumLoopWorkbench")
+QtCore.QTimer.singleShot(1000, finish_check)
