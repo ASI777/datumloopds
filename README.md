@@ -61,6 +61,9 @@ thermal fields. See
 The mechanism-definition foundation and its current limits are tracked in
 [`docs/milestone-2-mechanism-definition.md`](docs/milestone-2-mechanism-definition.md).
 
+The locked native Linux build environment and clean-checkout command are
+documented in [`docs/native-build-environment.md`](docs/native-build-environment.md).
+
 The first electronics slice imports one PCB from Circuit JSON or a supported
 subset of KiCad `.kicad_pcb` and displays a derived OCCT preview. Try a sample
 board with:

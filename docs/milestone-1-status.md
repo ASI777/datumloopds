@@ -33,15 +33,17 @@
 
 ## Remaining work
 
-- Add a declared native C++ dependency lock or equivalent clean-room build
-  environment for the compiler, Qt, OCCT, and optional solver packages. The
-  build profile records the verified host configuration, but that is not yet
-  a repository-managed lock for a clean checkout.
+- The native C++/Qt/OCCT application now has a repository-managed Ubuntu image,
+  dated APT snapshot, and direct package lock; the reproducible check builds,
+  runs CTest, and initializes the headless app shell. The lock is documented
+  in [`native-build-environment.md`](native-build-environment.md). The separate
+  FreeCAD 1.1.3 fork still needs its complete system-package closure pinned.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.
 - Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.
 - Continue replacing FreeCAD-owned document, selection, command, and persistence behavior with tested native equivalents before retiring the compatibility workbench.
+- Extend the pinned native build environment to lock the full system-package closure for a clean FreeCAD 1.1.3 fork build. The fork's `pixi.lock` and the [FreeCAD build profile](freecad-1.1.3-build-profile.md) record environment inputs and successful host build evidence, but do not pin every system dependency.
 
 ## Existing machine-part study
 

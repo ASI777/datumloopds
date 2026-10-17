@@ -84,10 +84,18 @@ Properties editors. Selection drives the property panel through
 Move previews a numeric translation along X/Y/Z and either commits it as an
 undoable command or cancels it without changing the document.
 
-`DatumEngineeringModel` is a separate document value containing mechanisms,
-linear/rotary axes, and motors with optional physical properties and stable CAD
-or topology references. The current axes are descriptive references only; the
-model does not yet define joints or drive a solver, and it has no editor UI.
+`DatumEngineeringModel` stores version-one mechanism definitions with stable
+body/object IDs, geometry-source descriptors, sourced optional mass properties,
+body-local frames, supported joint types, actuators, contacts, requirements,
+legacy linear/rotary axes, and motors. The `.dld` schema-6 readiness checks
+diagnose incomplete study inputs, but do not run a solver or check joint
+constraint consistency. Mechanism editing and geometry import have no native
+UI yet; see [`milestone-2-mechanism-definition.md`](milestone-2-mechanism-definition.md).
+
+The native build and headless shell smoke have a repository-managed Ubuntu/APT
+lock in [`native-build-environment.md`](native-build-environment.md). The
+FreeCAD compatibility build remains dependent on its separately documented
+host package profile.
 
 This is a foundation, not a replacement for Part Design, assemblies, native
 engineering semantics, or production simulation. The equation/FEM/RL examples

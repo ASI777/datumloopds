@@ -152,18 +152,18 @@ remain unresolved. The native viewport supports Object, Face, Edge, and Vertex
 modes. Large-model acceleration and distinct subshape highlight geometry
 remain future work.
 
-`DatumEngineeringModel` currently stores mechanisms, linear and rotary datum
-axes, and motors separately from CAD objects. `DatumElectronicsModel` stores
-materials, circuit connectivity, and PCB stack-up/geometry using common
-material references. Mechanisms reference CAD body
-object IDs; axes record their base and moving objects, metre-valued origin, and
-unit direction. Motors may reference their CAD representation and mounting
-topology, plus mass, inertia, center of mass, torque/speed data, electrical and
-thermal data, encoder, and supplier fields. All physical values use SI units;
-missing optional motor properties remain unknown and are not inferred from CAD
-or renderer meshes. Document validation checks identity collisions and object
-and topology ownership. These initial axes are engineering references only:
-they do not impose kinematic constraints, and the model has no joint solver yet.
+`DatumEngineeringModel` stores schema-six mechanism definitions separately
+from CAD objects: stable body IDs and geometry-source references, sourced
+optional mass properties, body-local joint frames, supported joint types,
+actuators, contacts, requirements, legacy datum axes, and motors.
+`DatumElectronicsModel` stores materials, circuit connectivity, and PCB
+stack-up/geometry using common material references. All physical values use SI
+units; missing optional values remain unknown and are not inferred from CAD or
+renderer meshes. Document validation checks identity, object, feature, and
+contact-face ownership. Study-readiness checks diagnose missing inputs but do
+not execute or validate solver constraints. Mechanism editing, STEP/SMLibPy
+source workflows, and mass-property calculation remain unimplemented; see
+[`milestone-2-mechanism-definition.md`](milestone-2-mechanism-definition.md).
 
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native

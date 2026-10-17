@@ -1,0 +1,13 @@
+# Linux amd64, Ubuntu 26.04 (Resolute), Ubuntu archive snapshot 20261017T000000Z.
+# Keep this list in sync with the pinned snapshot and base image in
+# native-build.Dockerfile. APT resolves transitive packages only from that
+# immutable archive snapshot.
+build-essential=12.12ubuntu2.26.04.2
+cmake=4.2.3-2ubuntu2
+libngspice0=45.2+ds-1
+libocct-foundation-dev=7.9.2+dfsg-4
+libocct-modeling-algorithms-dev=7.9.2+dfsg-4
+libocct-modeling-data-dev=7.9.2+dfsg-4
+qt6-base-dev=6.10.2+dfsg-7
+qt6-declarative-dev=6.10.2+dfsg-3
+qt6-quick3d-dev=6.10.2-1
