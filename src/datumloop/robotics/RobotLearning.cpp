@@ -343,6 +343,35 @@ void RLEnvironmentSpec::validate(const RobotModel& robot, const DatumEngineering
     for (const UncertainParameter& item : randomization) item.validate();
 }
 
+void addStructuralResponseObservation(RobotObservation& observation,
+                                      const StructuralElasticityRom& rom,
+                                      const Vector3& appliedForceN,
+                                      double youngsModulusPa)
+{
+    if (!finite(observation.timeS) || observation.timeS < 0.0) {
+        throw std::invalid_argument("robot observation requires a finite nonnegative time");
+    }
+    rom.validate();
+    const double appliedForceMagnitudeN = std::hypot(appliedForceN[0], appliedForceN[1], appliedForceN[2]);
+    if (!finite(appliedForceMagnitudeN) || appliedForceMagnitudeN <= 0.0) {
+        throw std::invalid_argument("structural response requires a finite nonzero applied force vector");
+    }
+    for (std::size_t axis = 0; axis < appliedForceN.size(); ++axis) {
+        if (!finite(appliedForceN[axis]) ||
+            std::abs(appliedForceN[axis] / appliedForceMagnitudeN - rom.appliedForceDirectionUnit[axis]) > 1e-9) {
+            throw std::invalid_argument("structural response force direction does not match its ROM provenance");
+        }
+    }
+    observation.structuralResponse = RobotObservation::StructuralResponse{
+        rom.id,
+        rom.appliedForceDirectionUnit,
+        appliedForceMagnitudeN,
+        youngsModulusPa,
+        rom.predictTipDisplacement(appliedForceMagnitudeN, youngsModulusPa),
+        rom.predictEffectiveStiffness(appliedForceMagnitudeN, youngsModulusPa),
+    };
+}
+
 DeterministicMassEnvironment::DeterministicMassEnvironment(const RobotModel& robot,
                                                            const DatumEngineeringModel& engineering,
                                                            RLEnvironmentSpec spec)

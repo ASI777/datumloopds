@@ -69,6 +69,23 @@ encoder values. The runtime record is
 This check does not establish parity with the in-house mass environment or
 validate a real machine. Backend-neutral specs remain the DatumLoop contract.
 
+## Structural ROM observation bridge
+
+`addStructuralResponseObservation` combines a bounded 3D static ROM response
+with a rigid-body `RobotObservation`. It records the ROM ID, applied-force
+direction and magnitude, Young's modulus, predicted tip deflection, and
+effective stiffness while preserving the rigid backend's existing sensors.
+The current check uses the MuJoCo runtime report's joint position and velocity,
+then evaluates two downward-load inputs (5 N and 15 N) from the MFEM-trained
+ROM. Deflection changes with load while the MuJoCo position and velocity stay
+fixed. MuJoCo continues to own rigid dynamics; this bridge adds an observation
+and does not alter its forces or state integration.
+
+This is observation-level coupling for a static, single-load-direction model.
+It is not flexible-body feedback, a transient structural solver, or a complete
+MuJoCo environment adapter. Bridge evidence is recorded in
+[`mfem-3d-elasticity.json`](../reports/validation/mfem-3d-elasticity.json).
+
 Robot and RL environment records are not yet persisted in `.dld`, exposed in
 the Qt UI, or dispatched as a solver job. No policy trainer, reward-learning
 agent, RL rollout store, environment compiler, simulation batching, or digital

@@ -153,6 +153,10 @@ errors are `1.09e-9` and `7.89e-10` against a 1% tolerance. These are parameter
 holdouts on the same geometry, mesh, equation, and solver, not experimental or
 cross-mesh validation. See the [ROM scope and sampling record](native-structural-rom.md)
 and the full [3D result report](../reports/validation/mfem-3d-elasticity.json).
+The same ROM now augments the verified MuJoCo rigid-state observation with a
+static tip-deflection value at 5 N and 15 N. Joint position and velocity are
+preserved, and MuJoCo rigid dynamics are unchanged. This is observation-level
+coupling only; no flexibility feedback is applied to the rigid simulation.
 
 ## External numerical libraries
 

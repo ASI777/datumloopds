@@ -5,6 +5,7 @@
 #include "datumloop/numerics/AnalysisMesh.hpp"
 #include "datumloop/numerics/MfemLinearElasticitySolver.hpp"
 #include "datumloop/numerics/StructuralReducedModel.hpp"
+#include "datumloop/robotics/RobotLearning.hpp"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -211,7 +212,8 @@ void writeReport(const std::filesystem::path& path,
                  double youngsModulusPa,
                  double analyticalTipM,
                  double analyticalSectionStressPa,
-                 const datumloop::StructuralElasticityRom& rom)
+                 const datumloop::StructuralElasticityRom& rom,
+                 const QJsonObject& mujocoRomBridge)
 {
     QJsonArray refinement;
     for (std::size_t index = 0; index < runs.size(); ++index) {
@@ -338,6 +340,18 @@ void writeReport(const std::filesystem::path& path,
             {QStringLiteral("solver_version"), QString::fromStdString(rom.solverVersion)},
             {QStringLiteral("mesh_revision_id"), QString::fromStdString(rom.mesh.revisionId)},
             {QStringLiteral("mesh_element_count"), static_cast<double>(rom.mesh.elementCount)},
+            {QStringLiteral("applied_force_direction_unit"), QJsonArray{
+                rom.appliedForceDirectionUnit[0], rom.appliedForceDirectionUnit[1], rom.appliedForceDirectionUnit[2]}},
+            {QStringLiteral("topology_reference_ids"), [&rom] {
+                QJsonArray ids;
+                for (const std::string& id : rom.topologyReferenceIds) ids.append(QString::fromStdString(id));
+                return ids;
+            }()},
+            {QStringLiteral("boundary_condition_ids"), [&rom] {
+                QJsonArray ids;
+                for (const std::string& id : rom.boundaryConditionIds) ids.append(QString::fromStdString(id));
+                return ids;
+            }()},
             {QStringLiteral("response_law"), QStringLiteral("tip_displacement_m = normalized_compliance_per_m * force_n / youngs_modulus_pa")},
             {QStringLiteral("normalized_compliance_per_m"), rom.normalizedCompliancePerM},
             {QStringLiteral("input_domain"), QJsonObject{
@@ -356,6 +370,7 @@ void writeReport(const std::filesystem::path& path,
             {QStringLiteral("out_of_domain_inputs_rejected"), rom.rejectsOutOfDomainInputs},
             {QStringLiteral("scope"), QStringLiteral("Bounded static response model for this CAD solid; not a modal or general-purpose ROM.")},
         }},
+        {QStringLiteral("mujoco_rom_bridge"), mujocoRomBridge},
         {QStringLiteral("convergence"), QJsonObject{
             {QStringLiteral("compared_runs"), QJsonArray{
                 QString::fromStdString(convergence.solverRunIds[convergence.solverRunIds.size() - 2]),
@@ -604,6 +619,88 @@ int main(int argc, char* argv[])
         require(extrapolationRejected && rom.rejectsOutOfDomainInputs,
                 "3D structural ROM accepted an applied load outside its validated domain");
 
+        QFile mujocoReportFile(QString::fromUtf8(DATUMLOOP_MUJOCO_RUNTIME_REPORT));
+        require(mujocoReportFile.open(QIODevice::ReadOnly),
+                "ROM bridge could not read the verified MuJoCo runtime report");
+        const QJsonObject mujocoReport = QJsonDocument::fromJson(mujocoReportFile.readAll()).object();
+        require(mujocoReport.value(QStringLiteral("backend")).toString() == QStringLiteral("MuJoCo") &&
+                    mujocoReport.value(QStringLiteral("runtime")).toString() == QStringLiteral("passed"),
+                "ROM bridge requires a passing MuJoCo rigid-body runtime record");
+        const double mujocoPositionM = mujocoReport.value(QStringLiteral("final_position_m")).toDouble();
+        const double mujocoVelocityMPerS = mujocoReport.value(QStringLiteral("final_velocity_m_per_s")).toDouble();
+        require(std::isfinite(mujocoPositionM) && std::isfinite(mujocoVelocityMPerS),
+                "ROM bridge requires finite rigid position and velocity from MuJoCo");
+        datumloop::RobotObservation rigidObservation;
+        rigidObservation.timeS = mujocoReport.value(QStringLiteral("steps")).toDouble() * 0.01;
+        datumloop::RobotSensorObservation jointPosition;
+        jointPosition.sensorId = "mujoco.slider_x.position";
+        jointPosition.valid = true;
+        jointPosition.value = mujocoPositionM;
+        jointPosition.unit = "m";
+        jointPosition.captureTimeS = rigidObservation.timeS;
+        jointPosition.deliveryTimeS = rigidObservation.timeS;
+        datumloop::RobotSensorObservation jointVelocity;
+        jointVelocity.sensorId = "mujoco.slider_x.velocity";
+        jointVelocity.valid = true;
+        jointVelocity.value = mujocoVelocityMPerS;
+        jointVelocity.unit = "m/s";
+        jointVelocity.captureTimeS = rigidObservation.timeS;
+        jointVelocity.deliveryTimeS = rigidObservation.timeS;
+        rigidObservation.sensors = {jointPosition, jointVelocity};
+
+        datumloop::RobotObservation lightLoadObservation = rigidObservation;
+        datumloop::addStructuralResponseObservation(lightLoadObservation, rom, {0.0, -5.0, 0.0}, youngsModulusPa);
+        datumloop::RobotObservation heavyLoadObservation = rigidObservation;
+        datumloop::addStructuralResponseObservation(heavyLoadObservation, rom, {0.0, -15.0, 0.0}, youngsModulusPa);
+        require(lightLoadObservation.sensors.size() == rigidObservation.sensors.size() &&
+                    heavyLoadObservation.sensors.size() == rigidObservation.sensors.size() &&
+                    lightLoadObservation.sensors[0].value == rigidObservation.sensors[0].value &&
+                    heavyLoadObservation.sensors[1].value == rigidObservation.sensors[1].value &&
+                    lightLoadObservation.structuralResponse.has_value() &&
+                    heavyLoadObservation.structuralResponse.has_value() &&
+                    lightLoadObservation.structuralResponse->romId == rom.id &&
+                    heavyLoadObservation.structuralResponse->tipDeflectionMagnitudeM >
+                        lightLoadObservation.structuralResponse->tipDeflectionMagnitudeM &&
+                    std::abs(heavyLoadObservation.structuralResponse->tipDeflectionMagnitudeM -
+                             rom.predictTipDisplacement(15.0, youngsModulusPa)) < 1e-15,
+                "MuJoCo rigid observations must be preserved while the FEM ROM adds load-dependent flex deflection");
+        bool incompatibleLoadDirectionRejected = false;
+        try {
+            datumloop::RobotObservation wrongDirectionObservation = rigidObservation;
+            datumloop::addStructuralResponseObservation(wrongDirectionObservation, rom,
+                                                        {5.0, 0.0, 0.0}, youngsModulusPa);
+        } catch (const std::invalid_argument&) {
+            incompatibleLoadDirectionRejected = true;
+        }
+        require(incompatibleLoadDirectionRejected,
+                "MuJoCo/ROM bridge accepted a force direction that differs from the trained ROM");
+        const QJsonObject mujocoRomBridge{
+            {QStringLiteral("backend"), mujocoReport.value(QStringLiteral("backend"))},
+            {QStringLiteral("version"), mujocoReport.value(QStringLiteral("version"))},
+            {QStringLiteral("runtime_status"), mujocoReport.value(QStringLiteral("runtime"))},
+            {QStringLiteral("rigid_position_m"), mujocoPositionM},
+            {QStringLiteral("rigid_velocity_m_per_s"), mujocoVelocityMPerS},
+            {QStringLiteral("rigid_dynamics_modified"), false},
+            {QStringLiteral("rom_id"), QString::fromStdString(rom.id)},
+            {QStringLiteral("load_direction_unit"), QJsonArray{
+                rom.appliedForceDirectionUnit[0], rom.appliedForceDirectionUnit[1], rom.appliedForceDirectionUnit[2]}},
+            {QStringLiteral("youngs_modulus_pa"), youngsModulusPa},
+            {QStringLiteral("observations"), QJsonArray{
+                QJsonObject{
+                    {QStringLiteral("applied_force_n"), lightLoadObservation.structuralResponse->appliedForceMagnitudeN},
+                    {QStringLiteral("joint_position_m"), lightLoadObservation.sensors[0].value.value()},
+                    {QStringLiteral("joint_velocity_m_per_s"), lightLoadObservation.sensors[1].value.value()},
+                    {QStringLiteral("tip_deflection_m"), lightLoadObservation.structuralResponse->tipDeflectionMagnitudeM},
+                    {QStringLiteral("effective_stiffness_n_per_m"), lightLoadObservation.structuralResponse->effectiveStiffnessNPerM}},
+                QJsonObject{
+                    {QStringLiteral("applied_force_n"), heavyLoadObservation.structuralResponse->appliedForceMagnitudeN},
+                    {QStringLiteral("joint_position_m"), heavyLoadObservation.sensors[0].value.value()},
+                    {QStringLiteral("joint_velocity_m_per_s"), heavyLoadObservation.sensors[1].value.value()},
+                    {QStringLiteral("tip_deflection_m"), heavyLoadObservation.structuralResponse->tipDeflectionMagnitudeM},
+                    {QStringLiteral("effective_stiffness_n_per_m"), heavyLoadObservation.structuralResponse->effectiveStiffnessNPerM}},
+            }},
+        };
+
         datumloop::DatumEngineeringModel engineering = document.engineeringModel();
         engineering.structuralStudies = {study};
         document.setEngineeringModel(std::move(engineering));
@@ -663,7 +760,7 @@ int main(int argc, char* argv[])
 
         if (argc == 3 && std::string(argv[1]) == "--report") {
             writeReport(argv[2], study, runs, *sourcedMaterial, youngsModulusPa,
-                        analyticalTipM, analyticalSectionStressPa, rom);
+                        analyticalTipM, analyticalSectionStressPa, rom, mujocoRomBridge);
         } else if (argc != 1) {
             throw std::invalid_argument("usage: datumloop-mfem-elasticity-tests [--report path]");
         }

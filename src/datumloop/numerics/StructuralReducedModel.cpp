@@ -161,6 +161,10 @@ void StructuralElasticityRom::validate() const
     for (const std::string& idValue : boundaryConditionIds) {
         requireText(idValue, "structural ROM boundary-condition provenance IDs must not be empty");
     }
+    const double loadDirectionNorm = norm(appliedForceDirectionUnit);
+    if (!finite(loadDirectionNorm) || std::abs(loadDirectionNorm - 1.0) > 1e-9) {
+        throw std::invalid_argument("structural ROM must retain its unit applied-force direction");
+    }
     std::unordered_set<std::string> allRunIds;
     std::set<std::pair<double, double>> allInputPairs;
     const auto validateRecords = [this, &allRunIds, &allInputPairs](
@@ -227,6 +231,13 @@ StructuralElasticityRom fitStructuralElasticityRom(
     rom.mesh = reference.provenance.mesh;
     rom.topologyReferenceIds = reference.provenance.topologyReferenceIds;
     rom.boundaryConditionIds = reference.provenance.boundaryConditionIds;
+    const double referenceForce = norm(reference.appliedForceN);
+    if (!finite(referenceForce) || referenceForce <= 0.0) {
+        throw std::invalid_argument("structural ROM reference run has no nonzero applied-force direction");
+    }
+    for (std::size_t axis = 0; axis < rom.appliedForceDirectionUnit.size(); ++axis) {
+        rom.appliedForceDirectionUnit[axis] = reference.appliedForceN[axis] / referenceForce;
+    }
     rom.validationToleranceRelative = validationToleranceRelative;
     rom.inputDomain.minimumAppliedForceN = std::numeric_limits<double>::infinity();
     rom.inputDomain.maximumAppliedForceN = 0.0;

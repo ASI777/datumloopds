@@ -49,6 +49,7 @@ struct StructuralElasticityRom {
     AnalysisMeshProvenance mesh;
     std::vector<std::string> topologyReferenceIds;
     std::vector<std::string> boundaryConditionIds;
+    Vector3 appliedForceDirectionUnit{0.0, 0.0, 0.0};
     StructuralRomInputDomain inputDomain;
     double normalizedCompliancePerM = 0.0;
     double validationToleranceRelative = 0.01;

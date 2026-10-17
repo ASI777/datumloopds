@@ -49,10 +49,11 @@
   the same geometry, mesh, and solver; they do not establish cross-mesh or
   experimental validation. The model and sample provenance are documented in
   [the ROM record](native-structural-rom.md) and the [numerical report](numerical-verification.md).
-- Connect this static ROM to MuJoCo as a modular flexible-response effect,
-  expose deflection in the fast environment, and compare held-out responses
-  with MFEM. The 3D result is a numerically verified model, not an
-  experimentally validated digital twin.
+- A first observation-level bridge now adds ROM tip deflection to a verified
+  MuJoCo rigid-state observation, while leaving MuJoCo dynamics unchanged.
+  Extend this to a runtime environment adapter with dynamic load transfer,
+  then compare held-out fast responses with MFEM. The 3D result is a
+  numerically verified model, not an experimentally validated digital twin.
 - Verify result-overlay rendering, selection, and camera movement on a
   hardware GPU; hardware rendering remains unverified.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.

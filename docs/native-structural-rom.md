@@ -15,6 +15,10 @@ tip displacement = normalized compliance [1/m] * applied force [N]
 effective stiffness = applied force / predicted tip displacement
 ```
 
+The model retains its applied-force unit direction, downward along global Y
+for this cantilever. Callers must use that same load direction when applying
+the scalar force input.
+
 The training grid contains nine MFEM runs at loads of 5, 10, and 15 N and
 Young's modulus factors of 0.973, 1.000, and 1.027 relative to the sourced
 69.6 GPa mean. The ±2.7% range follows the uncertainty recorded in the cited
@@ -34,5 +38,10 @@ stiffness. The held-out points vary load and material modulus but share the
 same CAD geometry, mesh, governing equation, and MFEM backend as training. The
 error therefore measures parameter-response fit, not mesh transfer,
 experimental validation, or model discrepancy. The ROM is not yet stored in
-`.dld` or consumed by MuJoCo; dynamic modes, flexible-body coupling, and
-fast-versus-high-fidelity environment comparison remain future work.
+`.dld`. The native robotics observation contract can append this static tip
+deflection to a rigid-body observation while preserving MuJoCo joint position
+and velocity. A check uses the verified MuJoCo runtime state and compares 5 N
+and 15 N loads; the rigid state stays unchanged as the flexible observation
+changes. This is observation-level coupling only: deflection does not feed
+back into MuJoCo forces or dynamics. Dynamic modes, flexible-body feedback,
+and time-varying load profiles remain future work.

@@ -107,7 +107,7 @@ add_library(datumloop_robotics STATIC
     src/datumloop/robotics/RobotLearning.cpp
 )
 target_include_directories(datumloop_robotics PUBLIC src)
-target_link_libraries(datumloop_robotics PUBLIC datumloop_core)
+target_link_libraries(datumloop_robotics PUBLIC datumloop_core datumloop_numerics)
 target_compile_options(datumloop_robotics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_ui STATIC
@@ -207,7 +207,9 @@ if(BUILD_TESTING)
         add_test(NAME datumloop-mfem-tests COMMAND datumloop-mfem-tests)
 
         add_executable(datumloop-mfem-elasticity-tests tests/native/test_mfem_3d_elasticity.cpp)
-        target_link_libraries(datumloop-mfem-elasticity-tests PRIVATE datumloop_mfem_backend datumloop_io Qt6::Core)
+        target_link_libraries(datumloop-mfem-elasticity-tests PRIVATE datumloop_mfem_backend datumloop_io datumloop_robotics Qt6::Core)
+        target_compile_definitions(datumloop-mfem-elasticity-tests PRIVATE
+            DATUMLOOP_MUJOCO_RUNTIME_REPORT="${CMAKE_SOURCE_DIR}/reports/validation/mujoco-runtime.json")
         add_test(NAME datumloop-mfem-elasticity-tests COMMAND datumloop-mfem-elasticity-tests)
     else()
         foreach(test_name IN ITEMS datumloop-mfem-tests datumloop-mfem-elasticity-tests)

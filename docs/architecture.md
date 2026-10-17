@@ -204,7 +204,7 @@ DatumDocument/DatumEngineeringModel -> persistent CAD-face boundary conditions
                                     -> MFEM 3D linear elasticity -> field datasets/provenance
                                     -> bounded load/modulus response ROM -> held-out metrics
 RobotModel -> backend-neutral observation/action contracts
-           -> deterministic fixture environment -> MJCF export -> MuJoCo runtime check
+           -> MJCF export -> MuJoCo rigid runtime state -> ROM-augmented observation
            -> simulated StateInterface / hardware writes disabled
 
 FreeCAD Python workbench -> separate compatibility path
@@ -224,9 +224,12 @@ provenance; it does not establish experimental validation. Separate
 engineering prototypes retain the E0-E6 equation registry, generic solver
 contracts, 1D cantilever reference, held-out reduced beam response,
 provider-neutral scientific-agent routing, and simulated-only one-axis
-robot/RL environment. A bounded static response ROM is also fitted from the
-3D MFEM case; its validity region and held-out parameter metrics are recorded,
-but it is not yet persisted in `.dld` or connected to the robotics environment.
+robot/RL environment. A bounded static response ROM is fitted from the 3D
+MFEM case; its validity region and held-out parameter metrics are recorded.
+The ROM is not yet persisted in `.dld`; a first observation-level bridge adds
+its static tip deflection to a verified MuJoCo rigid-state observation without
+changing MuJoCo dynamics. Dynamic feedback and a full MuJoCo environment
+adapter remain future work.
 The exact exported MJCF runs in the MuJoCo runtime check. Equation,
 scientific-agent, and robotics prototypes are not exposed in the Qt workspace.
 The mechanism data foundation and its limits are described in
