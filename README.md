@@ -8,11 +8,13 @@ FreeCAD fork.
 
 ## Status
 
-Milestone 1 is in progress. This repository contains the initial workbench,
-project shell, package metadata, and reproducible local checks. The required
-GitHub repositories and the fully branded FreeCAD build are not yet available.
-The project baseline is FreeCAD 1.1.3. The installed development copy may be
-older; only 1.1.3 will count toward the release gate.
+Milestone 1 is in progress. The public [DatumLoop DS repository](https://github.com/ASI777/datumloopds)
+contains the initial workbench, project shell, package metadata, and local
+checks. The public [FreeCAD fork](https://github.com/ASI777/FreeCAD) and
+[smlibpy fork](https://github.com/ASI777/smlibpy) are also available. The
+fully branded FreeCAD 1.1.3 build and desktop viewport verification remain
+release gates. The installed development copy may be older; only 1.1.3 counts
+toward the release gate.
 
 ## Development
 
