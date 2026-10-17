@@ -67,6 +67,7 @@ add_library(datumloop_numerics STATIC
     src/datumloop/numerics/CantileverBeamFEM.cpp
     src/datumloop/numerics/FemSolver.cpp
     src/datumloop/numerics/AnalysisMesh.cpp
+    src/datumloop/numerics/StructuralReducedModel.cpp
 )
 target_include_directories(datumloop_numerics PUBLIC src)
 target_link_libraries(datumloop_numerics PUBLIC datumloop_core)

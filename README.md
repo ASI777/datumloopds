@@ -88,6 +88,7 @@ Equation governance, analytical/FEM verification, a limited reduced beam
 response, and the simulated-only robot/RL/control interfaces are documented in
 [`docs/engineering-equation-governance.md`](docs/engineering-equation-governance.md),
 [`docs/numerical-verification.md`](docs/numerical-verification.md),
+[`docs/native-structural-rom.md`](docs/native-structural-rom.md),
 [`docs/multifidelity-simulation.md`](docs/multifidelity-simulation.md),
 [`docs/robot-learning-architecture.md`](docs/robot-learning-architecture.md),
 [`docs/scientific-agent-routing.md`](docs/scientific-agent-routing.md),

@@ -4,6 +4,7 @@
 #include "datumloop/io/DldProjectStore.hpp"
 #include "datumloop/numerics/AnalysisMesh.hpp"
 #include "datumloop/numerics/MfemLinearElasticitySolver.hpp"
+#include "datumloop/numerics/StructuralReducedModel.hpp"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -150,13 +151,67 @@ const datumloop::FieldDataset& field(const datumloop::StructuralAnalysisRun& run
     return *found;
 }
 
+datumloop::StructuralRomHighFidelitySample runRomSample(
+    const datumloop::DatumDocument& sourceDocument,
+    const datumloop::StructuralAnalysisStudy& sourceStudy,
+    const datumloop::MfemLinearElasticitySolver& solver,
+    const datumloop::AnalysisMeshSettings& meshSettings,
+    const std::string& sharedMeshRevisionId,
+    double appliedForceN,
+    double youngsModulusPa)
+{
+    datumloop::DatumDocument sampleDocument = sourceDocument;
+    datumloop::DatumElectronicsModel electronics = sampleDocument.electronicsModel();
+    datumloop::MaterialDefinition* material = nullptr;
+    for (datumloop::MaterialDefinition& candidate : electronics.materials) {
+        if (candidate.id == sourceStudy.materialDefinitionId) {
+            material = &candidate;
+            break;
+        }
+    }
+    require(material != nullptr, "ROM sample could not resolve its DatumLoop material definition");
+    datumloop::MaterialProperty* youngsModulus = nullptr;
+    for (datumloop::MaterialProperty& property : material->propertyModels) {
+        if (property.propertyName == "elastic.youngs_modulus") {
+            youngsModulus = &property;
+            break;
+        }
+    }
+    require(youngsModulus != nullptr && youngsModulus->constantValue.has_value() &&
+                youngsModulus->absoluteUncertainty.has_value(),
+            "ROM sample requires the sourced Young's-modulus value and uncertainty");
+    const double sourceUncertaintyFraction = *youngsModulus->absoluteUncertainty /
+                                            *youngsModulus->constantValue;
+    youngsModulus->constantValue = youngsModulusPa;
+    youngsModulus->absoluteUncertainty = youngsModulusPa * sourceUncertaintyFraction;
+    material->validate();
+    sampleDocument.setElectronicsModel(std::move(electronics));
+
+    datumloop::StructuralAnalysisStudy sampleStudy = sourceStudy;
+    bool loadUpdated = false;
+    for (datumloop::BoundaryCondition& condition : sampleStudy.boundaryConditions) {
+        if (auto* force = std::get_if<datumloop::AppliedForce>(&condition)) {
+            force->totalForceN = {0.0, -appliedForceN, 0.0};
+            loadUpdated = true;
+        }
+    }
+    require(loadUpdated, "ROM sample could not find the persistent-face applied force");
+
+    datumloop::AnalysisMesh mesh = datumloop::OcctPrismAnalysisMesher::generate(
+        sampleDocument, sampleStudy.cadObjectId, meshSettings);
+    mesh.provenance.revisionId = sharedMeshRevisionId;
+    datumloop::StructuralAnalysisRun run = solver.solve(sampleDocument, sampleStudy, mesh);
+    return {appliedForceN, youngsModulusPa, std::move(run)};
+}
+
 void writeReport(const std::filesystem::path& path,
                  const datumloop::StructuralAnalysisStudy& study,
                  const std::vector<datumloop::StructuralAnalysisRun>& runs,
                  const datumloop::MaterialDefinition& material,
                  double youngsModulusPa,
                  double analyticalTipM,
-                 double analyticalSectionStressPa)
+                 double analyticalSectionStressPa,
+                 const datumloop::StructuralElasticityRom& rom)
 {
     QJsonArray refinement;
     for (std::size_t index = 0; index < runs.size(); ++index) {
@@ -221,6 +276,22 @@ void writeReport(const std::filesystem::path& path,
             {QStringLiteral("temperature_range_verified"), run.provenance.temperatureRangeVerified},
         });
     }
+    const auto encodeRomSamples = [](const std::vector<datumloop::StructuralRomSampleRecord>& samples) {
+        QJsonArray encodedSamples;
+        for (const datumloop::StructuralRomSampleRecord& sample : samples) {
+            encodedSamples.append(QJsonObject{
+                {QStringLiteral("applied_force_n"), sample.appliedForceMagnitudeN},
+                {QStringLiteral("youngs_modulus_pa"), sample.youngsModulusPa},
+                {QStringLiteral("high_fidelity_tip_displacement_m"), sample.highFidelityTipDisplacementM},
+                {QStringLiteral("rom_tip_displacement_m"), sample.romTipDisplacementM},
+                {QStringLiteral("rom_effective_stiffness_n_per_m"), sample.effectiveStiffnessNPerM},
+                {QStringLiteral("relative_error"), sample.relativeError},
+                {QStringLiteral("solver_run_id"), QString::fromStdString(sample.solverRunId)},
+                {QStringLiteral("material_revision"), QString::fromStdString(sample.materialRevision)},
+            });
+        }
+        return encodedSamples;
+    };
     QJsonArray materialProperties;
     for (const datumloop::MaterialProperty& property : material.propertyModels) {
         QJsonObject encoded{
@@ -257,6 +328,34 @@ void writeReport(const std::filesystem::path& path,
         {QStringLiteral("analytical_euler_bernoulli_tip_m"), analyticalTipM},
         {QStringLiteral("analytical_midspan_section_stress_pa"), analyticalSectionStressPa},
         {QStringLiteral("mesh_refinement"), refinement},
+        {QStringLiteral("structural_rom"), QJsonObject{
+            {QStringLiteral("model_id"), QString::fromStdString(rom.id)},
+            {QStringLiteral("source_project_id"), QString::fromStdString(rom.sourceProjectId)},
+            {QStringLiteral("cad_object_id"), QString::fromStdString(rom.cadObjectId)},
+            {QStringLiteral("material_definition_id"), QString::fromStdString(rom.materialDefinitionId)},
+            {QStringLiteral("equation_definition_id"), QString::fromStdString(rom.equationDefinitionId)},
+            {QStringLiteral("solver_id"), QString::fromStdString(rom.solverId)},
+            {QStringLiteral("solver_version"), QString::fromStdString(rom.solverVersion)},
+            {QStringLiteral("mesh_revision_id"), QString::fromStdString(rom.mesh.revisionId)},
+            {QStringLiteral("mesh_element_count"), static_cast<double>(rom.mesh.elementCount)},
+            {QStringLiteral("response_law"), QStringLiteral("tip_displacement_m = normalized_compliance_per_m * force_n / youngs_modulus_pa")},
+            {QStringLiteral("normalized_compliance_per_m"), rom.normalizedCompliancePerM},
+            {QStringLiteral("input_domain"), QJsonObject{
+                {QStringLiteral("minimum_applied_force_n"), rom.inputDomain.minimumAppliedForceN},
+                {QStringLiteral("maximum_applied_force_n"), rom.inputDomain.maximumAppliedForceN},
+                {QStringLiteral("minimum_youngs_modulus_pa"), rom.inputDomain.minimumYoungsModulusPa},
+                {QStringLiteral("maximum_youngs_modulus_pa"), rom.inputDomain.maximumYoungsModulusPa},
+            }},
+            {QStringLiteral("training_samples"), encodeRomSamples(rom.trainingSamples)},
+            {QStringLiteral("held_out_samples"), encodeRomSamples(rom.validationSamples)},
+            {QStringLiteral("validation_tolerance_relative"), rom.validationToleranceRelative},
+            {QStringLiteral("maximum_relative_validation_error"), rom.maximumRelativeValidationError},
+            {QStringLiteral("rms_relative_validation_error"), rom.rmsRelativeValidationError},
+            {QStringLiteral("validation_passed"), rom.validationPassed},
+            {QStringLiteral("out_of_domain_policy"), QStringLiteral("reject")},
+            {QStringLiteral("out_of_domain_inputs_rejected"), rom.rejectsOutOfDomainInputs},
+            {QStringLiteral("scope"), QStringLiteral("Bounded static response model for this CAD solid; not a modal or general-purpose ROM.")},
+        }},
         {QStringLiteral("convergence"), QJsonObject{
             {QStringLiteral("compared_runs"), QJsonArray{
                 QString::fromStdString(convergence.solverRunIds[convergence.solverRunIds.size() - 2]),
@@ -462,6 +561,49 @@ int main(int argc, char* argv[])
         study.validate();
         require(convergence.converged, "fine mesh did not satisfy the recorded 5% convergence tolerance");
 
+        const datumloop::AnalysisMeshSettings romMeshSettings{0.0025, 3.0, 250000};
+        const datumloop::AnalysisMesh romBaseMesh = datumloop::OcctPrismAnalysisMesher::generate(
+            document, study.cadObjectId, romMeshSettings);
+        const std::array<double, 3> romTrainingLoadsN{5.0, 10.0, 15.0};
+        const std::array<double, 3> romTrainingModulusFactors{0.973, 1.0, 1.027};
+        std::vector<datumloop::StructuralRomHighFidelitySample> romTrainingSamples;
+        for (const double loadN : romTrainingLoadsN) {
+            for (const double modulusFactor : romTrainingModulusFactors) {
+                const double sampledYoungsModulusPa = youngsModulusPa * modulusFactor;
+                romTrainingSamples.push_back(runRomSample(
+                    document, study, solver, romMeshSettings, romBaseMesh.provenance.revisionId,
+                    loadN, sampledYoungsModulusPa));
+            }
+        }
+        const std::array<double, 2> romHeldOutLoadsN{7.5, 12.5};
+        const std::array<double, 2> romHeldOutModulusFactors{0.9865, 1.0135};
+        std::vector<datumloop::StructuralRomHighFidelitySample> romHeldOutSamples;
+        for (const double loadN : romHeldOutLoadsN) {
+            for (const double modulusFactor : romHeldOutModulusFactors) {
+                romHeldOutSamples.push_back(runRomSample(
+                    document, study, solver, romMeshSettings, romBaseMesh.provenance.revisionId,
+                    loadN, youngsModulusPa * modulusFactor));
+            }
+        }
+        const datumloop::StructuralElasticityRom rom = datumloop::fitStructuralElasticityRom(
+            "datumloop.cad-3d-elasticity.compliance-rom.v1",
+            romTrainingSamples,
+            romHeldOutSamples,
+            0.01);
+        require(rom.validationPassed && rom.trainingSamples.size() == 9 &&
+                    rom.validationSamples.size() == 4 && rom.maximumRelativeValidationError < 0.01 &&
+                    rom.rmsRelativeValidationError < 0.01 &&
+                    rom.predictEffectiveStiffness(10.0, youngsModulusPa) > 0.0,
+                "MFEM-sampled 3D structural ROM did not pass its held-out load/modulus grid");
+        bool extrapolationRejected = false;
+        try {
+            (void)rom.predictTipDisplacement(16.0, youngsModulusPa);
+        } catch (const std::out_of_range&) {
+            extrapolationRejected = true;
+        }
+        require(extrapolationRejected && rom.rejectsOutOfDomainInputs,
+                "3D structural ROM accepted an applied load outside its validated domain");
+
         datumloop::DatumEngineeringModel engineering = document.engineeringModel();
         engineering.structuralStudies = {study};
         document.setEngineeringModel(std::move(engineering));
@@ -521,12 +663,12 @@ int main(int argc, char* argv[])
 
         if (argc == 3 && std::string(argv[1]) == "--report") {
             writeReport(argv[2], study, runs, *sourcedMaterial, youngsModulusPa,
-                        analyticalTipM, analyticalSectionStressPa);
+                        analyticalTipM, analyticalSectionStressPa, rom);
         } else if (argc != 1) {
             throw std::invalid_argument("usage: datumloop-mfem-elasticity-tests [--report path]");
         }
         std::cout << "MFEM " << solver.solverVersion()
-                  << " CAD-derived 3D elasticity, reactions, indexed mesh snapshots, fields, four-mesh refinement, and DLD provenance passed.\n";
+                  << " CAD-derived 3D elasticity, mesh convergence, fields, bounded ROM sampling, held-out validation, and DLD provenance passed.\n";
     } catch (const std::exception& error) {
         std::cerr << "MFEM CAD 3D elasticity test failed: " << error.what() << '\n';
         return 1;

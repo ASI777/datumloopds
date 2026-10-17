@@ -144,6 +144,16 @@ maximum reaction-force balance error across the four runs is below
 The maximum element-center von Mises value can reflect idealized clamp or load
 edge concentrations; it is not used as a yield criterion.
 
+The 2.5 mm converged-resolution mesh also generated the first bounded 3D
+response ROM. Nine MFEM training solves span 5–15 N and 67.7208–71.4792 GPa;
+four independent load/modulus pairs are held out. The fitted normalized
+compliance response predicts tip displacement and effective stiffness, and
+rejects inputs outside its training region. Held-out maximum and RMS relative
+errors are `1.09e-9` and `7.89e-10` against a 1% tolerance. These are parameter
+holdouts on the same geometry, mesh, equation, and solver, not experimental or
+cross-mesh validation. See the [ROM scope and sampling record](native-structural-rom.md)
+and the full [3D result report](../reports/validation/mfem-3d-elasticity.json).
+
 ## External numerical libraries
 
 The adapter boundary remains solver-neutral. MFEM is the finite-element

@@ -42,10 +42,17 @@
   mesh/display path is limited to an axis-aligned rectangular solid and
   8-node hexahedra. Schema-7 results remain loadable but need a new solve to
   display because they do not include the FE coordinates/connectivity snapshot.
-- Generate a reduced model from the real 3D MFEM case, validate it on held-out
-  load/material samples, then connect it to MuJoCo and compare high-fidelity
-  and fast responses. The current 3D result is a numerically verified model,
-  not an experimentally validated digital twin.
+- The first bounded 3D static response ROM now comes from nine MFEM training
+  solves and four held-out load/material solves. It predicts tip displacement
+  and effective stiffness within a recorded force/modulus region and rejects
+  extrapolation. Its sub-`1e-9` held-out errors apply to parameter samples on
+  the same geometry, mesh, and solver; they do not establish cross-mesh or
+  experimental validation. The model and sample provenance are documented in
+  [the ROM record](native-structural-rom.md) and the [numerical report](numerical-verification.md).
+- Connect this static ROM to MuJoCo as a modular flexible-response effect,
+  expose deflection in the fast environment, and compare held-out responses
+  with MFEM. The 3D result is a numerically verified model, not an
+  experimentally validated digital twin.
 - Verify result-overlay rendering, selection, and camera movement on a
   hardware GPU; hardware rendering remains unverified.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.

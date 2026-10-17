@@ -202,6 +202,7 @@ EquationRegistry -> ScientificTask routing and structured proposals
 DatumDocument/DatumEngineeringModel -> persistent CAD-face boundary conditions
                                     -> OCCT rectangular-solid analysis mesh
                                     -> MFEM 3D linear elasticity -> field datasets/provenance
+                                    -> bounded load/modulus response ROM -> held-out metrics
 RobotModel -> backend-neutral observation/action contracts
            -> deterministic fixture environment -> MJCF export -> MuJoCo runtime check
            -> simulated StateInterface / hardware writes disabled
@@ -223,9 +224,12 @@ provenance; it does not establish experimental validation. Separate
 engineering prototypes retain the E0-E6 equation registry, generic solver
 contracts, 1D cantilever reference, held-out reduced beam response,
 provider-neutral scientific-agent routing, and simulated-only one-axis
-robot/RL environment. The exact exported MJCF runs in the MuJoCo runtime
-check. Equation, scientific-agent, and robotics prototypes are not exposed in
-the Qt workspace. The mechanism data foundation and its limits are described in
+robot/RL environment. A bounded static response ROM is also fitted from the
+3D MFEM case; its validity region and held-out parameter metrics are recorded,
+but it is not yet persisted in `.dld` or connected to the robotics environment.
+The exact exported MJCF runs in the MuJoCo runtime check. Equation,
+scientific-agent, and robotics prototypes are not exposed in the Qt workspace.
+The mechanism data foundation and its limits are described in
 [`milestone-2-mechanism-definition.md`](milestone-2-mechanism-definition.md).
 Renderer/display-mesh separation,
 workspace/editor composition, picking-service
