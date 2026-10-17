@@ -71,10 +71,14 @@ validate a real machine. Backend-neutral specs remain the DatumLoop contract.
 
 ## Structural ROM observation bridge
 
-`addStructuralResponseObservation` combines a bounded 3D static ROM response
+`addStructuralResponseObservation` combines one bounded 3D static ROM response
 with a rigid-body `RobotObservation`. It records the ROM ID, applied-force
-direction and magnitude, Young's modulus, predicted tip deflection, and
-effective stiffness while preserving the rigid backend's existing sensors.
+direction and magnitude, Young's modulus, predicted tip deflection, effective
+stiffness, and response evaluation time while preserving the rigid backend's
+existing sensors. `StructuralResponseObservationAdapter` applies the same
+quasi-static response at each strictly increasing observation timestamp and
+can reset for a new sequence. It rejects out-of-domain loads and does not
+consume a timestamp when a response cannot be produced.
 The held-out check uses the joint position and velocity returned by a verified
 MuJoCo 3.16.0 runtime step, then passes all four MFEM-held-out force/modulus
 pairs through the observation adapter. It compares structural deflection
@@ -83,11 +87,21 @@ and worst-operating-point errors. The MuJoCo position and velocity stay
 unchanged. MuJoCo continues to own rigid dynamics; this bridge adds the static
 ROM result to the observation and does not alter forces or state integration.
 
-This is observation-level coupling for a static, single-load-direction model.
-The rigid MuJoCo state is held fixed across the comparison grid; the grid
-measures ROM transfer through the observation adapter, not a MuJoCo structural
-prediction. This is not flexible-body feedback, a transient structural solver,
-or a complete MuJoCo environment adapter. Bridge evidence is recorded in
+The runtime smoke now records the MuJoCo clock, rigid joint state, and encoder
+values after each integrated step. The native bridge consumes this trace and
+adds a caller-supplied, linearly increasing 5-to-15 N fixture load at the same
+timestamps. That structural load is deliberately independent of MuJoCo's 1 N
+rigid actuator command; the adapter does not infer an actuator-to-structure
+load transfer. The report records each combined observation, and the check
+confirms that rigid sensor values remain unchanged, response times align, and
+the response changes with the explicit load schedule. CTest runs the fresh
+MuJoCo trace before this integration check when MuJoCo is available; otherwise
+the time-series bridge is reported as skipped.
+
+This is observation-level coupling for a quasi-static, single-load-direction
+model. The rigid MuJoCo state does not receive structural feedback. This is not
+a transient structural solver, a flexible-body dynamics model, or a complete
+MuJoCo environment. Bridge evidence is recorded in
 [`mfem-3d-elasticity.json`](../reports/validation/mfem-3d-elasticity.json).
 
 Robot and RL environment records are not yet persisted in `.dld`, exposed in

@@ -208,8 +208,14 @@ if(BUILD_TESTING)
 
         add_executable(datumloop-mfem-elasticity-tests tests/native/test_mfem_3d_elasticity.cpp)
         target_link_libraries(datumloop-mfem-elasticity-tests PRIVATE datumloop_mfem_backend datumloop_io datumloop_robotics Qt6::Core)
+        set(DATUMLOOP_MUJOCO_RUNTIME_REPORT "${CMAKE_CURRENT_BINARY_DIR}/reports/mujoco-runtime.json")
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/reports")
+        configure_file(
+            "${CMAKE_SOURCE_DIR}/reports/validation/mujoco-runtime.json"
+            "${DATUMLOOP_MUJOCO_RUNTIME_REPORT}"
+            COPYONLY)
         target_compile_definitions(datumloop-mfem-elasticity-tests PRIVATE
-            DATUMLOOP_MUJOCO_RUNTIME_REPORT="${CMAKE_SOURCE_DIR}/reports/validation/mujoco-runtime.json")
+            DATUMLOOP_MUJOCO_RUNTIME_REPORT="${DATUMLOOP_MUJOCO_RUNTIME_REPORT}")
         add_test(NAME datumloop-mfem-elasticity-tests COMMAND datumloop-mfem-elasticity-tests)
     else()
         foreach(test_name IN ITEMS datumloop-mfem-tests datumloop-mfem-elasticity-tests)
@@ -219,6 +225,7 @@ if(BUILD_TESTING)
         endforeach()
     endif()
 
+    set(DATUMLOOP_MUJOCO_RUNTIME_LIVE OFF)
     if(DATUMLOOP_MUJOCO_PYTHON)
         execute_process(
             COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" -c "import mujoco"
@@ -226,10 +233,14 @@ if(BUILD_TESTING)
             OUTPUT_QUIET ERROR_QUIET
         )
         if(DATUMLOOP_MUJOCO_IMPORT_STATUS EQUAL 0)
+            set(DATUMLOOP_MUJOCO_RUNTIME_LIVE ON)
             add_test(NAME datumloop-mujoco-runtime
                 COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_mujoco_runtime.py"
                         "${DATUMLOOP_MJCF_OUTPUT}" --report "${CMAKE_CURRENT_BINARY_DIR}/reports/mujoco-runtime.json")
             set_tests_properties(datumloop-mujoco-runtime PROPERTIES DEPENDS datumloop-robotics-tests)
+            if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+                set_tests_properties(datumloop-mfem-elasticity-tests PROPERTIES DEPENDS datumloop-mujoco-runtime)
+            endif()
         else()
             message(WARNING "DATUMLOOP_MUJOCO_PYTHON cannot import mujoco; runtime test is disabled")
             add_test(NAME datumloop-mujoco-runtime
@@ -240,6 +251,11 @@ if(BUILD_TESTING)
         add_test(NAME datumloop-mujoco-runtime
             COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: no Python interpreter configured with MuJoCo")
         set_tests_properties(datumloop-mujoco-runtime PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
+    endif()
+
+    if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+        target_compile_definitions(datumloop-mfem-elasticity-tests PRIVATE
+            DATUMLOOP_MUJOCO_RUNTIME_LIVE=$<BOOL:${DATUMLOOP_MUJOCO_RUNTIME_LIVE}>)
     endif()
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)

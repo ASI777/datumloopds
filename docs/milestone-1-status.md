@@ -52,13 +52,17 @@
   [the ROM record](native-structural-rom.md) and the [numerical report](numerical-verification.md).
 - A first observation-level bridge now adds ROM tip deflection to a verified
   MuJoCo rigid-state observation, while leaving MuJoCo dynamics unchanged.
-  A four-point held-out comparison now reports mean, RMS, and maximum relative
-  error plus its worst operating point for MFEM versus ROM and MuJoCo-plus-ROM
-  observations. The integrated static output matches the direct ROM on this
-  grid; MuJoCo supplies the rigid state and does not calculate flex or receive
-  feedback. Next, extend the observation bridge to a runtime environment
-  adapter with time-varying load transfer. The 3D result is a numerically
-  verified model, not an experimentally validated digital twin.
+  The runtime bridge now consumes time-stamped encoder and rigid-state samples
+  from actual MuJoCo integration steps and adds a caller-supplied, quasi-static
+  5-to-15 N ROM load schedule. It checks increasing timestamps, load-dependent
+  deflection, sensor preservation, reset, and out-of-domain rejection. The
+  fixture load is not inferred from the MuJoCo actuator and does not feed back
+  into rigid dynamics. A four-point held-out comparison reports mean, RMS, and
+  maximum relative error plus its worst operating point for MFEM versus ROM
+  and MuJoCo-plus-ROM observations. The next milestone is traceable requirements, editable native CAD,
+  manufacturing checks, and verified local MFEM analysis for a real machine
+  part; further ROM coupling follows that real-part verification. The 3D result is a numerically verified model, not an experimentally
+  validated digital twin.
 - Run [the manual NVIDIA viewport workflow](../.github/workflows/native-nvidia-gpu-smoke.yml)
   on a configured Linux runner; result-overlay rendering, selection, and camera
   movement on hardware remain unverified until that run passes.

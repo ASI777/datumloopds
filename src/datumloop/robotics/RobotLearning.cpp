@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace datumloop {
 namespace {
@@ -369,7 +370,33 @@ void addStructuralResponseObservation(RobotObservation& observation,
         youngsModulusPa,
         rom.predictTipDisplacement(appliedForceMagnitudeN, youngsModulusPa),
         rom.predictEffectiveStiffness(appliedForceMagnitudeN, youngsModulusPa),
+        observation.timeS,
     };
+}
+
+StructuralResponseObservationAdapter::StructuralResponseObservationAdapter(
+    StructuralElasticityRom rom,
+    double youngsModulusPa)
+    : rom_(std::move(rom)), youngsModulusPa_(youngsModulusPa)
+{
+    rom_.validate();
+    if (!finite(youngsModulusPa_) || youngsModulusPa_ <= 0.0) {
+        throw std::invalid_argument("structural observation adapter requires a finite positive Young's modulus");
+    }
+}
+
+RobotObservation StructuralResponseObservationAdapter::adapt(
+    const RobotObservation& rigidObservation,
+    const Vector3& appliedForceN)
+{
+    if (!finite(rigidObservation.timeS) || rigidObservation.timeS < 0.0 ||
+        (lastEvaluationTimeS_.has_value() && rigidObservation.timeS <= *lastEvaluationTimeS_)) {
+        throw std::invalid_argument("structural observation times must be finite, nonnegative, and strictly increasing");
+    }
+    RobotObservation combined = rigidObservation;
+    addStructuralResponseObservation(combined, rom_, appliedForceN, youngsModulusPa_);
+    lastEvaluationTimeS_ = rigidObservation.timeS;
+    return combined;
 }
 
 DeterministicMassEnvironment::DeterministicMassEnvironment(const RobotModel& robot,

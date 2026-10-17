@@ -671,8 +671,22 @@ int main(int argc, char* argv[])
         const double mujocoVelocityMPerS = mujocoReport.value(QStringLiteral("final_velocity_m_per_s")).toDouble();
         require(std::isfinite(mujocoPositionM) && std::isfinite(mujocoVelocityMPerS),
                 "ROM bridge requires finite rigid position and velocity from MuJoCo");
+        const QJsonArray mujocoRuntimeSamples = DATUMLOOP_MUJOCO_RUNTIME_LIVE
+            ? mujocoReport.value(QStringLiteral("observation_samples")).toArray() : QJsonArray{};
+        require(!DATUMLOOP_MUJOCO_RUNTIME_LIVE || !mujocoRuntimeSamples.isEmpty(),
+                "configured MuJoCo runtime did not produce a fresh per-step observation trace");
+        const double mujocoTimestepS = mujocoReport.value(QStringLiteral("timestep_s")).toDouble(0.01);
+        require(std::isfinite(mujocoTimestepS) && mujocoTimestepS > 0.0,
+                "MuJoCo runtime report requires a finite positive timestep");
         datumloop::RobotObservation rigidObservation;
-        rigidObservation.timeS = mujocoReport.value(QStringLiteral("steps")).toDouble() * 0.01;
+        rigidObservation.timeS = mujocoReport.value(QStringLiteral("steps")).toDouble() * mujocoTimestepS;
+        if (!mujocoRuntimeSamples.isEmpty()) {
+            const QJsonObject finalRuntimeSample = mujocoRuntimeSamples.last().toObject();
+            rigidObservation.timeS = finalRuntimeSample.value(QStringLiteral("time_s")).toDouble();
+            require(std::abs(finalRuntimeSample.value(QStringLiteral("joint_position_m")).toDouble() - mujocoPositionM) <= 1e-12 &&
+                        std::abs(finalRuntimeSample.value(QStringLiteral("joint_velocity_m_per_s")).toDouble() - mujocoVelocityMPerS) <= 1e-12,
+                    "MuJoCo final runtime state does not match its final observation sample");
+        }
         datumloop::RobotSensorObservation jointPosition;
         jointPosition.sensorId = "mujoco.slider_x.position";
         jointPosition.valid = true;
@@ -776,6 +790,167 @@ int main(int argc, char* argv[])
              encodeTipResponseErrorMetrics(mujocoPlusRomVsRomMetrics)},
         };
 
+        QJsonObject timeVaryingRuntimeBridge{
+            {QStringLiteral("status"), QStringLiteral("skipped")},
+            {QStringLiteral("reason"), QStringLiteral("MuJoCo report contains no per-step observation_samples")},
+            {QStringLiteral("response_type"), QStringLiteral("quasi-static ROM response")},
+            {QStringLiteral("load_source"), QStringLiteral("explicit test-fixture schedule; not inferred from MuJoCo control")},
+            {QStringLiteral("rigid_dynamics_modified"), false},
+        };
+        if (!mujocoRuntimeSamples.isEmpty()) {
+            const int expectedRuntimeSteps = mujocoReport.value(QStringLiteral("steps")).toInt(-1);
+            require(expectedRuntimeSteps > 1 && mujocoRuntimeSamples.size() == expectedRuntimeSteps,
+                    "MuJoCo runtime trace must contain one observation sample for every integration step");
+            datumloop::StructuralResponseObservationAdapter runtimeAdapter(rom, youngsModulusPa);
+            QJsonArray timeVaryingSamples;
+            std::optional<datumloop::RobotObservation> firstRuntimeObservation;
+            std::optional<datumloop::RobotObservation> lastRuntimeObservation;
+            double previousTimeS = -1.0;
+            double previousDeflectionM = -1.0;
+            double finalScheduledLoadN = 0.0;
+            const auto readFiniteNumber = [](const QJsonObject& object, const QString& key) {
+                const QJsonValue value = object.value(key);
+                if (!value.isDouble() || !std::isfinite(value.toDouble())) {
+                    throw std::runtime_error("MuJoCo per-step observation contains a missing or non-finite number");
+                }
+                return value.toDouble();
+            };
+            for (int index = 0; index < mujocoRuntimeSamples.size(); ++index) {
+                const QJsonObject runtimeSample = mujocoRuntimeSamples.at(index).toObject();
+                const double timeS = readFiniteNumber(runtimeSample, QStringLiteral("time_s"));
+                const double jointPositionM = readFiniteNumber(runtimeSample, QStringLiteral("joint_position_m"));
+                const double jointVelocityMPerS = readFiniteNumber(runtimeSample, QStringLiteral("joint_velocity_m_per_s"));
+                const double encoderPositionM = readFiniteNumber(runtimeSample, QStringLiteral("encoder_position_m"));
+                const double encoderVelocityMPerS = readFiniteNumber(runtimeSample, QStringLiteral("encoder_velocity_m_per_s"));
+                require(timeS > previousTimeS && timeS >= 0.0,
+                        "MuJoCo per-step observation times must be finite and strictly increasing");
+                if (index > 0) {
+                    require(std::abs((timeS - previousTimeS) - mujocoTimestepS) <= 1e-9,
+                            "MuJoCo runtime observation samples must align with the integration timestep");
+                }
+                require(std::abs(encoderPositionM - jointPositionM) <= 1e-12 &&
+                            std::abs(encoderVelocityMPerS - jointVelocityMPerS) <= 1e-12,
+                        "MuJoCo runtime encoder values do not match the integrated rigid-body state");
+
+                datumloop::RobotObservation perStepRigidObservation;
+                perStepRigidObservation.timeS = timeS;
+                datumloop::RobotSensorObservation positionSensor = jointPosition;
+                positionSensor.value = encoderPositionM;
+                positionSensor.captureTimeS = timeS;
+                positionSensor.deliveryTimeS = timeS;
+                datumloop::RobotSensorObservation velocitySensor = jointVelocity;
+                velocitySensor.value = encoderVelocityMPerS;
+                velocitySensor.captureTimeS = timeS;
+                velocitySensor.deliveryTimeS = timeS;
+                perStepRigidObservation.sensors = {positionSensor, velocitySensor};
+
+                const double loadFraction = static_cast<double>(index) /
+                                            static_cast<double>(mujocoRuntimeSamples.size() - 1);
+                const double appliedForceMagnitudeN = 5.0 + 10.0 * loadFraction;
+                const datumloop::Vector3 appliedForceN{
+                    rom.appliedForceDirectionUnit[0] * appliedForceMagnitudeN,
+                    rom.appliedForceDirectionUnit[1] * appliedForceMagnitudeN,
+                    rom.appliedForceDirectionUnit[2] * appliedForceMagnitudeN,
+                };
+                const datumloop::RobotObservation combinedObservation =
+                    runtimeAdapter.adapt(perStepRigidObservation, appliedForceN);
+                require(preservesRigidObservation(combinedObservation, perStepRigidObservation) &&
+                            combinedObservation.structuralResponse.has_value() &&
+                            combinedObservation.structuralResponse->romId == rom.id &&
+                            combinedObservation.structuralResponse->evaluationTimeS == timeS &&
+                            combinedObservation.structuralResponse->appliedForceMagnitudeN == appliedForceMagnitudeN,
+                        "time-varying ROM adapter changed a MuJoCo sensor or misaligned its response time");
+                const double tipDeflectionM = combinedObservation.structuralResponse->tipDeflectionMagnitudeM;
+                require(std::abs(tipDeflectionM - rom.predictTipDisplacement(appliedForceMagnitudeN, youngsModulusPa)) <= 1e-15 &&
+                            (index == 0 || tipDeflectionM > previousDeflectionM),
+                        "time-varying ROM response did not follow the explicit increasing load schedule");
+                timeVaryingSamples.append(QJsonObject{
+                    {QStringLiteral("time_s"), timeS},
+                    {QStringLiteral("applied_structural_force_n"), appliedForceMagnitudeN},
+                    {QStringLiteral("rigid_joint_position_m"), encoderPositionM},
+                    {QStringLiteral("rigid_joint_velocity_m_per_s"), encoderVelocityMPerS},
+                    {QStringLiteral("rom_tip_deflection_m"), tipDeflectionM},
+                    {QStringLiteral("effective_stiffness_n_per_m"),
+                     combinedObservation.structuralResponse->effectiveStiffnessNPerM},
+                    {QStringLiteral("response_evaluation_time_s"),
+                     combinedObservation.structuralResponse->evaluationTimeS},
+                });
+                if (index == 0) firstRuntimeObservation = perStepRigidObservation;
+                lastRuntimeObservation = perStepRigidObservation;
+                previousTimeS = timeS;
+                previousDeflectionM = tipDeflectionM;
+                finalScheduledLoadN = appliedForceMagnitudeN;
+            }
+
+            require(firstRuntimeObservation.has_value() && lastRuntimeObservation.has_value(),
+                    "time-varying adapter test did not retain runtime boundary observations");
+            bool duplicateTimeRejected = false;
+            try {
+                (void)runtimeAdapter.adapt(*lastRuntimeObservation,
+                    {rom.appliedForceDirectionUnit[0] * finalScheduledLoadN,
+                     rom.appliedForceDirectionUnit[1] * finalScheduledLoadN,
+                     rom.appliedForceDirectionUnit[2] * finalScheduledLoadN});
+            } catch (const std::invalid_argument&) {
+                duplicateTimeRejected = true;
+            }
+            require(duplicateTimeRejected,
+                    "time-varying ROM adapter accepted a duplicate MuJoCo observation timestamp");
+
+            datumloop::RobotObservation nextRuntimeObservation = *lastRuntimeObservation;
+            nextRuntimeObservation.timeS += mujocoTimestepS;
+            for (datumloop::RobotSensorObservation& sensor : nextRuntimeObservation.sensors) {
+                sensor.captureTimeS = nextRuntimeObservation.timeS;
+                sensor.deliveryTimeS = nextRuntimeObservation.timeS;
+            }
+            const datumloop::Vector3 outOfDomainForceN{
+                rom.appliedForceDirectionUnit[0] * 16.0,
+                rom.appliedForceDirectionUnit[1] * 16.0,
+                rom.appliedForceDirectionUnit[2] * 16.0,
+            };
+            bool outOfDomainLoadRejected = false;
+            try {
+                (void)runtimeAdapter.adapt(nextRuntimeObservation, outOfDomainForceN);
+            } catch (const std::out_of_range&) {
+                outOfDomainLoadRejected = true;
+            }
+            require(outOfDomainLoadRejected,
+                    "time-varying ROM adapter accepted an out-of-domain structural load");
+            const datumloop::Vector3 inDomainForceN{
+                rom.appliedForceDirectionUnit[0] * 15.0,
+                rom.appliedForceDirectionUnit[1] * 15.0,
+                rom.appliedForceDirectionUnit[2] * 15.0,
+            };
+            const datumloop::RobotObservation recoveredObservation =
+                runtimeAdapter.adapt(nextRuntimeObservation, inDomainForceN);
+            require(recoveredObservation.structuralResponse.has_value() &&
+                        recoveredObservation.structuralResponse->evaluationTimeS == nextRuntimeObservation.timeS,
+                    "rejected out-of-domain load consumed the next observation time");
+            runtimeAdapter.reset();
+            const datumloop::RobotObservation resetObservation = runtimeAdapter.adapt(
+                *firstRuntimeObservation,
+                {rom.appliedForceDirectionUnit[0] * 5.0,
+                 rom.appliedForceDirectionUnit[1] * 5.0,
+                 rom.appliedForceDirectionUnit[2] * 5.0});
+            require(resetObservation.structuralResponse.has_value() &&
+                        resetObservation.structuralResponse->evaluationTimeS == firstRuntimeObservation->timeS,
+                    "reset did not allow a new MuJoCo observation sequence");
+
+            timeVaryingRuntimeBridge = QJsonObject{
+                {QStringLiteral("status"), QStringLiteral("passed")},
+                {QStringLiteral("response_type"), QStringLiteral("quasi-static ROM response")},
+                {QStringLiteral("time_source"), QStringLiteral("MuJoCo simulation clock after each integrated step")},
+                {QStringLiteral("load_source"), QStringLiteral("explicit 5-to-15 N test-fixture schedule; not inferred from MuJoCo control")},
+                {QStringLiteral("load_direction_unit"), QJsonArray{
+                    rom.appliedForceDirectionUnit[0], rom.appliedForceDirectionUnit[1], rom.appliedForceDirectionUnit[2]}},
+                {QStringLiteral("sample_count"), timeVaryingSamples.size()},
+                {QStringLiteral("duplicate_time_rejected"), duplicateTimeRejected},
+                {QStringLiteral("out_of_domain_load_rejected"), outOfDomainLoadRejected},
+                {QStringLiteral("reset_supported"), true},
+                {QStringLiteral("rigid_dynamics_modified"), false},
+                {QStringLiteral("samples"), timeVaryingSamples},
+            };
+        }
+
         datumloop::RobotObservation lightLoadObservation = rigidObservation;
         datumloop::addStructuralResponseObservation(lightLoadObservation, rom, {0.0, -5.0, 0.0}, youngsModulusPa);
         datumloop::RobotObservation heavyLoadObservation = rigidObservation;
@@ -813,6 +988,7 @@ int main(int argc, char* argv[])
             {QStringLiteral("load_direction_unit"), QJsonArray{
                 rom.appliedForceDirectionUnit[0], rom.appliedForceDirectionUnit[1], rom.appliedForceDirectionUnit[2]}},
             {QStringLiteral("youngs_modulus_pa"), youngsModulusPa},
+            {QStringLiteral("time_varying_runtime"), timeVaryingRuntimeBridge},
             {QStringLiteral("observations"), QJsonArray{
                 QJsonObject{
                     {QStringLiteral("applied_force_n"), lightLoadObservation.structuralResponse->appliedForceMagnitudeN},
