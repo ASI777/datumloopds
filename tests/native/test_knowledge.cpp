@@ -1,10 +1,12 @@
 #include "datumloop/knowledge/EquationRegistry.hpp"
 #include "datumloop/numerics/CantileverBeamFEM.hpp"
+#include "datumloop/numerics/StructuralReducedModel.hpp"
 #include "datumloop/solver/PhysicsSolver.hpp"
 
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -65,12 +67,14 @@ int main()
         }, "dimension arithmetic accepted force plus temperature");
 
         const datumloop::EquationRegistry registry = datumloop::makeInitialEquationRegistry();
-        require(registry.equations().size() == 4, "initial equation registry must contain the three original equations and the cantilever model");
+        require(registry.equations().size() == 5, "initial equation registry must contain the original equations and both structural models");
         const auto* newton = registry.find("mechanics.newton.second-law.translation.v1");
         const auto* heat = registry.find("thermal.heat-equation.isotropic.v1");
         const auto* elasticity = registry.find("materials.elasticity.uniaxial-linear.v1");
         const auto* timoshenko = registry.find("structural.timoshenko-beam.isotropic.v1");
+        const auto* elasticity3d = registry.find("structural.linear-elasticity.3d.isotropic-small-strain.v1");
         require(newton != nullptr && heat != nullptr && elasticity != nullptr && timoshenko != nullptr &&
+                    elasticity3d != nullptr &&
                     newton->maturity == datumloop::ModelMaturity::E3 &&
                     registry.findAtLeast(newton->id, datumloop::ModelMaturity::E3) == newton &&
                     registry.findAtLeast(newton->id, datumloop::ModelMaturity::E4) == nullptr,
@@ -81,7 +85,12 @@ int main()
                     newton->variables.front().coordinateSystem == "Cartesian" &&
                     elasticity->weakForm.has_value() && !elasticity->constitutiveRelationships.empty() &&
                     timoshenko->maturity == datumloop::ModelMaturity::E4 && timoshenko->weakForm.has_value() &&
-                    registry.findAtLeast(timoshenko->id, datumloop::ModelMaturity::E4) == timoshenko,
+                    registry.findAtLeast(timoshenko->id, datumloop::ModelMaturity::E4) == timoshenko &&
+                    elasticity3d->maturity == datumloop::ModelMaturity::E3 &&
+                    elasticity3d->weakForm.has_value() &&
+                    elasticity3d->variables[0].quantityType == datumloop::EquationQuantityType::Vector &&
+                    elasticity3d->variables[1].quantityType == datumloop::EquationQuantityType::Tensor2 &&
+                    registry.findAtLeast(elasticity3d->id, datumloop::ModelMaturity::E3) == elasticity3d,
                 "equation formulations must carry explicit strong/weak form and vector frame metadata");
         auto unframedVector = newton->variables.front();
         unframedVector.referenceFrame.clear();
@@ -208,7 +217,33 @@ int main()
                   << ",validation_elements=" << rom.validationElementCount
                   << ",max_heldout_relative_error=" << rom.maximumRelativeValidationError << '\n';
 
-        std::cout << "Equation registry, units, analytical checks, generic solver contracts, cantilever FEM mesh convergence, and ROM validation passed.\n";
+        const std::vector<datumloop::StructuralResponseComparisonSample> responseComparisons{
+            {7.5, 69.0e9, 1.0e-3, 1.01e-3, "reference-run-a"},
+            {12.5, 70.0e9, 2.0e-3, 2.2e-3, "reference-run-b"},
+        };
+        const datumloop::StructuralResponseErrorMetrics responseMetrics =
+            datumloop::compareStructuralTipDeflections(responseComparisons);
+        require(responseMetrics.sampleCount == 2 &&
+                    close(responseMetrics.meanAbsoluteRelativeError, 0.055, 1e-12) &&
+                    close(responseMetrics.rmsRelativeError, std::sqrt(0.00505), 1e-12) &&
+                    close(responseMetrics.maximumRelativeError, 0.1, 1e-12) &&
+                    responseMetrics.worstOperatingPoint.referenceRunId == "reference-run-b" &&
+                    datumloop::relativeTipDeflectionError(responseComparisons[1]) ==
+                        responseMetrics.maximumRelativeError,
+                "structural response comparison did not report mean, RMS, maximum, and worst-case provenance");
+        requireThrows([&]() {
+            (void)datumloop::compareStructuralTipDeflections({});
+        }, "structural response comparison accepted an empty validation set");
+        auto invalidComparison = responseComparisons.front();
+        invalidComparison.referenceTipDeflectionM = 0.0;
+        requireThrows([&]() { (void)datumloop::relativeTipDeflectionError(invalidComparison); },
+                      "structural response comparison accepted a zero reference response");
+        invalidComparison.referenceTipDeflectionM = std::numeric_limits<double>::denorm_min();
+        invalidComparison.predictedTipDeflectionM = std::numeric_limits<double>::max();
+        requireThrows([&]() { (void)datumloop::relativeTipDeflectionError(invalidComparison); },
+                      "structural response comparison emitted an infinite relative error");
+
+        std::cout << "Equation registry, units, analytical checks, generic solver contracts, cantilever FEM mesh convergence, ROM validation, and structural response error metrics passed.\n";
     } catch (const std::exception& error) {
         std::cerr << "Knowledge and verification test failed: " << error.what() << '\n';
         return 1;

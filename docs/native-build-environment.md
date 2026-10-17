@@ -24,13 +24,18 @@ docker run --rm --volume "$PWD:/workspace:ro" datumloopds-native:locked
 ```
 
 The container performs a Release CMake configure/build, runs the native CTest
-suite with MFEM disabled, then launches `DatumLoopDS --smoke-load` on Qt's
+suite with MFEM disabled, checks the executable and native source for FreeCAD,
+Coin, and SoQt dependencies, then launches `DatumLoopDS --smoke-load` on Qt's
 offscreen platform. This verifies the project QML shell initializes; it does
 not verify rendered frames or hardware-GPU behavior. MFEM and MuJoCo remain
 optional integrations and are intentionally excluded from this baseline lock.
-The same commands run in
-[`reproducible-native-build.yml`](../.github/workflows/reproducible-native-build.yml)
-on pushes and pull requests.
+When either backend is unavailable, CTest reports its integration checks as
+skipped so the baseline does not imply those integrations were exercised.
+The same commands run in [`datumloop-native-ci.yml`](../.github/workflows/datumloop-native-ci.yml)
+on pushes and pull requests. FreeCAD has a separate manually dispatched
+workflow; its current failure is documented in
+[`freecad-run-39028748447.md`](../reports/compatibility/freecad-run-39028748447.md)
+and does not gate native changes.
 
 The standalone C++/Qt/OCCT application and the FreeCAD 1.1.3 fork have separate
 locked build images. The FreeCAD image and clean-checkout build/smoke command

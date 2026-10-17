@@ -1,4 +1,4 @@
-name: Reproducible native build
+name: DatumLoop native CI
 
 on:
   push:

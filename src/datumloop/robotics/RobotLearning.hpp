@@ -2,6 +2,7 @@
 
 #include "datumloop/engineering/DatumEngineeringModel.hpp"
 #include "datumloop/knowledge/EquationRegistry.hpp"
+#include "datumloop/numerics/StructuralReducedModel.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -169,6 +170,39 @@ struct RobotSensorObservation {
 struct RobotObservation {
     double timeS = 0.0;
     std::vector<RobotSensorObservation> sensors;
+    struct StructuralResponse {
+        std::string romId;
+        Vector3 appliedForceDirectionUnit{0.0, 0.0, 0.0};
+        double appliedForceMagnitudeN = 0.0;
+        double youngsModulusPa = 0.0;
+        double tipDeflectionMagnitudeM = 0.0;
+        double effectiveStiffnessNPerM = 0.0;
+        double evaluationTimeS = 0.0;
+    };
+    std::optional<StructuralResponse> structuralResponse;
+};
+
+// Adds a bounded, static flexible response to an observation supplied by a
+// rigid-body backend such as MuJoCo. Existing rigid sensor values are kept.
+void addStructuralResponseObservation(RobotObservation& observation,
+                                      const StructuralElasticityRom& rom,
+                                      const Vector3& appliedForceN,
+                                      double youngsModulusPa);
+
+// Adds one time-aligned ROM response to a rigid-backend observation stream.
+// Loads are supplied by the caller; no force transfer is inferred here.
+class StructuralResponseObservationAdapter final {
+public:
+    StructuralResponseObservationAdapter(StructuralElasticityRom rom, double youngsModulusPa);
+
+    [[nodiscard]] RobotObservation adapt(const RobotObservation& rigidObservation,
+                                         const Vector3& appliedForceN);
+    void reset() noexcept { lastEvaluationTimeS_.reset(); }
+
+private:
+    StructuralElasticityRom rom_;
+    double youngsModulusPa_ = 0.0;
+    std::optional<double> lastEvaluationTimeS_;
 };
 
 struct RobotAction {

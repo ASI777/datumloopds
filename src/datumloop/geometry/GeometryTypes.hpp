@@ -20,12 +20,14 @@ struct ShapeMetrics {
 struct MeshVertex {
     std::array<float, 3> position{};
     std::array<float, 3> normal{};
+    std::array<float, 4> color{1.0F, 1.0F, 1.0F, 1.0F};
 };
 
 struct TriangleMesh {
     std::vector<MeshVertex> vertices;
     Vector3 minimum{0.0, 0.0, 0.0};
     Vector3 maximum{0.0, 0.0, 0.0};
+    bool hasVertexColors = false;
 
     [[nodiscard]] std::size_t triangleCount() const noexcept
     {

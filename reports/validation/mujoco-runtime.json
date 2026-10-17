@@ -1,9 +1,10 @@
 {
   "backend": "MuJoCo",
   "version": "3.16.0",
-  "mjcf": "build/native/mujoco-runtime/one-axis-fixture.xml",
+  "mjcf": "build/mujoco-runtime/one-axis-fixture.xml",
   "model_name": "One-axis <fixture>",
   "joint": "slider_x",
+  "timestep_s": 0.01,
   "joint_range_m": [
     -0.2,
     0.2
@@ -25,5 +26,77 @@
   "encoder_position_m": 0.005499999999999998,
   "encoder_velocity_m_per_s": 0.09999999999999995,
   "steps": 10,
+  "observation_samples": [
+    {
+      "time_s": 0.01,
+      "joint_position_m": 9.999999999999995e-05,
+      "joint_velocity_m_per_s": 0.009999999999999995,
+      "encoder_position_m": 9.999999999999995e-05,
+      "encoder_velocity_m_per_s": 0.009999999999999995
+    },
+    {
+      "time_s": 0.02,
+      "joint_position_m": 0.00029999999999999987,
+      "joint_velocity_m_per_s": 0.01999999999999999,
+      "encoder_position_m": 0.00029999999999999987,
+      "encoder_velocity_m_per_s": 0.01999999999999999
+    },
+    {
+      "time_s": 0.03,
+      "joint_position_m": 0.0005999999999999997,
+      "joint_velocity_m_per_s": 0.029999999999999985,
+      "encoder_position_m": 0.0005999999999999997,
+      "encoder_velocity_m_per_s": 0.029999999999999985
+    },
+    {
+      "time_s": 0.04,
+      "joint_position_m": 0.0009999999999999996,
+      "joint_velocity_m_per_s": 0.03999999999999998,
+      "encoder_position_m": 0.0009999999999999996,
+      "encoder_velocity_m_per_s": 0.03999999999999998
+    },
+    {
+      "time_s": 0.05,
+      "joint_position_m": 0.0014999999999999994,
+      "joint_velocity_m_per_s": 0.049999999999999975,
+      "encoder_position_m": 0.0014999999999999994,
+      "encoder_velocity_m_per_s": 0.049999999999999975
+    },
+    {
+      "time_s": 0.060000000000000005,
+      "joint_position_m": 0.002099999999999999,
+      "joint_velocity_m_per_s": 0.05999999999999997,
+      "encoder_position_m": 0.002099999999999999,
+      "encoder_velocity_m_per_s": 0.05999999999999997
+    },
+    {
+      "time_s": 0.07,
+      "joint_position_m": 0.0027999999999999987,
+      "joint_velocity_m_per_s": 0.06999999999999997,
+      "encoder_position_m": 0.0027999999999999987,
+      "encoder_velocity_m_per_s": 0.06999999999999997
+    },
+    {
+      "time_s": 0.08,
+      "joint_position_m": 0.003599999999999998,
+      "joint_velocity_m_per_s": 0.07999999999999996,
+      "encoder_position_m": 0.003599999999999998,
+      "encoder_velocity_m_per_s": 0.07999999999999996
+    },
+    {
+      "time_s": 0.09,
+      "joint_position_m": 0.004499999999999998,
+      "joint_velocity_m_per_s": 0.08999999999999996,
+      "encoder_position_m": 0.004499999999999998,
+      "encoder_velocity_m_per_s": 0.08999999999999996
+    },
+    {
+      "time_s": 0.09999999999999999,
+      "joint_position_m": 0.005499999999999998,
+      "joint_velocity_m_per_s": 0.09999999999999995,
+      "encoder_position_m": 0.005499999999999998,
+      "encoder_velocity_m_per_s": 0.09999999999999995
+    }
+  ],
   "runtime": "passed"
 }

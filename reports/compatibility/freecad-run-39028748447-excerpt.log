@@ -1,0 +1,9 @@
+2026-10-17T13:27:28.3278631Z -- Installing: /tmp/datumloopds-freecad-install/include/gtest/internal/gtest-death-test-internal.h
+2026-10-17T13:27:28.3282233Z -- Installing: /tmp/datumloopds-freecad-install/include/gtest/internal/gtest-param-util.h
+2026-10-17T13:27:28.3285721Z -- Installing: /tmp/datumloopds-freecad-install/include/gtest/internal/gtest-internal.h
+2026-10-17T13:27:28.3289245Z -- Installing: /tmp/datumloopds-freecad-install/include/gtest/gtest-message.h
+2026-10-17T13:27:28.3293167Z -- Installing: /tmp/datumloopds-freecad-install/lib/libgtest.a
+2026-10-17T13:27:28.3306792Z -- Installing: /tmp/datumloopds-freecad-install/lib/libgtest_main.a
+2026-10-17T13:27:28.3310684Z -- Installing: /tmp/datumloopds-freecad-install/lib/pkgconfig/gtest.pc
+2026-10-17T13:27:28.3314243Z -- Installing: /tmp/datumloopds-freecad-install/lib/pkgconfig/gtest_main.pc
+2026-10-17T13:27:31.0388996Z ##[error]Process completed with exit code 1.

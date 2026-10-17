@@ -11,7 +11,7 @@ Qt 6/QML, and OCCT; tscircuit's React/TypeScript UI is not part of the
 application architecture.
 
 The first implementation slice adds a native material/electronics model,
-`.dld` schema 6 persistence, Circuit JSON import/export, a bounded KiCad PCB
+`.dld` schema 7 persistence, Circuit JSON import/export, a bounded KiCad PCB
 importer, an OCCT-derived PCB preview, and a process-isolated DC circuit solver.
 It does not implement a general physics graph or multiphysics coupling engine.
 
@@ -49,12 +49,13 @@ planes, keepouts, solder joints, plated-hole barrels, stack-up dielectric
 layers, manufacturing rules, or temperature/frequency-dependent layer laws.
 Missing material and stack-up data is preserved as unknown.
 
-The `.dld` schema 6 stores these definitions, source IDs, relationships,
+The `.dld` schema 7 stores these definitions, source IDs, relationships,
 placement, units, optional values, and provenance. Geometry remains exact OCCT
 B-Rep data. Large fields are represented by dataset references rather than
 being copied into ordinary CAD properties. Design geometry, simulation fields,
 measured data, and calibrated parameters are separate concepts; only the design
-document and material-state placeholders are currently persisted. See
+document, material states, and the first bounded structural studies and fields
+are persisted. See
 [`native-project-format.md`](native-project-format.md).
 
 ## Import and viewport scope
@@ -182,8 +183,10 @@ KiCad implementation code or third-party libraries.
 
 ## Implemented versus planned
 
-Implemented in this slice: common material definitions/state placeholders;
-native circuits and PCB stack-up/geometry/connectivity; schema 6 persistence;
+Implemented in this slice: common material definitions and state; sourced
+material property uncertainty and temperature-bound metadata; native circuits
+and PCB stack-up/geometry/connectivity; schema 7 persistence including the
+first CAD-linked 3D structural study, MFEM fields, and provenance;
 Circuit JSON profile import/export; simple KiCad PCB profile import; a
 display-only OCCT PCB compound; an isolated ngspice DC adapter; and a
 power-to-thermal-source placeholder. Tests cover native round-trip/migrations,

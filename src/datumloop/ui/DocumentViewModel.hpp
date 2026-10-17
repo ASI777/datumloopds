@@ -2,10 +2,13 @@
 
 #include "datumloop/core/DatumCommand.hpp"
 #include "datumloop/core/DatumDocument.hpp"
+#include "datumloop/ui/AnalysisResultDisplay.hpp"
 
 #include <QAbstractListModel>
 #include <QUrl>
 #include <QVector3D>
+
+#include <string>
 
 namespace datumloop {
 
@@ -29,6 +32,14 @@ class DocumentViewModel final : public QAbstractListModel {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(QString projectName READ projectName NOTIFY projectChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY projectChanged)
+    Q_PROPERTY(bool analysisResultAvailable READ analysisResultAvailable NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisDisplayMode READ analysisDisplayMode NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisResultStatus READ analysisResultStatus NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisLegendTitle READ analysisLegendTitle NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisLegendMinimum READ analysisLegendMinimum NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisLegendMaximum READ analysisLegendMaximum NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(QString analysisResultProvenance READ analysisResultProvenance NOTIFY analysisDisplayChanged)
+    Q_PROPERTY(double analysisDeformationScale READ analysisDeformationScale NOTIFY analysisDisplayChanged)
 
 public:
     enum Role {
@@ -65,6 +76,15 @@ public:
     [[nodiscard]] bool canRedo() const noexcept { return history_.canRedo(); }
     [[nodiscard]] QString projectName() const;
     [[nodiscard]] bool dirty() const noexcept { return document_ != nullptr && document_->isDirty(); }
+    [[nodiscard]] bool analysisResultAvailable() const noexcept { return analysisResultAvailable_; }
+    [[nodiscard]] QString analysisDisplayMode() const { return analysisDisplayMode_; }
+    [[nodiscard]] QString analysisResultStatus() const { return analysisResultStatus_; }
+    [[nodiscard]] QString analysisLegendTitle() const { return analysisLegendTitle_; }
+    [[nodiscard]] QString analysisLegendMinimum() const { return analysisLegendMinimum_; }
+    [[nodiscard]] QString analysisLegendMaximum() const { return analysisLegendMaximum_; }
+    [[nodiscard]] QString analysisResultProvenance() const { return analysisResultProvenance_; }
+    [[nodiscard]] double analysisDeformationScale() const noexcept { return analysisDeformationScale_; }
+    [[nodiscard]] const TriangleMesh& analysisDisplayMesh() const noexcept { return analysisResultDisplay_.mesh; }
 
     Q_INVOKABLE void selectRow(int row);
     Q_INVOKABLE bool selectObjectId(const QString& objectId);
@@ -81,6 +101,8 @@ public:
     Q_INVOKABLE void saveProjectAs(const QUrl& fileUrl);
     Q_INVOKABLE void openProject(const QUrl& fileUrl);
     Q_INVOKABLE void reportInteractionStatus(const QString& message);
+    Q_INVOKABLE void setAnalysisDisplayMode(const QString& mode);
+    Q_INVOKABLE void setAnalysisDeformationScale(double scale);
 
 signals:
     void selectionChanged();
@@ -92,6 +114,7 @@ signals:
     void projectChanged();
     void saveAsRequested();
     void documentContentChanged();
+    void analysisDisplayChanged();
 
 private:
     [[nodiscard]] const DatumObject* selectedObject() const noexcept;
@@ -99,6 +122,9 @@ private:
     [[nodiscard]] Vector3 previewDelta() const noexcept;
     void updateStatus();
     void notifyObjectRows();
+    void rebuildAnalysisDisplay();
+    [[nodiscard]] bool validateAnalysisRunForDisplay(const StructuralAnalysisRun& run,
+                                                    std::string& reason) const;
 
     DatumDocument* document_ = nullptr;
     int selectedRow_ = -1;
@@ -110,6 +136,15 @@ private:
     Vector3 previewDelta_{0.0, 0.0, 0.0};
     CommandHistory history_;
     QString projectPath_;
+    QString analysisDisplayMode_ = QStringLiteral("Geometry");
+    QString analysisResultStatus_ = QStringLiteral("No structural result for this part.");
+    QString analysisLegendTitle_;
+    QString analysisLegendMinimum_;
+    QString analysisLegendMaximum_;
+    QString analysisResultProvenance_;
+    double analysisDeformationScale_ = 1.0;
+    bool analysisResultAvailable_ = false;
+    AnalysisResultDisplay analysisResultDisplay_;
 };
 
 }  // namespace datumloop

@@ -152,10 +152,15 @@ def main() -> int:
         return 2
 
     env = os.environ.copy()
-    env["QT_QPA_PLATFORM"] = "xcb"
-    env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+    env.setdefault("QT_QPA_PLATFORM", "xcb")
+    software_gl = env.get("DATUMLOOPDS_SOFTWARE_GL", "1").strip().lower() not in {"0", "false", "no"}
+    if software_gl:
+        env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+    else:
+        env.pop("LIBGL_ALWAYS_SOFTWARE", None)
+    smoke_argument = "--gpu-smoke" if env.get("DATUMLOOPDS_GPU_SMOKE") == "1" else "--interaction-smoke"
     process = subprocess.Popen(
-        [str(EXECUTABLE), "--interaction-smoke"],
+        [str(EXECUTABLE), smoke_argument],
         cwd=ROOT,
         env=env,
         stdout=subprocess.PIPE,

@@ -1,10 +1,12 @@
 #include "datumloop/ui/DocumentViewModel.hpp"
 
 #include "datumloop/io/DldProjectStore.hpp"
+#include "datumloop/numerics/AnalysisMesh.hpp"
 
 #include <QLocale>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 namespace datumloop {
@@ -34,6 +36,7 @@ DocumentViewModel::DocumentViewModel(DatumDocument* document, QObject* parent)
     if (document_ != nullptr && !document_->objects().empty()) {
         selectedRow_ = 0;
     }
+    rebuildAnalysisDisplay();
 }
 
 int DocumentViewModel::rowCount(const QModelIndex& parent) const
@@ -191,6 +194,7 @@ void DocumentViewModel::selectRow(int row)
         emit dataChanged(index(selectedRow_), index(selectedRow_), {IsSelectedRole});
     }
     emit selectionChanged();
+    rebuildAnalysisDisplay();
     if (rowChanged) {
         emit displayPositionChanged();
     }
@@ -244,6 +248,7 @@ bool DocumentViewModel::selectTopologyReference(const QString& objectId, const Q
     if (selectedTopologyReferenceId_ != referenceId) {
         selectedTopologyReferenceId_ = referenceId;
         emit selectionChanged();
+        rebuildAnalysisDisplay();
     }
     const QString type = QString::fromStdString(datumSubshapeTypeName(referenceIterator->subshapeType));
     statusText_ = QStringLiteral("Selected %1  |  %2")
@@ -462,6 +467,7 @@ void DocumentViewModel::openProject(const QUrl& fileUrl)
         emit displayPositionChanged();
         emit historyChanged();
         emit documentContentChanged();
+        rebuildAnalysisDisplay();
         statusText_ = QStringLiteral("Opened  |  %1").arg(path);
     } catch (const std::exception& error) {
         statusText_ = QStringLiteral("Open failed  |  %1").arg(exceptionText(error));
@@ -475,6 +481,39 @@ void DocumentViewModel::reportInteractionStatus(const QString& message)
         statusText_ = message;
         emit statusTextChanged();
     }
+}
+
+void DocumentViewModel::setAnalysisDisplayMode(const QString& mode)
+{
+    const QString normalized = mode.trimmed();
+    if (normalized != QStringLiteral("Geometry") && normalized != QStringLiteral("Displacement") &&
+        normalized != QStringLiteral("von Mises Stress") && normalized != QStringLiteral("Strain")) {
+        return;
+    }
+    if (normalized != QStringLiteral("Geometry") && !analysisResultAvailable_) {
+        statusText_ = analysisResultStatus_;
+        emit statusTextChanged();
+        return;
+    }
+    if (analysisDisplayMode_ == normalized) {
+        return;
+    }
+    analysisDisplayMode_ = normalized;
+    rebuildAnalysisDisplay();
+}
+
+void DocumentViewModel::setAnalysisDeformationScale(double scale)
+{
+    if (!std::isfinite(scale) || scale < 0.0 || scale > 1000.0) {
+        statusText_ = QStringLiteral("Deformation display scale must be between 0× and 1000×.");
+        emit statusTextChanged();
+        return;
+    }
+    if (analysisDeformationScale_ == scale) {
+        return;
+    }
+    analysisDeformationScale_ = scale;
+    rebuildAnalysisDisplay();
 }
 
 const DatumObject* DocumentViewModel::selectedObject() const noexcept
@@ -523,6 +562,155 @@ void DocumentViewModel::notifyObjectRows()
         emit dataChanged(index(0), index(rowCount() - 1),
                          {ObjectPositionRole, ObjectVolumeRole, IsSelectedRole});
     }
+}
+
+void DocumentViewModel::rebuildAnalysisDisplay()
+{
+    analysisResultDisplay_ = {};
+    analysisResultAvailable_ = false;
+    analysisLegendTitle_.clear();
+    analysisLegendMinimum_.clear();
+    analysisLegendMaximum_.clear();
+    analysisResultProvenance_.clear();
+
+    const std::string objectId = displayObjectId().toStdString();
+    const StructuralAnalysisRun* latestRun = nullptr;
+    if (document_ != nullptr && !objectId.empty()) {
+        for (const StructuralAnalysisStudy& study : document_->engineeringModel().structuralStudies) {
+            if (study.cadObjectId != objectId) {
+                continue;
+            }
+            for (auto iterator = study.runs.rbegin(); iterator != study.runs.rend(); ++iterator) {
+                if (iterator->provenance.cadObjectId == objectId && iterator->converged) {
+                    latestRun = &*iterator;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (latestRun == nullptr) {
+        analysisResultStatus_ = QStringLiteral("No structural result for this part.");
+        analysisDisplayMode_ = QStringLiteral("Geometry");
+        emit analysisDisplayChanged();
+        return;
+    }
+    if (!latestRun->meshSnapshot.has_value()) {
+        analysisResultStatus_ = QStringLiteral(
+            "This stored result has no persisted analysis mesh. Re-run the analysis to display its fields.");
+        analysisDisplayMode_ = QStringLiteral("Geometry");
+        emit analysisDisplayChanged();
+        return;
+    }
+
+    try {
+        latestRun->validate(latestRun->provenance.boundaryConditionIds);
+        std::string validationReason;
+        if (!validateAnalysisRunForDisplay(*latestRun, validationReason)) {
+            throw std::invalid_argument(validationReason);
+        }
+        analysisResultAvailable_ = true;
+        analysisResultStatus_ = QStringLiteral("Structural field result ready.");
+        const QString runId = QString::fromStdString(latestRun->provenance.solverRunId);
+        analysisResultProvenance_ = QStringLiteral("Run %1 · %2 %3 · source revision %4 · material %5")
+            .arg(runId.left(8), QString::fromStdString(latestRun->provenance.solverId),
+                 QString::fromStdString(latestRun->provenance.solverVersion))
+            .arg(static_cast<qulonglong>(latestRun->provenance.sourceDocumentRevision))
+            .arg(QString::fromStdString(latestRun->provenance.materialRevision));
+    } catch (const std::exception& error) {
+        analysisResultStatus_ = QStringLiteral("Structural result is not displayable: %1")
+                                    .arg(exceptionText(error));
+        analysisDisplayMode_ = QStringLiteral("Geometry");
+        emit analysisDisplayChanged();
+        return;
+    }
+
+    if (analysisDisplayMode_ != QStringLiteral("Geometry")) {
+        AnalysisResultField field;
+        if (analysisDisplayMode_ == QStringLiteral("Displacement")) {
+            field = AnalysisResultField::DisplacementMagnitude;
+        } else if (analysisDisplayMode_ == QStringLiteral("von Mises Stress")) {
+            field = AnalysisResultField::VonMisesStress;
+        } else {
+            field = AnalysisResultField::EquivalentStrain;
+        }
+        try {
+            analysisResultDisplay_ = buildAnalysisResultDisplay(
+                *latestRun, field, analysisDeformationScale_);
+            analysisLegendTitle_ = QString::fromStdString(analysisResultDisplay_.fieldName);
+            const QString units = QString::fromStdString(analysisResultDisplay_.units);
+            analysisLegendMinimum_ = QStringLiteral("%1 %2")
+                .arg(QString::number(analysisResultDisplay_.minimum, 'g', 4), units);
+            analysisLegendMaximum_ = QStringLiteral("%1 %2")
+                .arg(QString::number(analysisResultDisplay_.maximum, 'g', 4), units);
+        } catch (const std::exception& error) {
+            analysisResultAvailable_ = false;
+            analysisResultStatus_ = QStringLiteral("Structural result is not displayable: %1")
+                                        .arg(exceptionText(error));
+            analysisDisplayMode_ = QStringLiteral("Geometry");
+        }
+    }
+    emit analysisDisplayChanged();
+}
+
+bool DocumentViewModel::validateAnalysisRunForDisplay(const StructuralAnalysisRun& run,
+                                                      std::string& reason) const
+{
+    if (document_ == nullptr || !run.meshSnapshot.has_value()) {
+        reason = "the source analysis mesh snapshot is unavailable";
+        return false;
+    }
+    const DatumObject* object = document_->object(run.provenance.cadObjectId);
+    if (object == nullptr) {
+        reason = "the source CAD object no longer exists";
+        return false;
+    }
+    const MaterialDefinition* material =
+        document_->electronicsModel().material(run.provenance.materialDefinitionId);
+    if (material == nullptr) {
+        reason = "the source material definition no longer exists in the current document";
+        return false;
+    }
+
+    AnalysisMeshSettings settings;
+    settings.maximumElementSizeM = run.provenance.mesh.requestedMaximumElementSizeM;
+    settings.maximumElementAspectRatio = std::max(1.0, run.provenance.mesh.maximumAspectRatio + 1e-9);
+    settings.maximumElementCount = std::max<std::uint64_t>(
+        settings.maximumElementCount, run.provenance.mesh.elementCount);
+    try {
+        const AnalysisMesh currentMesh = OcctPrismAnalysisMesher::generate(
+            *document_, run.provenance.cadObjectId, settings);
+        if (currentMesh.provenance.generator != run.provenance.mesh.generator ||
+            currentMesh.provenance.generatorVersion != run.provenance.mesh.generatorVersion ||
+            currentMesh.provenance.elementType != run.provenance.mesh.elementType ||
+            currentMesh.topologyReferenceIds != run.provenance.topologyReferenceIds ||
+            currentMesh.nodes.size() != run.meshSnapshot->nodePositionsM.size() ||
+            currentMesh.elements.size() != run.meshSnapshot->hexahedra.size()) {
+            reason = "the current CAD-derived mesh no longer matches the result's topology or mesh settings";
+            return false;
+        }
+        for (std::size_t node = 0; node < currentMesh.nodes.size(); ++node) {
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                const double expected = run.meshSnapshot->nodePositionsM[node][axis];
+                const double actual = currentMesh.nodes[node].positionM[axis];
+                const double tolerance = 1e-12 * std::max({1.0, std::abs(expected), std::abs(actual)});
+                if (std::abs(expected - actual) > tolerance) {
+                    reason = "the current CAD geometry differs from the saved analysis mesh";
+                    return false;
+                }
+            }
+        }
+        for (std::size_t element = 0; element < currentMesh.elements.size(); ++element) {
+            if (currentMesh.elements[element].nodeIndices != run.meshSnapshot->hexahedra[element]) {
+                reason = "the current CAD-derived element connectivity differs from the saved analysis mesh";
+                return false;
+            }
+        }
+    } catch (const std::exception& error) {
+        reason = std::string("the current CAD mesh could not be verified: ") + error.what();
+        return false;
+    }
+    return true;
 }
 
 }  // namespace datumloop

@@ -65,10 +65,28 @@ def main() -> None:
     mujoco.mj_resetData(model, data)
     initial_position = float(data.qpos[qpos_address])
     data.ctrl[actuator_id] = 1.0  # N, inside the exported ±5 N action interval.
+    observation_samples: list[dict[str, float]] = []
     for _ in range(10):
         mujoco.mj_step(model, data)
-    # Re-evaluate position/velocity sensors at the final integrated state.
-    mujoco.mj_forward(model, data)
+        # Re-evaluate sensors at each integrated state so the report is a
+        # time-aligned runtime trace rather than a final-state snapshot.
+        mujoco.mj_forward(model, data)
+        sample = {
+            "time_s": float(data.time),
+            "joint_position_m": float(data.qpos[qpos_address]),
+            "joint_velocity_m_per_s": float(data.qvel[dof_address]),
+            "encoder_position_m": float(data.sensordata[int(model.sensor_adr[position_sensor])]),
+            "encoder_velocity_m_per_s": float(data.sensordata[int(model.sensor_adr[velocity_sensor])]),
+        }
+        if not all(math.isfinite(value) for value in sample.values()):
+            raise AssertionError("MuJoCo produced a non-finite runtime observation sample")
+        if not (math.isclose(sample["encoder_position_m"], sample["joint_position_m"], rel_tol=1e-9, abs_tol=1e-12) and
+                math.isclose(sample["encoder_velocity_m_per_s"], sample["joint_velocity_m_per_s"], rel_tol=1e-9, abs_tol=1e-12)):
+            raise AssertionError("MuJoCo encoder sensors did not track a runtime observation sample")
+        if observation_samples and sample["time_s"] <= observation_samples[-1]["time_s"]:
+            raise AssertionError("MuJoCo runtime observation times are not strictly increasing")
+        observation_samples.append(sample)
+
     final_position = float(data.qpos[qpos_address])
     final_velocity = float(data.qvel[dof_address])
     if not (math.isfinite(final_position) and math.isfinite(final_velocity)):
@@ -90,6 +108,7 @@ def main() -> None:
         "mjcf": str(args.mjcf),
         "model_name": "One-axis <fixture>",
         "joint": "slider_x",
+        "timestep_s": float(model.opt.timestep),
         "joint_range_m": [lower, upper],
         "body_mass_kg": mass,
         "body_principal_inertia_kg_m2": inertia,
@@ -100,7 +119,8 @@ def main() -> None:
         "final_velocity_m_per_s": final_velocity,
         "encoder_position_m": measured_position,
         "encoder_velocity_m_per_s": measured_velocity,
-        "steps": 10,
+        "steps": len(observation_samples),
+        "observation_samples": observation_samples,
         "runtime": "passed",
     }
     if args.report:

@@ -14,9 +14,13 @@ struct Vertex {
     float nx;
     float ny;
     float nz;
+    float red;
+    float green;
+    float blue;
+    float alpha;
 };
 
-static_assert(sizeof(Vertex) == sizeof(float) * 6);
+static_assert(sizeof(Vertex) == sizeof(float) * 10);
 
 }  // namespace
 
@@ -36,7 +40,8 @@ void ExactShapeGeometry::setMesh(const TriangleMesh& mesh)
     for (const MeshVertex& vertex : mesh.vertices) {
         const Vertex packed{
             vertex.position[0], vertex.position[1], vertex.position[2],
-            vertex.normal[0], vertex.normal[1], vertex.normal[2]
+            vertex.normal[0], vertex.normal[1], vertex.normal[2],
+            vertex.color[0], vertex.color[1], vertex.color[2], vertex.color[3]
         };
         vertexData.append(reinterpret_cast<const char*>(&packed), static_cast<qsizetype>(sizeof(Vertex)));
     }
@@ -46,6 +51,9 @@ void ExactShapeGeometry::setMesh(const TriangleMesh& mesh)
     setStride(sizeof(Vertex));
     addAttribute(Attribute::PositionSemantic, offsetof(Vertex, px), Attribute::F32Type);
     addAttribute(Attribute::NormalSemantic, offsetof(Vertex, nx), Attribute::F32Type);
+    if (mesh.hasVertexColors) {
+        addAttribute(Attribute::ColorSemantic, offsetof(Vertex, red), Attribute::F32Type);
+    }
     setVertexData(vertexData);
     setBounds(QVector3D(static_cast<float>(mesh.minimum[0]),
                         static_cast<float>(mesh.minimum[1]),

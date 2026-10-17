@@ -31,8 +31,8 @@ dynamics, assigned material definitions with sourced elastic modulus and
 Poisson ratio for structural inputs, and resolvable contact surfaces and
 friction data for contact inputs.
 
-The `.dld` project format is now schema 6. It writes all version-one mechanism
-fields and continues to read schemas 1 through 5. Older mechanism records are
+The `.dld` project format is now schema 7. It writes all version-one mechanism
+fields and continues to read schemas 1 through 6. Older mechanism records are
 preserved as legacy CAD-object references, axes, and motors; they are not
 silently upgraded into authored body or joint definitions. The full field
 contract and remaining persistence limitations are in
@@ -41,9 +41,9 @@ contract and remaining persistence limitations are in
 ## Verification
 
 The native tests cover mechanism input validation, study-readiness diagnostics
-for kinematics/dynamics/structural/contact inputs, complete schema-six
-round-trip, and schema-five migration. The full native build and CTest suite
-pass with 10 of 10 test targets.
+for kinematics/dynamics/structural/contact inputs, schema-seven round-trip,
+schema-six migration, and the optional CAD-derived MFEM 3D elasticity case. The
+MFEM-enabled native build currently runs 11 CTest targets.
 
 These checks establish data validation and persistence behavior only. A
 `readyForStudy()` result means required input records passed these checks; it

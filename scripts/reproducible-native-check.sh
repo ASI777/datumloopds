@@ -10,4 +10,6 @@ cmake -S "$repo_root" -B "$build_dir" \
     -DDATUMLOOP_ENABLE_MFEM=OFF
 cmake --build "$build_dir" --parallel 2
 ctest --test-dir "$build_dir" --output-on-failure
+DATUMLOOPDS_EXECUTABLE="$build_dir/apps/datumloop-desktop/DatumLoopDS" \
+    "$repo_root/scripts/check-native-independence.sh"
 QT_QPA_PLATFORM=offscreen "$build_dir/apps/datumloop-desktop/DatumLoopDS" --smoke-load

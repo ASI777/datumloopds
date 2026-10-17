@@ -24,6 +24,7 @@ add_library(datumloop_core STATIC
     src/datumloop/core/DatumUuid.cpp
     src/datumloop/core/DatumTopologyReference.cpp
     src/datumloop/engineering/DatumEngineeringModel.cpp
+    src/datumloop/engineering/StructuralAnalysis.cpp
     src/datumloop/knowledge/EquationRegistry.cpp
     src/datumloop/materials/MaterialModel.cpp
     src/datumloop/electronics/ElectronicsModel.cpp
@@ -65,8 +66,11 @@ find_library(DATUMLOOP_NGSPICE_LIBRARY NAMES ngspice libngspice.so.0)
 add_library(datumloop_numerics STATIC
     src/datumloop/numerics/CantileverBeamFEM.cpp
     src/datumloop/numerics/FemSolver.cpp
+    src/datumloop/numerics/AnalysisMesh.cpp
+    src/datumloop/numerics/StructuralReducedModel.cpp
 )
 target_include_directories(datumloop_numerics PUBLIC src)
+target_link_libraries(datumloop_numerics PUBLIC datumloop_core)
 target_compile_options(datumloop_numerics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_digitaltwin STATIC
@@ -89,6 +93,7 @@ endif()
 if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
     add_library(datumloop_mfem_backend STATIC
         src/datumloop/numerics/MfemFemSolver.cpp
+        src/datumloop/numerics/MfemLinearElasticitySolver.cpp
     )
     target_include_directories(datumloop_mfem_backend PUBLIC src)
     target_link_libraries(datumloop_mfem_backend PUBLIC datumloop_numerics datumloop_solver mfem)
@@ -102,15 +107,16 @@ add_library(datumloop_robotics STATIC
     src/datumloop/robotics/RobotLearning.cpp
 )
 target_include_directories(datumloop_robotics PUBLIC src)
-target_link_libraries(datumloop_robotics PUBLIC datumloop_core)
+target_link_libraries(datumloop_robotics PUBLIC datumloop_core datumloop_numerics)
 target_compile_options(datumloop_robotics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_ui STATIC
+    src/datumloop/ui/AnalysisResultDisplay.cpp
     src/datumloop/ui/DocumentViewModel.cpp
     src/datumloop/ui/PickingService.cpp
 )
 target_include_directories(datumloop_ui PUBLIC src)
-target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io Qt6::Core Qt6::Gui)
+target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io datumloop_numerics Qt6::Core Qt6::Gui)
 target_compile_options(datumloop_ui PRIVATE -Wall -Wextra -Wpedantic)
 
 qt_add_executable(DatumLoopDS
@@ -199,8 +205,27 @@ if(BUILD_TESTING)
         add_executable(datumloop-mfem-tests tests/native/test_mfem_solver.cpp)
         target_link_libraries(datumloop-mfem-tests PRIVATE datumloop_mfem_backend)
         add_test(NAME datumloop-mfem-tests COMMAND datumloop-mfem-tests)
+
+        add_executable(datumloop-mfem-elasticity-tests tests/native/test_mfem_3d_elasticity.cpp)
+        target_link_libraries(datumloop-mfem-elasticity-tests PRIVATE datumloop_mfem_backend datumloop_io datumloop_robotics Qt6::Core)
+        set(DATUMLOOP_MUJOCO_RUNTIME_REPORT "${CMAKE_CURRENT_BINARY_DIR}/reports/mujoco-runtime.json")
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/reports")
+        configure_file(
+            "${CMAKE_SOURCE_DIR}/reports/validation/mujoco-runtime.json"
+            "${DATUMLOOP_MUJOCO_RUNTIME_REPORT}"
+            COPYONLY)
+        target_compile_definitions(datumloop-mfem-elasticity-tests PRIVATE
+            DATUMLOOP_MUJOCO_RUNTIME_REPORT="${DATUMLOOP_MUJOCO_RUNTIME_REPORT}")
+        add_test(NAME datumloop-mfem-elasticity-tests COMMAND datumloop-mfem-elasticity-tests)
+    else()
+        foreach(test_name IN ITEMS datumloop-mfem-tests datumloop-mfem-elasticity-tests)
+            add_test(NAME ${test_name}
+                COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: MFEM 4.10 is unavailable or disabled")
+            set_tests_properties(${test_name} PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
+        endforeach()
     endif()
 
+    set(DATUMLOOP_MUJOCO_RUNTIME_LIVE OFF)
     if(DATUMLOOP_MUJOCO_PYTHON)
         execute_process(
             COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" -c "import mujoco"
@@ -208,13 +233,29 @@ if(BUILD_TESTING)
             OUTPUT_QUIET ERROR_QUIET
         )
         if(DATUMLOOP_MUJOCO_IMPORT_STATUS EQUAL 0)
+            set(DATUMLOOP_MUJOCO_RUNTIME_LIVE ON)
             add_test(NAME datumloop-mujoco-runtime
                 COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_mujoco_runtime.py"
                         "${DATUMLOOP_MJCF_OUTPUT}" --report "${CMAKE_CURRENT_BINARY_DIR}/reports/mujoco-runtime.json")
             set_tests_properties(datumloop-mujoco-runtime PROPERTIES DEPENDS datumloop-robotics-tests)
+            if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+                set_tests_properties(datumloop-mfem-elasticity-tests PROPERTIES DEPENDS datumloop-mujoco-runtime)
+            endif()
         else()
             message(WARNING "DATUMLOOP_MUJOCO_PYTHON cannot import mujoco; runtime test is disabled")
+            add_test(NAME datumloop-mujoco-runtime
+                COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: configured Python cannot import MuJoCo")
+            set_tests_properties(datumloop-mujoco-runtime PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
         endif()
+    else()
+        add_test(NAME datumloop-mujoco-runtime
+            COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: no Python interpreter configured with MuJoCo")
+        set_tests_properties(datumloop-mujoco-runtime PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
+    endif()
+
+    if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+        target_compile_definitions(datumloop-mfem-elasticity-tests PRIVATE
+            DATUMLOOP_MUJOCO_RUNTIME_LIVE=$<BOOL:${DATUMLOOP_MUJOCO_RUNTIME_LIVE}>)
     endif()
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)

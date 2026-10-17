@@ -357,8 +357,8 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 6,
-                "saved project did not include the version-six schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 8,
+                "saved project did not include the version-eight schema");
         require(root.value(QStringLiteral("engineeringModel")).toObject()
                     .value(QStringLiteral("mechanisms")).toArray().size() == 1 &&
                     root.value(QStringLiteral("engineeringModel")).toObject()
@@ -644,7 +644,7 @@ int main(int argc, char* argv[])
                                 loadedBooleanObject->featureGraph.features().end(), [](const auto& feature) {
                                     return feature.status == datumloop::DatumFeatureStatus::Succeeded;
                                 }),
-                "Boolean feature DAG did not recompute and round-trip through schema 6");
+                "Boolean feature DAG did not recompute and round-trip through schema 7");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");

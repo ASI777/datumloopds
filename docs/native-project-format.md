@@ -1,8 +1,7 @@
-# Native DatumLoop project format (`.dld`)
+# Native DatumLoop project format (`.dld`, schema 8)
 
 The native application saves projects as UTF-8 JSON in a `.dld` file. Schema
-version 6 is provisional and stores the document state supported by the current
-native core:
+version 8 stores the document state supported by the current native core:
 
 - project UUID and name;
 - object UUID, name, optional parent UUID, and typed scalar properties;
@@ -31,7 +30,7 @@ Example structure (the geometry payload is abbreviated):
 ```json
 {
   "format": "datumloop-project",
-  "schemaVersion": 6,
+  "schemaVersion": 8,
   "project": { "id": "…", "name": "Assembly" },
   "objects": [{
     "id": "…",
@@ -193,23 +192,33 @@ their current output feature; the resolver does not yet migrate them across
 arbitrary graph edits.
 
 `DldProjectStore` writes OCCT's current ASCII B-Rep stream with triangulation
-and normals disabled. The display mesh is never saved. Loading validates the
-entire file into a temporary document, recomputes shape metrics, then the UI
-replaces its document and clears the old command history. A failed load leaves
-the open document untouched. Saving uses `QSaveFile`; the document becomes
-clean only after the atomic file commit succeeds.
+and normals disabled. The CAD renderer tessellation is never saved. A
+structural run can persist its analysis mesh snapshot separately: SI node
+positions and hexahedron connectivity are tied to the mesh revision used by
+its field datasets. This derived mesh does not replace or modify the nominal
+OCCT B-Rep. Loading validates the entire file into a temporary document,
+recomputes shape metrics, then the UI replaces its document and clears the old
+command history. A failed load leaves the open document untouched. Saving uses
+`QSaveFile`; the document becomes clean only after the atomic file commit
+succeeds.
 
-Schema version 6 reads versions 1 through 5. Version 1 files receive initial
+Schema version 8 reads versions 1 through 7. Version 1 files receive initial
 face, edge, and vertex references; version 2 through 4 references, object
 identities, and supported engineering data are preserved. Versions 1 through 3
 load with an empty engineering model; versions 1 through 4 load with an empty
 electronics model. Engineering data in a schema 1, 2, or 3 file and electronics
 data in a schema 1 through 4 file are rejected rather than discarded. Schemas 5
-and 6 require their electronics model. Schema 5 mechanisms and motors migrate as
+through 7 require their electronics model. Schema 5 mechanisms and motors migrate as
 legacy records with no explicit body/joint/actuator/contact/requirement
-definitions. Unknown schema versions are rejected. Equation definitions,
-physics solver requests/results, robot/sensor/action specs, and simulation
-state are not yet persisted in schema 6. The object feature graph
+definitions. Unknown schema versions are rejected. Schema 7 added sourced
+material properties/states, structural study inputs, persistent CAD-face
+references, analysis mesh provenance, MFEM field datasets, solver-run
+provenance, and convergence records. Schema 8 adds the SI mesh coordinates and
+hexahedron connectivity for field visualization. Version-seven results without
+that snapshot still load and can be saved again, but their fields cannot be
+drawn until the analysis is rerun. Other equation definitions, generic solver
+requests/results, robot/sensor/action specs, and simulation state are not yet
+persisted. The object feature graph
 is an append-ordered DAG with
 explicit feature UUIDs, owner, type, input feature UUIDs,
 parameters in millimetres, and a geometry backend identifier. The first native

@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace datumloop {
 namespace {
@@ -341,6 +342,61 @@ void RLEnvironmentSpec::validate(const RobotModel& robot, const DatumEngineering
         }
     }
     for (const UncertainParameter& item : randomization) item.validate();
+}
+
+void addStructuralResponseObservation(RobotObservation& observation,
+                                      const StructuralElasticityRom& rom,
+                                      const Vector3& appliedForceN,
+                                      double youngsModulusPa)
+{
+    if (!finite(observation.timeS) || observation.timeS < 0.0) {
+        throw std::invalid_argument("robot observation requires a finite nonnegative time");
+    }
+    rom.validate();
+    const double appliedForceMagnitudeN = std::hypot(appliedForceN[0], appliedForceN[1], appliedForceN[2]);
+    if (!finite(appliedForceMagnitudeN) || appliedForceMagnitudeN <= 0.0) {
+        throw std::invalid_argument("structural response requires a finite nonzero applied force vector");
+    }
+    for (std::size_t axis = 0; axis < appliedForceN.size(); ++axis) {
+        if (!finite(appliedForceN[axis]) ||
+            std::abs(appliedForceN[axis] / appliedForceMagnitudeN - rom.appliedForceDirectionUnit[axis]) > 1e-9) {
+            throw std::invalid_argument("structural response force direction does not match its ROM provenance");
+        }
+    }
+    observation.structuralResponse = RobotObservation::StructuralResponse{
+        rom.id,
+        rom.appliedForceDirectionUnit,
+        appliedForceMagnitudeN,
+        youngsModulusPa,
+        rom.predictTipDisplacement(appliedForceMagnitudeN, youngsModulusPa),
+        rom.predictEffectiveStiffness(appliedForceMagnitudeN, youngsModulusPa),
+        observation.timeS,
+    };
+}
+
+StructuralResponseObservationAdapter::StructuralResponseObservationAdapter(
+    StructuralElasticityRom rom,
+    double youngsModulusPa)
+    : rom_(std::move(rom)), youngsModulusPa_(youngsModulusPa)
+{
+    rom_.validate();
+    if (!finite(youngsModulusPa_) || youngsModulusPa_ <= 0.0) {
+        throw std::invalid_argument("structural observation adapter requires a finite positive Young's modulus");
+    }
+}
+
+RobotObservation StructuralResponseObservationAdapter::adapt(
+    const RobotObservation& rigidObservation,
+    const Vector3& appliedForceN)
+{
+    if (!finite(rigidObservation.timeS) || rigidObservation.timeS < 0.0 ||
+        (lastEvaluationTimeS_.has_value() && rigidObservation.timeS <= *lastEvaluationTimeS_)) {
+        throw std::invalid_argument("structural observation times must be finite, nonnegative, and strictly increasing");
+    }
+    RobotObservation combined = rigidObservation;
+    addStructuralResponseObservation(combined, rom_, appliedForceN, youngsModulusPa_);
+    lastEvaluationTimeS_ = rigidObservation.timeS;
+    return combined;
 }
 
 DeterministicMassEnvironment::DeterministicMassEnvironment(const RobotModel& robot,

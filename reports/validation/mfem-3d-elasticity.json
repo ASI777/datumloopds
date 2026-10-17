@@ -1,0 +1,736 @@
+{
+    "analysis_temperature_k": 293.15,
+    "analytical_euler_bernoulli_tip_m": 0.00045977011494252877,
+    "analytical_midspan_section_stress_pa": 4499999.999999999,
+    "benchmark_id": "datumloop-cad-mfem-3d-linear-elasticity-v1",
+    "convergence": {
+        "compared_runs": [
+            "23dd0294-ee86-40d2-bd63-95d3f8d1b71c",
+            "1a41678f-5742-4575-932f-cf95e9283343"
+        ],
+        "converged": true,
+        "relative_section_stress_change": 0.02793383261919365,
+        "relative_strain_energy_change": 0.027503240164178922,
+        "relative_tip_displacement_change": 0.027503367798946528,
+        "tolerance": 0.05
+    },
+    "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+    "equation_maturity": "E3",
+    "fast_vs_high_fidelity": {
+        "comparison_quantity": "static tip deflection magnitude",
+        "fast_backend": "MuJoCo rigid runtime plus DatumLoop bounded structural ROM",
+        "held_out_operating_points": [
+            {
+                "applied_force_n": 7.5,
+                "material_revision": "sha256:83f3840628f09f6cc21c8a536f2e8d77a95a9a2f62454d742bc4a31f1cac15d4",
+                "mfem_solver_run_id": "a138000f-6a78-4d70-a448-4424517204eb",
+                "mfem_tip_displacement_m": 0.0003358235254523917,
+                "mujoco_plus_rom_relative_error_vs_mfem": 1.0877837747362604e-09,
+                "mujoco_plus_rom_relative_error_vs_rom": 0,
+                "mujoco_plus_rom_tip_deflection_m": 0.00033582352581769506,
+                "rom_relative_error_vs_mfem": 1.0877837747362604e-09,
+                "rom_tip_displacement_m": 0.00033582352581769506,
+                "youngs_modulus_pa": 68660400000
+            },
+            {
+                "applied_force_n": 7.5,
+                "material_revision": "sha256:5be828c883192f0c8a9cd7c35e86e9bb0b0098d106c7420e1d6e9aab4c8c782b",
+                "mfem_solver_run_id": "3bee89b9-2a9a-4435-80c6-4b12184f7763",
+                "mfem_tip_displacement_m": 0.00032687706772511197,
+                "mujoco_plus_rom_relative_error_vs_mfem": 2.407414441752999e-10,
+                "mujoco_plus_rom_relative_error_vs_rom": 0,
+                "mujoco_plus_rom_tip_deflection_m": 0.00032687706780380483,
+                "rom_relative_error_vs_mfem": 2.407414441752999e-10,
+                "rom_tip_displacement_m": 0.00032687706780380483,
+                "youngs_modulus_pa": 70539600000
+            },
+            {
+                "applied_force_n": 12.5,
+                "material_revision": "sha256:83f3840628f09f6cc21c8a536f2e8d77a95a9a2f62454d742bc4a31f1cac15d4",
+                "mfem_solver_run_id": "7ddc544a-e3a0-44aa-940e-4f16188cdfed",
+                "mfem_tip_displacement_m": 0.000559705875754202,
+                "mujoco_plus_rom_relative_error_vs_mfem": 1.0873982287165029e-09,
+                "mujoco_plus_rom_relative_error_vs_rom": 0,
+                "mujoco_plus_rom_tip_deflection_m": 0.0005597058763628252,
+                "rom_relative_error_vs_mfem": 1.0873982287165029e-09,
+                "rom_tip_displacement_m": 0.0005597058763628252,
+                "youngs_modulus_pa": 68660400000
+            },
+            {
+                "applied_force_n": 12.5,
+                "material_revision": "sha256:5be828c883192f0c8a9cd7c35e86e9bb0b0098d106c7420e1d6e9aab4c8c782b",
+                "mfem_solver_run_id": "a0d01a75-390e-4907-9a8c-a574e3838011",
+                "mfem_tip_displacement_m": 0.0005447951128648767,
+                "mujoco_plus_rom_relative_error_vs_mfem": 2.596659635180778e-10,
+                "mujoco_plus_rom_relative_error_vs_rom": 0,
+                "mujoco_plus_rom_tip_deflection_m": 0.0005447951130063414,
+                "rom_relative_error_vs_mfem": 2.596659635180778e-10,
+                "rom_tip_displacement_m": 0.0005447951130063414,
+                "youngs_modulus_pa": 70539600000
+            }
+        ],
+        "mujoco_plus_rom_vs_mfem": {
+            "maximum_relative_error": 1.0877837747362604e-09,
+            "mean_absolute_relative_error": 6.688973527865352e-10,
+            "rms_relative_error": 7.891595694073278e-10,
+            "sample_count": 4,
+            "worst_operating_point": {
+                "applied_force_n": 7.5,
+                "predicted_tip_deflection_m": 0.00033582352581769506,
+                "reference_run_id": "a138000f-6a78-4d70-a448-4424517204eb",
+                "reference_tip_deflection_m": 0.0003358235254523917,
+                "relative_error": 1.0877837747362604e-09,
+                "youngs_modulus_pa": 68660400000
+            }
+        },
+        "mujoco_plus_rom_vs_rom": {
+            "maximum_relative_error": 0,
+            "mean_absolute_relative_error": 0,
+            "rms_relative_error": 0,
+            "sample_count": 4,
+            "worst_operating_point": {
+                "applied_force_n": 7.5,
+                "predicted_tip_deflection_m": 0.00033582352581769506,
+                "reference_run_id": "a138000f-6a78-4d70-a448-4424517204eb",
+                "reference_tip_deflection_m": 0.00033582352581769506,
+                "relative_error": 0,
+                "youngs_modulus_pa": 68660400000
+            }
+        },
+        "reference_backend": "mfem.serial-h1-q1-3d-linear-elasticity",
+        "reference_solver_version": "4.10.0",
+        "relative_error_definition": "absolute(predicted - MFEM) / abs(MFEM); mean is arithmetic and RMS is root-mean-square",
+        "rigid_observation_preserved": true,
+        "rom_vs_mfem": {
+            "maximum_relative_error": 1.0877837747362604e-09,
+            "mean_absolute_relative_error": 6.688973527865352e-10,
+            "rms_relative_error": 7.891595694073278e-10,
+            "sample_count": 4,
+            "worst_operating_point": {
+                "applied_force_n": 7.5,
+                "predicted_tip_deflection_m": 0.00033582352581769506,
+                "reference_run_id": "a138000f-6a78-4d70-a448-4424517204eb",
+                "reference_tip_deflection_m": 0.0003358235254523917,
+                "relative_error": 1.0877837747362604e-09,
+                "youngs_modulus_pa": 68660400000
+            }
+        },
+        "validation_tolerance_relative": 0.01
+    },
+    "material_definition_id": "59168382-4e29-4dcf-b817-d0e1dae0c5f3",
+    "material_properties": [
+        {
+            "absolute_uncertainty": 5.42,
+            "name": "mass.density",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 0.200000%",
+            "source_percent_uncertainty": 0.2,
+            "unit": "kg/m^3",
+            "value": 2710
+        },
+        {
+            "absolute_uncertainty": 1879200000,
+            "name": "elastic.youngs_modulus",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 2.700000%",
+            "source_percent_uncertainty": 2.7,
+            "unit": "Pa",
+            "value": 69600000000
+        },
+        {
+            "absolute_uncertainty": 0.004965000000000001,
+            "name": "elastic.poisson_ratio",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 1.500000%",
+            "source_percent_uncertainty": 1.5,
+            "unit": "1",
+            "value": 0.331
+        }
+    ],
+    "material_property_statistic": "source table mean values; solver uses central values and does not propagate uncertainty",
+    "material_revision": "sha256:7d8ed8d05312b62bc07a40e716b5d7cc1a1bfec918f06ba80c878e0742595707",
+    "material_source": "H. M. Ledbetter (1982), NBS NSRDS 61 Part V, Table 2(SI); https://doi.org/10.6028/NBS.NSRDS.61p5",
+    "mesh_refinement": [
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "b4de0795-db80-43bb-8420-ba49ce8416b5",
+                "be663b65-98b6-4f2a-b27a-3e9cc1221cca"
+            ],
+            "cad_object_id": "ed8b598b-b637-4354-8af4-ef939565ad8a",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "04abbda8-5933-4d06-84b9-0af51af9266f",
+            "hexahedra": 80,
+            "iterations": 246,
+            "material_state_id": "146eb476-d604-4f6c-9bfa-c3ddb1195643",
+            "maximum_aspect_ratio": 2,
+            "maximum_displacement_m": 0.0003193019018042638,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 4046234.352133072,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "37bb3465-ceaf-4218-aab5-723bbeeb0c15",
+            "nodes": 189,
+            "reaction_force_n": [
+                -2.4739748027968744e-09,
+                9.999999999054701,
+                7.254762124375702e-09
+            ],
+            "relative_force_balance_error": 7.723063829300649e-10,
+            "relative_residual": 1.964690612831887e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.01,
+            "section_axial_stress_pa": 3376406.8829389485,
+            "section_stress_relative_error_vs_beam_estimate": 0.33277775932118525,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "abe0a53e-e16e-4f66-a07c-047b1babf636",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "512e4d4d-a68f-42ef-b786-5cb979769a68",
+            "strain_energy_j": 0.0015953734699974188,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T17:44:47.938Z",
+            "tip_displacement_m": 0.0003190745925519853,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.44094868621549865,
+            "topology_reference_ids": [
+                "d219de98-f0e7-4321-8abe-204c01abb454",
+                "64f9d63b-31cf-450d-89a1-009ce527752c",
+                "a58e216d-a7c3-4bf7-b2b4-1b78e7685bb9",
+                "c8a21816-22db-4f6d-ba78-991bec5d307d",
+                "c53216b5-16ff-4ba7-a961-3dded8e9273e",
+                "616497a3-4164-4f7e-9020-5b3420be2f78"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "b4de0795-db80-43bb-8420-ba49ce8416b5",
+                "be663b65-98b6-4f2a-b27a-3e9cc1221cca"
+            ],
+            "cad_object_id": "ed8b598b-b637-4354-8af4-ef939565ad8a",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "04abbda8-5933-4d06-84b9-0af51af9266f",
+            "hexahedra": 160,
+            "iterations": 272,
+            "material_state_id": "146eb476-d604-4f6c-9bfa-c3ddb1195643",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.00039935936634596714,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 5178137.439793499,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "e8632fcf-07d5-454b-9682-b3b7a86c0fe9",
+            "nodes": 369,
+            "reaction_force_n": [
+                -3.5774263551502372e-09,
+                9.99999999091586,
+                -1.1624337048488087e-09
+            ],
+            "relative_force_balance_error": 9.832132263983488e-10,
+            "relative_residual": 2.3010291094235774e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.005,
+            "section_axial_stress_pa": 4207758.613337699,
+            "section_stress_relative_error_vs_beam_estimate": 0.06945298281511604,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "a78e8fb4-0c41-4b0e-ae73-9719fa176475",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "512e4d4d-a68f-42ef-b786-5cb979769a68",
+            "strain_energy_j": 0.001995383435069421,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T17:44:47.974Z",
+            "tip_displacement_m": 0.0003990765168168059,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.15208511543059297,
+            "topology_reference_ids": [
+                "d219de98-f0e7-4321-8abe-204c01abb454",
+                "64f9d63b-31cf-450d-89a1-009ce527752c",
+                "a58e216d-a7c3-4bf7-b2b4-1b78e7685bb9",
+                "c8a21816-22db-4f6d-ba78-991bec5d307d",
+                "c53216b5-16ff-4ba7-a961-3dded8e9273e",
+                "616497a3-4164-4f7e-9020-5b3420be2f78"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "b4de0795-db80-43bb-8420-ba49ce8416b5",
+                "be663b65-98b6-4f2a-b27a-3e9cc1221cca"
+            ],
+            "cad_object_id": "ed8b598b-b637-4354-8af4-ef939565ad8a",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "04abbda8-5933-4d06-84b9-0af51af9266f",
+            "hexahedra": 1280,
+            "iterations": 456,
+            "material_state_id": "146eb476-d604-4f6c-9bfa-c3ddb1195643",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.00044203298376652676,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 8480561.387327734,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "a84110a2-88e5-4cd5-a23c-a8af339c9f07",
+            "nodes": 2025,
+            "reaction_force_n": [
+                3.845975982130767e-09,
+                9.999999977959432,
+                -5.910081313231785e-10
+            ],
+            "relative_force_balance_error": 2.238140926865425e-09,
+            "relative_residual": 2.3378688585967466e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.0025,
+            "section_axial_stress_pa": 4332127.308165244,
+            "section_stress_relative_error_vs_beam_estimate": 0.0387506367872308,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "23dd0294-ee86-40d2-bd63-95d3f8d1b71c",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "512e4d4d-a68f-42ef-b786-5cb979769a68",
+            "strain_energy_j": 0.0022085986982953183,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T17:44:48.257Z",
+            "tip_displacement_m": 0.00044171987748861284,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.04086353902962236,
+            "topology_reference_ids": [
+                "d219de98-f0e7-4321-8abe-204c01abb454",
+                "64f9d63b-31cf-450d-89a1-009ce527752c",
+                "a58e216d-a7c3-4bf7-b2b4-1b78e7685bb9",
+                "c8a21816-22db-4f6d-ba78-991bec5d307d",
+                "c53216b5-16ff-4ba7-a961-3dded8e9273e",
+                "616497a3-4164-4f7e-9020-5b3420be2f78"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "b4de0795-db80-43bb-8420-ba49ce8416b5",
+                "be663b65-98b6-4f2a-b27a-3e9cc1221cca"
+            ],
+            "cad_object_id": "ed8b598b-b637-4354-8af4-ef939565ad8a",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "04abbda8-5933-4d06-84b9-0af51af9266f",
+            "hexahedra": 10240,
+            "iterations": 833,
+            "material_state_id": "146eb476-d604-4f6c-9bfa-c3ddb1195643",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.0004545348508082544,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 10132758.45000241,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "2a7af459-7f81-4901-9725-5ab0f47392e0",
+            "nodes": 13041,
+            "reaction_force_n": [
+                -8.024416686680524e-10,
+                9.99999997446039,
+                -2.402210608209998e-08
+            ],
+            "relative_force_balance_error": 3.507103004791151e-09,
+            "relative_residual": 4.800151096672179e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.00125,
+            "section_axial_stress_pa": 4456617.721649534,
+            "section_stress_relative_error_vs_beam_estimate": 0.009734350366135477,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "1a41678f-5742-4575-932f-cf95e9283343",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "512e4d4d-a68f-42ef-b786-5cb979769a68",
+            "strain_energy_j": 0.002271060212754003,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T17:44:53.155Z",
+            "tip_displacement_m": 0.00045421224389113554,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.01223628628717752,
+            "topology_reference_ids": [
+                "d219de98-f0e7-4321-8abe-204c01abb454",
+                "64f9d63b-31cf-450d-89a1-009ce527752c",
+                "a58e216d-a7c3-4bf7-b2b4-1b78e7685bb9",
+                "c8a21816-22db-4f6d-ba78-991bec5d307d",
+                "c53216b5-16ff-4ba7-a961-3dded8e9273e",
+                "616497a3-4164-4f7e-9020-5b3420be2f78"
+            ]
+        }
+    ],
+    "metric_definitions": {
+        "maximum_displacement": "maximum nodal displacement magnitude",
+        "maximum_von_mises_stress": "maximum element-center von Mises stress; not a yield metric and may reflect ideal clamp/load-edge concentrations",
+        "mesh_convergence": "relative change from the medium mesh to the fine mesh for tip displacement, strain energy, and fixed-point section stress",
+        "section_axial_stress": "absolute axial stress sampled at the reported fixed midspan point; adjacent element values are averaged"
+    },
+    "mujoco_rom_bridge": {
+        "backend": "MuJoCo",
+        "load_direction_unit": [
+            0,
+            -1,
+            0
+        ],
+        "observations": [
+            {
+                "applied_force_n": 5,
+                "effective_stiffness_n_per_m": 22638.78196687649,
+                "joint_position_m": 0.005499999999999998,
+                "joint_velocity_m_per_s": 0.09999999999999995,
+                "tip_deflection_m": 0.00022085993881277078
+            },
+            {
+                "applied_force_n": 15,
+                "effective_stiffness_n_per_m": 22638.781966876486,
+                "joint_position_m": 0.005499999999999998,
+                "joint_velocity_m_per_s": 0.09999999999999995,
+                "tip_deflection_m": 0.0006625798164383124
+            }
+        ],
+        "rigid_dynamics_modified": false,
+        "rigid_position_m": 0.005499999999999998,
+        "rigid_velocity_m_per_s": 0.09999999999999995,
+        "rom_id": "datumloop.cad-3d-elasticity.compliance-rom.v1",
+        "runtime_status": "passed",
+        "time_varying_runtime": {
+            "duplicate_time_rejected": true,
+            "load_direction_unit": [
+                0,
+                -1,
+                0
+            ],
+            "load_source": "explicit 5-to-15 N test-fixture schedule; not inferred from MuJoCo control",
+            "out_of_domain_load_rejected": true,
+            "reset_supported": true,
+            "response_type": "quasi-static ROM response",
+            "rigid_dynamics_modified": false,
+            "sample_count": 10,
+            "samples": [
+                {
+                    "applied_structural_force_n": 5,
+                    "effective_stiffness_n_per_m": 22638.78196687649,
+                    "response_evaluation_time_s": 0.01,
+                    "rigid_joint_position_m": 9.999999999999995e-05,
+                    "rigid_joint_velocity_m_per_s": 0.009999999999999995,
+                    "rom_tip_deflection_m": 0.00022085993881277078,
+                    "time_s": 0.01
+                },
+                {
+                    "applied_structural_force_n": 6.111111111111111,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.02,
+                    "rigid_joint_position_m": 0.00029999999999999987,
+                    "rigid_joint_velocity_m_per_s": 0.01999999999999999,
+                    "rom_tip_deflection_m": 0.00026993992521560874,
+                    "time_s": 0.02
+                },
+                {
+                    "applied_structural_force_n": 7.222222222222222,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.03,
+                    "rigid_joint_position_m": 0.0005999999999999997,
+                    "rigid_joint_velocity_m_per_s": 0.029999999999999985,
+                    "rom_tip_deflection_m": 0.0003190199116184467,
+                    "time_s": 0.03
+                },
+                {
+                    "applied_structural_force_n": 8.333333333333332,
+                    "effective_stiffness_n_per_m": 22638.78196687649,
+                    "response_evaluation_time_s": 0.04,
+                    "rigid_joint_position_m": 0.0009999999999999996,
+                    "rigid_joint_velocity_m_per_s": 0.03999999999999998,
+                    "rom_tip_deflection_m": 0.0003680998980212846,
+                    "time_s": 0.04
+                },
+                {
+                    "applied_structural_force_n": 9.444444444444445,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.05,
+                    "rigid_joint_position_m": 0.0014999999999999994,
+                    "rigid_joint_velocity_m_per_s": 0.049999999999999975,
+                    "rom_tip_deflection_m": 0.00041717988442412264,
+                    "time_s": 0.05
+                },
+                {
+                    "applied_structural_force_n": 10.555555555555555,
+                    "effective_stiffness_n_per_m": 22638.78196687649,
+                    "response_evaluation_time_s": 0.060000000000000005,
+                    "rigid_joint_position_m": 0.002099999999999999,
+                    "rigid_joint_velocity_m_per_s": 0.05999999999999997,
+                    "rom_tip_deflection_m": 0.0004662598708269605,
+                    "time_s": 0.060000000000000005
+                },
+                {
+                    "applied_structural_force_n": 11.666666666666666,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.07,
+                    "rigid_joint_position_m": 0.0027999999999999987,
+                    "rigid_joint_velocity_m_per_s": 0.06999999999999997,
+                    "rom_tip_deflection_m": 0.0005153398572297985,
+                    "time_s": 0.07
+                },
+                {
+                    "applied_structural_force_n": 12.777777777777779,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.08,
+                    "rigid_joint_position_m": 0.003599999999999998,
+                    "rigid_joint_velocity_m_per_s": 0.07999999999999996,
+                    "rom_tip_deflection_m": 0.0005644198436326365,
+                    "time_s": 0.08
+                },
+                {
+                    "applied_structural_force_n": 13.88888888888889,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.09,
+                    "rigid_joint_position_m": 0.004499999999999998,
+                    "rigid_joint_velocity_m_per_s": 0.08999999999999996,
+                    "rom_tip_deflection_m": 0.0006134998300354745,
+                    "time_s": 0.09
+                },
+                {
+                    "applied_structural_force_n": 15,
+                    "effective_stiffness_n_per_m": 22638.781966876486,
+                    "response_evaluation_time_s": 0.09999999999999999,
+                    "rigid_joint_position_m": 0.005499999999999998,
+                    "rigid_joint_velocity_m_per_s": 0.09999999999999995,
+                    "rom_tip_deflection_m": 0.0006625798164383124,
+                    "time_s": 0.09999999999999999
+                }
+            ],
+            "status": "passed",
+            "time_source": "MuJoCo simulation clock after each integrated step"
+        },
+        "version": "3.16.0",
+        "youngs_modulus_pa": 69600000000
+    },
+    "scope_limitations": [
+        "Structured hexahedral meshing currently supports one axis-aligned rectangular OCCT solid with six unsplit planar faces.",
+        "The solve is serial MFEM H1/Q1, static, homogeneous, isotropic, small-strain linear elasticity.",
+        "The cited material compilation reports property percent uncertainties, recorded above, but no verified temperature applicability range; 293.15 K is a fixture reference assumption.",
+        "No experiment or physical machine was used; this report is numerical verification only."
+    ],
+    "solver": "mfem.serial-h1-q1-3d-linear-elasticity",
+    "solver_version": "4.10.0",
+    "structural_rom": {
+        "applied_force_direction_unit": [
+            0,
+            -1,
+            0
+        ],
+        "boundary_condition_ids": [
+            "b4de0795-db80-43bb-8420-ba49ce8416b5",
+            "be663b65-98b6-4f2a-b27a-3e9cc1221cca"
+        ],
+        "cad_object_id": "ed8b598b-b637-4354-8af4-ef939565ad8a",
+        "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+        "held_out_samples": [
+            {
+                "applied_force_n": 7.5,
+                "high_fidelity_tip_displacement_m": 0.0003358235254523917,
+                "material_revision": "sha256:83f3840628f09f6cc21c8a536f2e8d77a95a9a2f62454d742bc4a31f1cac15d4",
+                "relative_error": 1.0877837747362604e-09,
+                "rom_effective_stiffness_n_per_m": 22333.158410323656,
+                "rom_tip_displacement_m": 0.00033582352581769506,
+                "solver_run_id": "a138000f-6a78-4d70-a448-4424517204eb",
+                "youngs_modulus_pa": 68660400000
+            },
+            {
+                "applied_force_n": 7.5,
+                "high_fidelity_tip_displacement_m": 0.00032687706772511197,
+                "material_revision": "sha256:5be828c883192f0c8a9cd7c35e86e9bb0b0098d106c7420e1d6e9aab4c8c782b",
+                "relative_error": 2.407414441752999e-10,
+                "rom_effective_stiffness_n_per_m": 22944.40552342932,
+                "rom_tip_displacement_m": 0.00032687706780380483,
+                "solver_run_id": "3bee89b9-2a9a-4435-80c6-4b12184f7763",
+                "youngs_modulus_pa": 70539600000
+            },
+            {
+                "applied_force_n": 12.5,
+                "high_fidelity_tip_displacement_m": 0.000559705875754202,
+                "material_revision": "sha256:83f3840628f09f6cc21c8a536f2e8d77a95a9a2f62454d742bc4a31f1cac15d4",
+                "relative_error": 1.0873982287165029e-09,
+                "rom_effective_stiffness_n_per_m": 22333.158410323653,
+                "rom_tip_displacement_m": 0.0005597058763628252,
+                "solver_run_id": "7ddc544a-e3a0-44aa-940e-4f16188cdfed",
+                "youngs_modulus_pa": 68660400000
+            },
+            {
+                "applied_force_n": 12.5,
+                "high_fidelity_tip_displacement_m": 0.0005447951128648767,
+                "material_revision": "sha256:5be828c883192f0c8a9cd7c35e86e9bb0b0098d106c7420e1d6e9aab4c8c782b",
+                "relative_error": 2.596659635180778e-10,
+                "rom_effective_stiffness_n_per_m": 22944.40552342932,
+                "rom_tip_displacement_m": 0.0005447951130063414,
+                "solver_run_id": "a0d01a75-390e-4907-9a8c-a574e3838011",
+                "youngs_modulus_pa": 70539600000
+            }
+        ],
+        "input_domain": {
+            "maximum_applied_force_n": 15,
+            "maximum_youngs_modulus_pa": 71479200000,
+            "minimum_applied_force_n": 5,
+            "minimum_youngs_modulus_pa": 67720800000
+        },
+        "material_definition_id": "59168382-4e29-4dcf-b817-d0e1dae0c5f3",
+        "maximum_relative_validation_error": 1.0877837747362604e-09,
+        "mesh_element_count": 1280,
+        "mesh_revision_id": "db2d5751-3973-4dd8-9b79-2f045b911913",
+        "model_id": "datumloop.cad-3d-elasticity.compliance-rom.v1",
+        "normalized_compliance_per_m": 3074370.3482737695,
+        "out_of_domain_inputs_rejected": true,
+        "out_of_domain_policy": "reject",
+        "response_law": "tip_displacement_m = normalized_compliance_per_m * force_n / youngs_modulus_pa",
+        "rms_relative_validation_error": 7.891595694073278e-10,
+        "scope": "Bounded static response model for this CAD solid; not a modal or general-purpose ROM.",
+        "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+        "solver_version": "4.10.0",
+        "source_project_id": "512e4d4d-a68f-42ef-b786-5cb979769a68",
+        "topology_reference_ids": [
+            "d219de98-f0e7-4321-8abe-204c01abb454",
+            "64f9d63b-31cf-450d-89a1-009ce527752c",
+            "a58e216d-a7c3-4bf7-b2b4-1b78e7685bb9",
+            "c8a21816-22db-4f6d-ba78-991bec5d307d",
+            "c53216b5-16ff-4ba7-a961-3dded8e9273e",
+            "616497a3-4164-4f7e-9020-5b3420be2f78"
+        ],
+        "training_samples": [
+            {
+                "applied_force_n": 5,
+                "high_fidelity_tip_displacement_m": 0.0002269886320892749,
+                "material_revision": "sha256:7956b7b9b5e0d67d380053afee11991830849c950c4e18f30c0aecfbf4133018",
+                "relative_error": 9.512530700441603e-10,
+                "rom_effective_stiffness_n_per_m": 22027.534853770823,
+                "rom_tip_displacement_m": 0.00022698863187335127,
+                "solver_run_id": "363e1afb-cd0a-4925-9a29-fb497d3db3f4",
+                "youngs_modulus_pa": 67720800000
+            },
+            {
+                "applied_force_n": 5,
+                "high_fidelity_tip_displacement_m": 0.00022085993874375933,
+                "material_revision": "sha256:7d8ed8d05312b62bc07a40e716b5d7cc1a1bfec918f06ba80c878e0742595707",
+                "relative_error": 3.1246702023101574e-10,
+                "rom_effective_stiffness_n_per_m": 22638.78196687649,
+                "rom_tip_displacement_m": 0.00022085993881277078,
+                "solver_run_id": "8b58e7ae-d1b2-4008-9bd3-676066b0e414",
+                "youngs_modulus_pa": 69600000000
+            },
+            {
+                "applied_force_n": 5,
+                "high_fidelity_tip_displacement_m": 0.00021505349430342582,
+                "material_revision": "sha256:2f29df9c603d42e228ba0e6b4afe07e4211faa9041812f031eb77b4087c724d9",
+                "relative_error": 7.387146045632834e-10,
+                "rom_effective_stiffness_n_per_m": 23250.029079982156,
+                "rom_tip_displacement_m": 0.00021505349446228897,
+                "solver_run_id": "1f560594-af20-4e22-a083-171fb4f2196e",
+                "youngs_modulus_pa": 71479200000
+            },
+            {
+                "applied_force_n": 10,
+                "high_fidelity_tip_displacement_m": 0.00045397726417780744,
+                "material_revision": "sha256:7956b7b9b5e0d67d380053afee11991830849c950c4e18f30c0aecfbf4133018",
+                "relative_error": 9.496178488880104e-10,
+                "rom_effective_stiffness_n_per_m": 22027.534853770823,
+                "rom_tip_displacement_m": 0.00045397726374670253,
+                "solver_run_id": "9b8f95cb-8c9e-4327-b0a1-136df268bb40",
+                "youngs_modulus_pa": 67720800000
+            },
+            {
+                "applied_force_n": 10,
+                "high_fidelity_tip_displacement_m": 0.00044171987748861284,
+                "material_revision": "sha256:7d8ed8d05312b62bc07a40e716b5d7cc1a1bfec918f06ba80c878e0742595707",
+                "relative_error": 3.099899371551189e-10,
+                "rom_effective_stiffness_n_per_m": 22638.78196687649,
+                "rom_tip_displacement_m": 0.00044171987762554155,
+                "solver_run_id": "1cdf9300-6475-44ea-a305-21286b9ab888",
+                "youngs_modulus_pa": 69600000000
+            },
+            {
+                "applied_force_n": 10,
+                "high_fidelity_tip_displacement_m": 0.00043010698860629603,
+                "material_revision": "sha256:2f29df9c603d42e228ba0e6b4afe07e4211faa9041812f031eb77b4087c724d9",
+                "relative_error": 7.400063747935254e-10,
+                "rom_effective_stiffness_n_per_m": 23250.029079982156,
+                "rom_tip_displacement_m": 0.00043010698892457795,
+                "solver_run_id": "a6bae3e4-41ad-458f-8486-5a9a891bca41",
+                "youngs_modulus_pa": 71479200000
+            },
+            {
+                "applied_force_n": 15,
+                "high_fidelity_tip_displacement_m": 0.0006809658962749223,
+                "material_revision": "sha256:7956b7b9b5e0d67d380053afee11991830849c950c4e18f30c0aecfbf4133018",
+                "relative_error": 9.616757838890322e-10,
+                "rom_effective_stiffness_n_per_m": 22027.534853770823,
+                "rom_tip_displacement_m": 0.0006809658956200539,
+                "solver_run_id": "a9e6abb8-79aa-4053-97c4-bc4fb7360fe2",
+                "youngs_modulus_pa": 67720800000
+            },
+            {
+                "applied_force_n": 15,
+                "high_fidelity_tip_displacement_m": 0.0006625798162362224,
+                "material_revision": "sha256:7d8ed8d05312b62bc07a40e716b5d7cc1a1bfec918f06ba80c878e0742595707",
+                "relative_error": 3.0500472155735555e-10,
+                "rom_effective_stiffness_n_per_m": 22638.781966876486,
+                "rom_tip_displacement_m": 0.0006625798164383124,
+                "solver_run_id": "7d37e91a-9af0-45af-b459-f646b6f1db68",
+                "youngs_modulus_pa": 69600000000
+            },
+            {
+                "applied_force_n": 15,
+                "high_fidelity_tip_displacement_m": 0.0006451604829063958,
+                "material_revision": "sha256:2f29df9c603d42e228ba0e6b4afe07e4211faa9041812f031eb77b4087c724d9",
+                "relative_error": 7.447311860552457e-10,
+                "rom_effective_stiffness_n_per_m": 23250.029079982152,
+                "rom_tip_displacement_m": 0.000645160483386867,
+                "solver_run_id": "2a2bd32b-a577-4757-81a6-7833612f09fe",
+                "youngs_modulus_pa": 71479200000
+            }
+        ],
+        "validation_passed": true,
+        "validation_tolerance_relative": 0.01
+    },
+    "validation_classification": "numerical verification; no experimental validation claimed",
+    "youngs_modulus_pa": 69600000000
+}

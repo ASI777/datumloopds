@@ -49,7 +49,34 @@ enum class MaterialPropertyLaw {
     PiecewiseLinear,
 };
 
-struct MaterialPropertyModel {
+enum class MaterialSourceKind {
+    ManufacturerDatasheet,
+    MaterialDatabase,
+    PublishedSource,
+    ExperimentalMeasurement,
+    UserInput,
+    EstimatedAssumption,
+    CalibratedValue,
+};
+
+[[nodiscard]] std::string materialSourceKindName(MaterialSourceKind kind);
+[[nodiscard]] std::optional<MaterialSourceKind> materialSourceKindFromName(const std::string& name);
+
+struct MaterialSource {
+    std::string id;
+    MaterialSourceKind kind = MaterialSourceKind::UserInput;
+    std::string title;
+    std::string publisher;
+    std::string version;
+    std::string reference;
+    std::string url;
+
+    void validate() const;
+
+    friend bool operator==(const MaterialSource&, const MaterialSource&) = default;
+};
+
+struct MaterialProperty {
     std::string propertyName;
     std::string propertyUnit;
     std::string independentVariable;
@@ -60,9 +87,17 @@ struct MaterialPropertyModel {
     std::string source;
     std::string sourceVersion;
     std::optional<double> confidence;
+    std::optional<std::string> sourceId;
+    // Absolute uncertainty is expressed in propertyUnit. Missing uncertainty
+    // and temperature bounds mean the source did not establish those values.
+    std::optional<double> absoluteUncertainty;
+    std::optional<double> minimumTemperatureK;
+    std::optional<double> maximumTemperatureK;
 
-    friend bool operator==(const MaterialPropertyModel&, const MaterialPropertyModel&) = default;
+    friend bool operator==(const MaterialProperty&, const MaterialProperty&) = default;
 };
+
+using MaterialPropertyModel = MaterialProperty;
 
 struct MaterialProcessHistoryEntry {
     std::string process;
@@ -85,6 +120,7 @@ struct MaterialDefinition {
     std::vector<MaterialPhaseDefinition> phases;
     std::optional<MaterialMicrostructure> microstructure;
     std::vector<MaterialProcessHistoryEntry> processHistory;
+    std::vector<MaterialSource> sources;
     std::vector<MaterialPropertyModel> propertyModels;
     std::vector<std::string> provenance;
 
@@ -103,6 +139,7 @@ struct MaterialState {
     std::vector<MaterialPhaseFraction> phaseFractions;
     std::optional<MaterialMicrostructure> microstructure;
     std::vector<std::string> fieldDatasetReferences;
+    std::vector<std::string> provenance;
 
     void validate() const;
 

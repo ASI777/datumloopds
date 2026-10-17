@@ -136,6 +136,16 @@ QJsonObject encodeMaterial(const MaterialDefinition& material)
                                    {QStringLiteral("durationS"), optionalNumber(item.durationS)},
                                    {QStringLiteral("provenance"), q(item.provenance)}});
     }
+    QJsonArray sources;
+    for (const MaterialSource& item : material.sources) {
+        sources.append(QJsonObject{{QStringLiteral("id"), q(item.id)},
+                                   {QStringLiteral("kind"), q(materialSourceKindName(item.kind))},
+                                   {QStringLiteral("title"), q(item.title)},
+                                   {QStringLiteral("publisher"), q(item.publisher)},
+                                   {QStringLiteral("version"), q(item.version)},
+                                   {QStringLiteral("reference"), q(item.reference)},
+                                   {QStringLiteral("url"), q(item.url)}});
+    }
     QJsonArray properties;
     for (const MaterialPropertyModel& item : material.propertyModels) {
         QJsonArray table;
@@ -154,7 +164,11 @@ QJsonObject encodeMaterial(const MaterialDefinition& material)
                                       {QStringLiteral("table"), table},
                                       {QStringLiteral("source"), q(item.source)},
                                       {QStringLiteral("sourceVersion"), q(item.sourceVersion)},
-                                      {QStringLiteral("confidence"), optionalNumber(item.confidence)}});
+                                      {QStringLiteral("sourceId"), optionalString(item.sourceId)},
+                                      {QStringLiteral("confidence"), optionalNumber(item.confidence)},
+                                      {QStringLiteral("absoluteUncertainty"), optionalNumber(item.absoluteUncertainty)},
+                                      {QStringLiteral("minimumTemperatureK"), optionalNumber(item.minimumTemperatureK)},
+                                      {QStringLiteral("maximumTemperatureK"), optionalNumber(item.maximumTemperatureK)}});
     }
     return {{QStringLiteral("id"), q(material.id)},
             {QStringLiteral("name"), q(material.name)},
@@ -164,6 +178,7 @@ QJsonObject encodeMaterial(const MaterialDefinition& material)
             {QStringLiteral("microstructure"), material.microstructure.has_value()
                  ? QJsonValue(encodeMicrostructure(*material.microstructure)) : QJsonValue(QJsonValue::Null)},
             {QStringLiteral("processHistory"), history},
+            {QStringLiteral("sources"), sources},
             {QStringLiteral("propertyModels"), properties},
             {QStringLiteral("provenance"), strings(material.provenance)}};
 }
@@ -207,6 +222,26 @@ MaterialDefinition readMaterial(const QJsonValue& value)
                                          readOptionalNumber(item.value(QStringLiteral("durationS")), QStringLiteral("durationS")),
                                          s(item.value(QStringLiteral("provenance")), QStringLiteral("provenance"))});
     }
+    const QJsonValue sourcesValue = object.value(QStringLiteral("sources"));
+    if (!sourcesValue.isUndefined() && !sourcesValue.isArray()) {
+        fail(QStringLiteral("Material sources must be an array."));
+    }
+    for (const QJsonValue& entry : sourcesValue.toArray()) {
+        if (!entry.isObject()) fail(QStringLiteral("Material source entries must be objects."));
+        const QJsonObject item = entry.toObject();
+        const std::string kindName = s(item.value(QStringLiteral("kind")), QStringLiteral("source.kind"));
+        const auto kind = materialSourceKindFromName(kindName);
+        if (!kind.has_value()) fail(QStringLiteral("Unknown material source kind '%1'.").arg(q(kindName)));
+        result.sources.push_back({
+            s(item.value(QStringLiteral("id")), QStringLiteral("source.id")),
+            *kind,
+            s(item.value(QStringLiteral("title")), QStringLiteral("source.title")),
+            s(item.value(QStringLiteral("publisher")), QStringLiteral("source.publisher")),
+            s(item.value(QStringLiteral("version")), QStringLiteral("source.version")),
+            s(item.value(QStringLiteral("reference")), QStringLiteral("source.reference")),
+            s(item.value(QStringLiteral("url")), QStringLiteral("source.url")),
+        });
+    }
     const QJsonValue properties = object.value(QStringLiteral("propertyModels"));
     if (!properties.isArray()) fail(QStringLiteral("Material propertyModels must be an array."));
     for (const QJsonValue& entry : properties.toArray()) {
@@ -232,7 +267,14 @@ MaterialDefinition readMaterial(const QJsonValue& value)
         }
         property.source = s(item.value(QStringLiteral("source")), QStringLiteral("source"));
         property.sourceVersion = s(item.value(QStringLiteral("sourceVersion")), QStringLiteral("sourceVersion"));
+        property.sourceId = readOptionalString(item.value(QStringLiteral("sourceId")), QStringLiteral("sourceId"));
         property.confidence = readOptionalNumber(item.value(QStringLiteral("confidence")), QStringLiteral("confidence"));
+        property.absoluteUncertainty = readOptionalNumber(item.value(QStringLiteral("absoluteUncertainty")),
+                                                          QStringLiteral("absoluteUncertainty"));
+        property.minimumTemperatureK = readOptionalNumber(item.value(QStringLiteral("minimumTemperatureK")),
+                                                          QStringLiteral("minimumTemperatureK"));
+        property.maximumTemperatureK = readOptionalNumber(item.value(QStringLiteral("maximumTemperatureK")),
+                                                          QStringLiteral("maximumTemperatureK"));
         result.propertyModels.push_back(std::move(property));
     }
     result.provenance = readStrings(object.value(QStringLiteral("provenance")), QStringLiteral("material.provenance"));
@@ -563,7 +605,8 @@ QJsonObject encodeElectronicsModel(const DatumElectronicsModel& model)
                                   {QStringLiteral("phaseFractions"), phaseFractions(item.phaseFractions)},
                                   {QStringLiteral("microstructure"), item.microstructure.has_value()
                                        ? QJsonValue(encodeMicrostructure(*item.microstructure)) : QJsonValue(QJsonValue::Null)},
-                                  {QStringLiteral("fieldDatasetReferences"), strings(item.fieldDatasetReferences)}});
+                                  {QStringLiteral("fieldDatasetReferences"), strings(item.fieldDatasetReferences)},
+                                  {QStringLiteral("provenance"), strings(item.provenance)}});
     }
     QJsonArray circuits;
     for (const CircuitDocument& item : model.circuits) circuits.append(encodeCircuit(item));
@@ -597,6 +640,10 @@ DatumElectronicsModel decodeElectronicsModel(const QJsonObject& object)
         if (microstructure.isObject()) state.microstructure = readMicrostructure(microstructure, QStringLiteral("materialState.microstructure"));
         else if (!microstructure.isNull()) fail(QStringLiteral("Material state microstructure must be an object or null."));
         state.fieldDatasetReferences = readStrings(item.value(QStringLiteral("fieldDatasetReferences")), QStringLiteral("materialState.fieldDatasetReferences"));
+        const QJsonValue stateProvenance = item.value(QStringLiteral("provenance"));
+        if (!stateProvenance.isUndefined()) {
+            state.provenance = readStrings(stateProvenance, QStringLiteral("materialState.provenance"));
+        }
         model.materialStates.push_back(std::move(state));
     }
     for (const QJsonValue& entry : circuits.toArray()) model.circuits.push_back(readCircuit(entry));
