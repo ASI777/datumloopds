@@ -49,6 +49,28 @@ void SetFeatureGraphCommand::undo(DatumDocument& document)
     document.restoreObjectSnapshot(*before_);
 }
 
+SetEngineeringModelCommand::SetEngineeringModelCommand(DatumEngineeringModel model)
+    : model_(std::move(model))
+{
+}
+
+void SetEngineeringModelCommand::execute(DatumDocument& document)
+{
+    DatumEngineeringModel before = document.engineeringModel();
+    document.setEngineeringModel(model_);
+    if (!before_.has_value()) {
+        before_ = std::move(before);
+    }
+}
+
+void SetEngineeringModelCommand::undo(DatumDocument& document)
+{
+    if (!before_.has_value()) {
+        throw std::logic_error("engineering model command was not executed");
+    }
+    document.setEngineeringModel(*before_);
+}
+
 void CommandHistory::execute(DatumDocument& document, std::unique_ptr<DatumCommand> command)
 {
     if (!command) {

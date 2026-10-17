@@ -21,6 +21,34 @@ bool finite(const Vector3& value)
     });
 }
 
+bool hasEngineeringIdentity(const DatumEngineeringModel& model, const std::string& id)
+{
+    for (const DatumMechanism& mechanism : model.mechanisms) {
+        if (mechanism.id == id || std::any_of(mechanism.axes.begin(), mechanism.axes.end(), [&id](const auto& axis) {
+                return axis.id == id;
+            })) {
+            return true;
+        }
+    }
+    return std::any_of(model.motors.begin(), model.motors.end(), [&id](const auto& motor) {
+        return motor.id == id;
+    });
+}
+
+void reserveEngineeringIdentities(const DatumEngineeringModel& model,
+                                 std::unordered_set<std::string>& reservedIds)
+{
+    for (const DatumMechanism& mechanism : model.mechanisms) {
+        reservedIds.insert(mechanism.id);
+        for (const DatumAxis& axis : mechanism.axes) {
+            reservedIds.insert(axis.id);
+        }
+    }
+    for (const DatumMotor& motor : model.motors) {
+        reservedIds.insert(motor.id);
+    }
+}
+
 }  // namespace
 
 DatumDocument::DatumDocument(std::string name, std::string projectId)
@@ -55,6 +83,7 @@ void DatumDocument::clear(std::string name)
     projectId_ = createDatumUuidV4();
     objects_.clear();
     topologyReferences_.clear();
+    engineeringModel_ = {};
     ++revision_;
     dirty_ = true;
 }
@@ -65,6 +94,7 @@ void DatumDocument::replaceWith(DatumDocument replacement)
     projectId_ = std::move(replacement.projectId_);
     objects_ = std::move(replacement.objects_);
     topologyReferences_ = std::move(replacement.topologyReferences_);
+    engineeringModel_ = std::move(replacement.engineeringModel_);
     ++revision_;
     dirty_ = replacement.dirty_;
 }
@@ -108,7 +138,7 @@ const DatumObject& DatumDocument::addObject(std::string id,
         }) ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&id](const auto& reference) {
             return reference.id == id;
-        })) {
+        }) || hasEngineeringIdentity(engineeringModel_, id)) {
         throw std::invalid_argument("object id must be unique within a project");
     }
     if (id == projectId_) {
@@ -149,6 +179,7 @@ const DatumObject& DatumDocument::addObject(std::string id,
         for (const DatumTopologyReference& existing : topologyReferences_) {
             reservedIds.insert(existing.id);
         }
+        reserveEngineeringIdentities(engineeringModel_, reservedIds);
         for (const DatumTopologyReference& reference : generatedReferences) {
             if (!reservedIds.insert(reference.id).second) {
                 throw std::runtime_error("generated topology reference UUID is not unique within the document");
@@ -225,6 +256,7 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
                            [&reference](const DatumFeature& feature) { return feature.id == reference.id; });
     });
     if (reference.id == projectId_ || object(reference.id) != nullptr || featureIdCollision ||
+        hasEngineeringIdentity(engineeringModel_, reference.id) ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&](const auto& existing) {
             return existing.id == reference.id;
         })) {
@@ -288,6 +320,83 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
     return topologyReferences_.back();
 }
 
+void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
+{
+    model.validate();
+    std::unordered_set<std::string> reservedIds;
+    reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
+    reservedIds.insert(projectId_);
+    for (const DatumObject& item : objects_) {
+        reservedIds.insert(item.id);
+        for (const DatumFeature& feature : item.featureGraph.features()) {
+            reservedIds.insert(feature.id);
+        }
+    }
+    for (const DatumTopologyReference& reference : topologyReferences_) {
+        reservedIds.insert(reference.id);
+    }
+    for (const DatumMechanism& mechanism : model.mechanisms) {
+        if (!reservedIds.insert(mechanism.id).second) {
+            throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+        }
+        for (const std::string& bodyObjectId : mechanism.bodyObjectIds) {
+            if (object(bodyObjectId) == nullptr) {
+                throw std::invalid_argument("mechanism bodyObjectIds must reference existing CAD objects");
+            }
+        }
+        for (const DatumAxis& axis : mechanism.axes) {
+            if (!reservedIds.insert(axis.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+        }
+    }
+    for (const DatumMotor& motor : model.motors) {
+        if (!reservedIds.insert(motor.id).second) {
+            throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+        }
+        const DatumMechanism* mechanism = model.mechanism(motor.mechanismId);
+        if (mechanism == nullptr) {
+            throw std::invalid_argument("motor references an unknown mechanism");
+        }
+        const auto isMechanismBody = [mechanism](const std::string& objectId) {
+            return std::find(mechanism->bodyObjectIds.begin(), mechanism->bodyObjectIds.end(), objectId) !=
+                   mechanism->bodyObjectIds.end();
+        };
+        if (motor.cadRepresentationObjectId.has_value() &&
+            (object(*motor.cadRepresentationObjectId) == nullptr ||
+             !isMechanismBody(*motor.cadRepresentationObjectId))) {
+            throw std::invalid_argument("motor CAD representation must be an object in its mechanism");
+        }
+        for (const DatumMountingReference& mounting : motor.mountingReferences) {
+            if (object(mounting.objectId) == nullptr || !isMechanismBody(mounting.objectId)) {
+                throw std::invalid_argument("motor mounting reference must point to an object in its mechanism");
+            }
+            if (mounting.topologyReferenceId.has_value()) {
+                const auto topology = std::find_if(
+                    topologyReferences_.begin(), topologyReferences_.end(), [&mounting](const auto& reference) {
+                        return reference.id == *mounting.topologyReferenceId;
+                    });
+                if (topology == topologyReferences_.end() || topology->objectId != mounting.objectId) {
+                    throw std::invalid_argument("motor mounting topology reference must belong to its CAD object");
+                }
+            }
+        }
+    }
+    for (const DatumMechanism& mechanism : model.mechanisms) {
+        for (const DatumAxis& axis : mechanism.axes) {
+            if (object(axis.baseObjectId) == nullptr || object(axis.movingObjectId) == nullptr) {
+                throw std::invalid_argument("axis base and moving references must be existing CAD objects");
+            }
+        }
+    }
+
+    if (engineeringModel_ != model) {
+        engineeringModel_ = std::move(model);
+        ++revision_;
+        dirty_ = true;
+    }
+}
+
 void DatumDocument::setFeatureGraph(const std::string& objectId,
                                     DatumFeatureGraph graph,
                                     bool captureTopologyReferences)
@@ -314,6 +423,7 @@ void DatumDocument::setFeatureGraph(const std::string& objectId,
     std::unordered_set<std::string> reservedIds;
     reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
     reservedIds.insert(projectId_);
+    reserveEngineeringIdentities(engineeringModel_, reservedIds);
     reservedIds.insert(objectId);
     for (const DatumObject& existing : objects_) {
         if (existing.id != objectId) {
@@ -404,6 +514,7 @@ void DatumDocument::restoreObjectSnapshot(DatumObjectSnapshot snapshot)
     std::unordered_set<std::string> reservedIds;
     reservedIds.insert(projectId_);
     reservedIds.insert(snapshot.object.id);
+    reserveEngineeringIdentities(engineeringModel_, reservedIds);
     for (const DatumObject& existing : objects_) {
         if (existing.id != snapshot.object.id) {
             reservedIds.insert(existing.id);

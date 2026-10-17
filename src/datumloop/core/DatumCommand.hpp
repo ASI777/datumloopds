@@ -44,6 +44,18 @@ private:
     std::optional<DatumObjectSnapshot> after_;
 };
 
+class SetEngineeringModelCommand final : public DatumCommand {
+public:
+    explicit SetEngineeringModelCommand(DatumEngineeringModel model);
+    void execute(DatumDocument& document) override;
+    void undo(DatumDocument& document) override;
+    [[nodiscard]] std::string label() const override { return "Set Engineering Model"; }
+
+private:
+    DatumEngineeringModel model_;
+    std::optional<DatumEngineeringModel> before_;
+};
+
 class CommandHistory final {
 public:
     void execute(DatumDocument& document, std::unique_ptr<DatumCommand> command);

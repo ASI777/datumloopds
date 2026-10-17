@@ -20,6 +20,7 @@ add_library(datumloop_core STATIC
     src/datumloop/core/DatumFeatureGraph.cpp
     src/datumloop/core/DatumUuid.cpp
     src/datumloop/core/DatumTopologyReference.cpp
+    src/datumloop/engineering/DatumEngineeringModel.cpp
     src/datumloop/topology/DatumTopologyResolver.cpp
     src/datumloop/geometry/OcctKernel.cpp
 )

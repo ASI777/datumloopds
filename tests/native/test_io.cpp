@@ -89,6 +89,50 @@ int main(int argc, char* argv[])
         persistedFeatureReference.id = uuid().toStdString();
         persistedFeatureReference.featureId = uuid().toStdString();
         (void)document.addTopologyReference(persistedFeatureReference);
+
+        datumloop::DatumEngineeringModel engineeringModel;
+        datumloop::DatumMechanism mechanism;
+        mechanism.id = uuid().toStdString();
+        mechanism.name = "Round-trip mechanism";
+        mechanism.bodyObjectIds = {parentId, childId};
+        datumloop::DatumMotor motor;
+        motor.id = uuid().toStdString();
+        motor.mechanismId = mechanism.id;
+        motor.name = "Round-trip servo";
+        motor.cadRepresentationObjectId = parentId;
+        motor.massKg = 1.25;
+        motor.inertiaTensorKgM2 = datumloop::DatumInertiaTensorKgM2{0.002, 0.003, 0.004, 0.0, 0.0, 0.0};
+        motor.centerOfMassLocalM = datumloop::Vector3{0.0, 0.0, 0.01};
+        motor.ratedSpeedRadPerSec = 100.0;
+        motor.maximumSpeedRadPerSec = 300.0;
+        motor.ratedTorqueNm = 1.2;
+        motor.peakTorqueNm = 2.4;
+        motor.torqueCurve = {{0.0, 2.4}, {100.0, 1.8}, {300.0, 0.0}};
+        motor.electrical = {48.0, 3.2, 8.0};
+        motor.thermal = {2.5, 18.0, 423.15};
+        motor.encoder = datumloop::DatumMotorEncoder{"incremental", 4096};
+        motor.mountingReferences = {{"housing flange", parentId, capturedReferences.front().id}};
+        motor.supplierData = datumloop::DatumMotorSupplierData{
+            std::string("Datum Components"), std::string("DL-SV-48-100"),
+            std::string("https://example.invalid/dl-sv-48-100")};
+        datumloop::DatumAxis axis;
+        axis.id = uuid().toStdString();
+        axis.name = "X travel";
+        axis.type = datumloop::DatumAxisType::Linear;
+        axis.baseObjectId = parentId;
+        axis.movingObjectId = childId;
+        axis.directionInBaseFrame = {1.0, 0.0, 0.0};
+        axis.actuatorMotorId = motor.id;
+        mechanism.axes.push_back(axis);
+        engineeringModel.mechanisms.push_back(mechanism);
+        engineeringModel.motors.push_back(motor);
+        datumloop::DatumMotor unspecifiedMotor;
+        unspecifiedMotor.id = uuid().toStdString();
+        unspecifiedMotor.mechanismId = mechanism.id;
+        unspecifiedMotor.name = "Unspecified motor";
+        engineeringModel.motors.push_back(unspecifiedMotor);
+        document.setEngineeringModel(engineeringModel);
+
         const TopoDS_Shape regeneratedBox = datumloop::OcctKernel::box({40.0, 30.0, 20.0});
         for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
             const auto resolution = datumloop::DatumTopologyResolver::resolve(
@@ -153,8 +197,13 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 3,
-                "saved project did not include the version-three schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 4,
+                "saved project did not include the version-four schema");
+        require(root.value(QStringLiteral("engineeringModel")).toObject()
+                    .value(QStringLiteral("mechanisms")).toArray().size() == 1 &&
+                    root.value(QStringLiteral("engineeringModel")).toObject()
+                    .value(QStringLiteral("motors")).toArray().size() == 2,
+                "saved project omitted engineering mechanisms or motors");
         require(root.value(QStringLiteral("topologyReferences")).toArray().size() ==
                     static_cast<qsizetype>(document.topologyReferences().size()),
                 "saved project omitted its persistent topology references");
@@ -173,6 +222,8 @@ int main(int argc, char* argv[])
 
         datumloop::DatumDocument loaded = datumloop::DldProjectStore::load(projectPath);
         require(!loaded.isDirty(), "loaded project should start clean");
+        require(loaded.engineeringModel() == engineeringModel,
+                "engineering entities, SI values, optional unknowns, or CAD references changed during round-trip");
         require(loaded.projectId() == projectId, "project UUID did not survive round-trip");
         require(loaded.name() == "Round-trip assembly", "project name did not survive round-trip");
         require(loaded.objects().size() == 2, "project object count did not survive round-trip");
@@ -232,6 +283,7 @@ int main(int argc, char* argv[])
         QJsonObject versionOne = root;
         versionOne.insert(QStringLiteral("schemaVersion"), 1);
         versionOne.remove(QStringLiteral("topologyReferences"));
+        versionOne.remove(QStringLiteral("engineeringModel"));
         QJsonArray legacyObjects = versionOne.value(QStringLiteral("objects")).toArray();
         for (qsizetype index = 0; index < legacyObjects.size(); ++index) {
             QJsonObject legacyObject = legacyObjects.at(index).toObject();
@@ -275,8 +327,68 @@ int main(int argc, char* argv[])
         QFile migratedV2Manifest(versionTwoPath);
         require(migratedV2Manifest.open(QIODevice::ReadOnly), "migrated schema-v2 project could not be reopened");
         const QJsonObject migratedV2Root = QJsonDocument::fromJson(migratedV2Manifest.readAll()).object();
-        require(migratedV2Root.value(QStringLiteral("schemaVersion")).toInt() == 3,
+        require(migratedV2Root.value(QStringLiteral("schemaVersion")).toInt() ==
+                    datumloop::DldProjectStore::SchemaVersion,
                 "saving a schema-v2 project did not write the current schema");
+
+        QJsonObject versionThree = root;
+        versionThree.insert(QStringLiteral("schemaVersion"), 3);
+        versionThree.remove(QStringLiteral("engineeringModel"));
+        const QString versionThreePath = temporaryDirectory.filePath(QStringLiteral("schema-v3.dld"));
+        writeObject(versionThreePath, versionThree);
+        datumloop::DatumDocument migratedVersionThree = datumloop::DldProjectStore::load(versionThreePath);
+        require(migratedVersionThree.engineeringModel() == datumloop::DatumEngineeringModel{} &&
+                    migratedVersionThree.objects().size() == 2 && !migratedVersionThree.isDirty(),
+                "schema-v3 project did not migrate with an empty engineering model");
+        datumloop::DldProjectStore::save(migratedVersionThree, versionThreePath);
+        QFile migratedV3Manifest(versionThreePath);
+        require(migratedV3Manifest.open(QIODevice::ReadOnly), "migrated schema-v3 project could not be reopened");
+        const QJsonObject migratedV3Root = QJsonDocument::fromJson(migratedV3Manifest.readAll()).object();
+        require(migratedV3Root.value(QStringLiteral("schemaVersion")).toInt() ==
+                    datumloop::DldProjectStore::SchemaVersion &&
+                    migratedV3Root.value(QStringLiteral("engineeringModel")).toObject()
+                    .value(QStringLiteral("motors")).toArray().isEmpty(),
+                "saving a schema-v3 project did not write the current schema and empty engineering model");
+
+        QJsonObject invalidSchemaThree = versionThree;
+        invalidSchemaThree.insert(QStringLiteral("engineeringModel"), root.value(QStringLiteral("engineeringModel")));
+        const QString invalidSchemaThreePath =
+            temporaryDirectory.filePath(QStringLiteral("schema-v3-with-engineering-data.dld"));
+        writeObject(invalidSchemaThreePath, invalidSchemaThree);
+        require(loadFails(invalidSchemaThreePath),
+                "schema-v3 project silently accepted schema-v4 engineering data");
+
+        QJsonObject invalidEngineering = root;
+        QJsonObject invalidModel = invalidEngineering.value(QStringLiteral("engineeringModel")).toObject();
+        QJsonArray invalidMotors = invalidModel.value(QStringLiteral("motors")).toArray();
+        QJsonObject invalidMotor = invalidMotors.at(0).toObject();
+        invalidMotor.insert(QStringLiteral("mechanismId"), uuid());
+        invalidMotors.replace(0, invalidMotor);
+        invalidModel.insert(QStringLiteral("motors"), invalidMotors);
+        invalidEngineering.insert(QStringLiteral("engineeringModel"), invalidModel);
+        const QString invalidEngineeringPath =
+            temporaryDirectory.filePath(QStringLiteral("invalid-engineering-model.dld"));
+        writeObject(invalidEngineeringPath, invalidEngineering);
+        require(loadFails(invalidEngineeringPath),
+                "schema-v4 load accepted a motor with a missing mechanism reference");
+
+        QJsonObject missingNullableField = root;
+        QJsonObject missingFieldModel = missingNullableField.value(QStringLiteral("engineeringModel")).toObject();
+        QJsonArray missingFieldMotors = missingFieldModel.value(QStringLiteral("motors")).toArray();
+        QJsonObject motorWithMount = missingFieldMotors.at(0).toObject();
+        QJsonArray motorMounts = motorWithMount.value(QStringLiteral("mountingReferences")).toArray();
+        QJsonObject incompleteMount = motorMounts.at(0).toObject();
+        incompleteMount.remove(QStringLiteral("topologyReferenceId"));
+        motorMounts.replace(0, incompleteMount);
+        motorWithMount.insert(QStringLiteral("mountingReferences"), motorMounts);
+        missingFieldMotors.replace(0, motorWithMount);
+        missingFieldModel.insert(QStringLiteral("motors"), missingFieldMotors);
+        missingNullableField.insert(QStringLiteral("engineeringModel"), missingFieldModel);
+        const QString missingNullablePath =
+            temporaryDirectory.filePath(QStringLiteral("missing-engineering-nullable-field.dld"));
+        writeObject(missingNullablePath, missingNullableField);
+        require(loadFails(missingNullablePath),
+                "schema-v4 load accepted an omitted nullable engineering field");
 
         datumloop::DatumDocument booleanDocument("Boolean feature round-trip");
         const std::string booleanObjectId = booleanDocument.createBox("Boolean result", {8.0, 8.0, 8.0}).id;
@@ -316,7 +428,7 @@ int main(int argc, char* argv[])
                                 loadedBooleanObject->featureGraph.features().end(), [](const auto& feature) {
                                     return feature.status == datumloop::DatumFeatureStatus::Succeeded;
                                 }),
-                "Boolean feature DAG did not recompute and round-trip through schema 3");
+                "Boolean feature DAG did not recompute and round-trip through schema 4");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");

@@ -102,10 +102,11 @@ triangle counts as approximate display comparisons.
 The standalone application uses C++20, Qt 6 Quick/QML, and direct OCCT APIs.
 `DatumDocument` owns each exact `TopoDS_Shape`, project, object and feature
 UUIDs, object hierarchy, typed scalar properties, shape metrics, translation,
-dirty and revision state, topology reference signatures, and an object-scoped
-feature graph. `DldProjectStore` reads and writes the version-three `.dld` manifest
-using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates display
-tessellation after load. Schema v1 and v2 projects migrate to v3. Feature-backed
+dirty and revision state, topology reference signatures, an object-scoped
+feature graph, and a separate engineering model. `DldProjectStore` reads and
+writes the version-four `.dld` manifest using Qt Core and OCCT; it persists exact
+B-Rep geometry and regenerates display tessellation after load. Schema v1, v2,
+and v3 projects migrate to v4 with an empty engineering model. Feature-backed
 objects persist their feature inputs and recompute exact shapes on load; direct
 imported geometry remains stored as B-Rep data.
 `DocumentViewModel` provides Save/Open,
@@ -138,6 +139,17 @@ remain unresolved. The native viewport supports Object, Face, Edge, and Vertex
 modes. Large-model acceleration and distinct subshape highlight geometry
 remain future work.
 
+`DatumEngineeringModel` currently stores mechanisms, linear and rotary datum
+axes, and motors separately from CAD objects. Mechanisms reference CAD body
+object IDs; axes record their base and moving objects, metre-valued origin, and
+unit direction. Motors may reference their CAD representation and mounting
+topology, plus mass, inertia, center of mass, torque/speed data, electrical and
+thermal data, encoder, and supplier fields. All physical values use SI units;
+missing optional motor properties remain unknown and are not inferred from CAD
+or renderer meshes. Document validation checks identity collisions and object
+and topology ownership. These initial axes are engineering references only:
+they do not impose kinematic constraints, and the model has no joint solver yet.
+
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native
 application. The initial topology matcher can leave changed or ambiguous
@@ -145,8 +157,8 @@ references unresolved. The first feature graph supports box, cylinder, sphere,
 and cone primitives, translation, and union/cut/intersection Booleans within
 one object. Feature graph replacement creates a new initial topology reference
 set for that object's output; provenance-aware topology migration,
-object-to-object references, sketch and manufacturing features, rotations, and
-engineering objects remain future work.
+object-to-object references, sketch and manufacturing features, rotations,
+joints, and solver integration remain future work.
 
 ```text
 Qt Quick / QML workspace and editor components
@@ -167,31 +179,34 @@ FreeCAD Python workbench -> separate compatibility path
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
-version-three `.dld` save/open with an initial recomputable feature graph. The
-renderer/display-mesh boundary, workspace/editor composition, picking-service
+version-four `.dld` save/open with an initial recomputable feature graph and
+mechanism/axis/motor metadata. Renderer/display-mesh separation,
+workspace/editor composition, picking-service
 boundary, and native independence are guarded by architecture checks. An XTest
 pointer smoke covers the visible viewport and Move workflow when the Qt XCB
 runtime is available. The 2026-10-17 recheck could not start the XCB window
 because `xcb-cursor0` is missing; the offscreen check only verifies QML and
 viewport-data initialization. Hardware-GPU behavior remains unverified. See
 [`native-baseline.md`](native-baseline.md) for this run's results.
-Further editors and engineering workflows are later work.
+Joint definitions, solver integration, and further engineering workflows are
+later work.
 
 ### Current native implementation status
 
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
 workspace without loading FreeCAD. Core, persistence, and UI-model checks cover
-geometry measures, `.dld` round-trip and v1/v2 migration, typed properties,
+geometry measures, `.dld` round-trip and v1/v2/v3 migration, typed properties,
 hierarchy, dirty state, exact primitive/transform/Boolean recompute, feature
-status and error reporting, stable-ID object and subshape picking,
+status and error reporting, engineering-model validation and persistence,
+stable-ID object and subshape picking,
 preview/cancel/commit behavior, input validation, and move/feature-graph
 undo/redo. The headless QML smoke checks the common host
 and all three editor components. `make native-independence-check` finds no
 FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The
-offscreen platform cannot render Qt Quick 3D; Xvfb presents the app and the
-XTest pointer smoke checks viewport object/face picking, camera orbit and zoom,
-and Move cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified.
+offscreen platform cannot render Qt Quick 3D; this environment also lacks the
+`xcb-cursor0` runtime needed for the Xvfb window and XTest pointer workflow.
+Hardware-GPU behavior remains unverified.
 The manual native viewport and `.dld` verification procedure is in
 [`native-verification-checklist.md`](native-verification-checklist.md).
 
@@ -223,7 +238,7 @@ but those do not complete the branded application gate by themselves.
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
   FreeCAD, Coin, SoQt, or PySide.
-- The native document owns its stable IDs, geometry, commands, and version-three
+- The native document owns its stable IDs, geometry, commands, and version-four
   `.dld` persistence, including initial face, edge, and vertex reference
   signatures. The previous FreeCAD document model remains the compatibility
   path until native import/export and project workflows are verified.

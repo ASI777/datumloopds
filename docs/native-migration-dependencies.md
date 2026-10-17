@@ -14,10 +14,11 @@ evidence; they do not verify a standalone application.
 The native target is a C++20/Qt 6 Quick/QML executable. OCCT is its primary
 exact kernel, and SMLib remains optional. `DatumDocument` owns stable object and
 feature UUIDs, hierarchy, typed properties, exact B-Rep shapes, topology
-references, and the initial object-scoped parametric feature graph. The native
-`.dld` format is at schema 3, writes exact B-Rep and feature definitions, and
-migrates schema 1 and 2 projects. FreeCAD `.FCStd` support remains isolated in
-the compatibility workbench; native persistence does not replace that import
+references, an initial object-scoped parametric feature graph, and a separate
+mechanism/axis/motor model. The native `.dld` format is at schema 4, writes
+exact B-Rep, feature definitions, and engineering metadata, and migrates schema
+1, 2, and 3 projects with an empty engineering model. FreeCAD `.FCStd` support
+remains isolated in the compatibility workbench; native persistence does not replace that import
 and migration path.
 
 The native executable currently configures and builds against Qt 6.10.2 and
@@ -80,6 +81,11 @@ Properties editors. Selection drives the property panel through
 `PickingService`; camera orbit/pan/zoom and frame-selected controls are native.
 Move previews a numeric translation along X/Y/Z and either commits it as an
 undoable command or cancels it without changing the document.
+
+`DatumEngineeringModel` is a separate document value containing mechanisms,
+linear/rotary axes, and motors with optional physical properties and stable CAD
+or topology references. The current axes are descriptive references only; the
+model does not yet define joints or drive a solver, and it has no editor UI.
 
 This is a foundation, not a replacement for Part Design, assemblies, native
 engineering semantics, or simulation. The FreeCAD 1.1.3 compatibility shell's

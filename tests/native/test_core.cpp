@@ -223,11 +223,124 @@ int main()
                     close(document.object(id)->metrics.volume, 1500.0),
                 "undo did not restore the last valid feature graph after a failed recompute");
 
+        datumloop::DatumDocument engineeringDocument("Engineering model checks");
+        const std::string baseObjectId = engineeringDocument.createBox("Motor housing", {30.0, 20.0, 15.0}).id;
+        const std::string movingObjectId = engineeringDocument.createBox("Carriage", {12.0, 8.0, 4.0}).id;
+        const auto mountingFace = std::find_if(
+            engineeringDocument.topologyReferences().begin(), engineeringDocument.topologyReferences().end(),
+            [&baseObjectId](const auto& reference) {
+                return reference.objectId == baseObjectId && reference.subshapeType == datumloop::DatumSubshapeType::Face;
+            });
+        require(mountingFace != engineeringDocument.topologyReferences().end(),
+                "test motor housing has no persistent mounting face reference");
+
+        datumloop::DatumEngineeringModel engineeringModel;
+        datumloop::DatumMechanism mechanism;
+        mechanism.id = datumloop::createDatumUuidV4();
+        mechanism.name = "Linear axis mechanism";
+        mechanism.bodyObjectIds = {baseObjectId, movingObjectId};
+        datumloop::DatumMotor motor;
+        motor.id = datumloop::createDatumUuidV4();
+        motor.mechanismId = mechanism.id;
+        motor.name = "Servo motor";
+        motor.cadRepresentationObjectId = baseObjectId;
+        motor.massKg = 1.25;
+        motor.inertiaTensorKgM2 = datumloop::DatumInertiaTensorKgM2{0.002, 0.003, 0.004, 0.0, 0.0, 0.0};
+        motor.centerOfMassLocalM = datumloop::Vector3{0.0, 0.0, 0.01};
+        motor.ratedSpeedRadPerSec = 100.0;
+        motor.maximumSpeedRadPerSec = 300.0;
+        motor.ratedTorqueNm = 1.2;
+        motor.peakTorqueNm = 2.4;
+        motor.torqueCurve = {{0.0, 2.4}, {100.0, 1.8}, {300.0, 0.0}};
+        motor.electrical = {48.0, 3.2, 8.0};
+        motor.thermal = {2.5, 18.0, 423.15};
+        motor.encoder = datumloop::DatumMotorEncoder{"incremental", 4096};
+        motor.mountingReferences = {{"housing flange", baseObjectId, mountingFace->id}};
+        motor.supplierData = datumloop::DatumMotorSupplierData{
+            std::string("Datum Components"), std::string("DL-SV-48-100"), std::string("https://example.invalid/dl-sv-48-100")};
+        datumloop::DatumAxis axis;
+        axis.id = datumloop::createDatumUuidV4();
+        axis.name = "X travel";
+        axis.type = datumloop::DatumAxisType::Linear;
+        axis.baseObjectId = baseObjectId;
+        axis.movingObjectId = movingObjectId;
+        axis.directionInBaseFrame = {1.0, 0.0, 0.0};
+        axis.actuatorMotorId = motor.id;
+        mechanism.axes.push_back(axis);
+        engineeringModel.mechanisms.push_back(mechanism);
+        engineeringModel.motors.push_back(motor);
+        engineeringModel.validate();
+
+        datumloop::DatumEngineeringModel overflowingInertia = engineeringModel;
+        overflowingInertia.motors.front().inertiaTensorKgM2 =
+            datumloop::DatumInertiaTensorKgM2{1.0e308, 1.0e308, 1.0e308, 1.7e308, 0.0, 0.0};
+        bool nonPhysicalInertiaRejected = false;
+        try {
+            overflowingInertia.validate();
+        } catch (const std::invalid_argument&) {
+            nonPhysicalInertiaRejected = true;
+        }
+        require(nonPhysicalInertiaRejected,
+                "engineering model accepted a non-positive-semidefinite inertia tensor at extreme finite magnitude");
+
+        datumloop::DatumEngineeringModel torqueAbovePeak = engineeringModel;
+        torqueAbovePeak.motors.front().torqueCurve.front().torqueNm = 3.0;
+        bool torqueAbovePeakRejected = false;
+        try {
+            torqueAbovePeak.validate();
+        } catch (const std::invalid_argument&) {
+            torqueAbovePeakRejected = true;
+        }
+        require(torqueAbovePeakRejected, "engineering model accepted a torque curve above the motor peak torque");
+
+        engineeringDocument.markSaved();
+        datumloop::CommandHistory engineeringHistory;
+        engineeringHistory.execute(engineeringDocument,
+            std::make_unique<datumloop::SetEngineeringModelCommand>(engineeringModel));
+        require(engineeringDocument.isDirty() && engineeringDocument.engineeringModel() == engineeringModel,
+                "engineering model command did not install typed entities and mark the document dirty");
+        require(engineeringHistory.undo(engineeringDocument) &&
+                    engineeringDocument.engineeringModel() == datumloop::DatumEngineeringModel{},
+                "engineering model command did not undo the model replacement");
+        require(engineeringHistory.redo(engineeringDocument) &&
+                    engineeringDocument.engineeringModel() == engineeringModel,
+                "engineering model command did not redo the model replacement");
+
+        datumloop::DatumEngineeringModel invalidEngineeringModel = engineeringModel;
+        invalidEngineeringModel.motors.front().maximumSpeedRadPerSec = 10.0;
+        bool invalidMotorRejected = false;
+        try {
+            engineeringDocument.setEngineeringModel(invalidEngineeringModel);
+        } catch (const std::invalid_argument&) {
+            invalidMotorRejected = true;
+        }
+        require(invalidMotorRejected && engineeringDocument.engineeringModel() == engineeringModel,
+                "engineering model accepted inconsistent motor speed limits or partially mutated the document");
+        datumloop::DatumEngineeringModel missingRepresentation = engineeringModel;
+        missingRepresentation.motors.front().cadRepresentationObjectId = datumloop::createDatumUuidV4();
+        bool missingRepresentationRejected = false;
+        try {
+            engineeringDocument.setEngineeringModel(missingRepresentation);
+        } catch (const std::invalid_argument&) {
+            missingRepresentationRejected = true;
+        }
+        require(missingRepresentationRejected && engineeringDocument.engineeringModel() == engineeringModel,
+                "engineering model accepted a CAD representation link outside the document");
+        bool engineeringIdentityCollisionRejected = false;
+        try {
+            (void)engineeringDocument.addObject(axis.id, "Duplicate engineering identity",
+                                                datumloop::OcctKernel::box({1.0, 1.0, 1.0}));
+        } catch (const std::invalid_argument&) {
+            engineeringIdentityCollisionRejected = true;
+        }
+        require(engineeringIdentityCollisionRejected,
+                "CAD object UUID collided with an existing engineering entity UUID");
+
         const std::uint64_t revision = document.revision();
         require(!document.setPosition(id, {NAN, 0.0, 0.0}), "document accepted a non-finite position");
         require(document.revision() == revision, "invalid position changed the document revision");
 
-        std::cout << "Native DatumLoop core checks passed: parametric OCCT primitives, transforms, Booleans, graph status, exact display separation, and command undo/redo.\n";
+        std::cout << "Native DatumLoop core checks passed: parametric OCCT primitives, transforms, Booleans, engineering references, motor validation, exact display separation, and command undo/redo.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native DatumLoop core check failed: " << error.what() << '\n';

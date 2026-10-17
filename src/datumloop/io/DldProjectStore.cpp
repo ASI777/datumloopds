@@ -274,6 +274,364 @@ Vector3 decodeVector(const QJsonValue& value, const QString& description)
     };
 }
 
+QJsonValue encodeOptionalNumber(const std::optional<double>& value)
+{
+    return value.has_value() ? QJsonValue(*value) : QJsonValue(QJsonValue::Null);
+}
+
+std::optional<double> decodeOptionalNumber(const QJsonObject& object, const QString& key)
+{
+    if (!object.contains(key)) {
+        fail(QStringLiteral("Engineering field '%1' is missing.").arg(key));
+    }
+    const QJsonValue value = object.value(key);
+    if (value.isNull()) {
+        return std::nullopt;
+    }
+    return requiredFiniteNumber(value, QStringLiteral("engineering.%1").arg(key));
+}
+
+QJsonValue encodeOptionalString(const std::optional<std::string>& value)
+{
+    return value.has_value() ? QJsonValue(fromUtf8(*value)) : QJsonValue(QJsonValue::Null);
+}
+
+std::optional<std::string> decodeOptionalString(const QJsonObject& object, const QString& key)
+{
+    if (!object.contains(key)) {
+        fail(QStringLiteral("Engineering field '%1' is missing.").arg(key));
+    }
+    const QJsonValue value = object.value(key);
+    if (value.isNull()) {
+        return std::nullopt;
+    }
+    if (!value.isString() || value.toString().trimmed().isEmpty()) {
+        fail(QStringLiteral("Engineering field '%1' must be a non-empty string or null.").arg(key));
+    }
+    return toUtf8(value.toString());
+}
+
+QJsonObject encodeMechanism(const DatumMechanism& mechanism)
+{
+    QJsonArray bodyObjects;
+    for (const std::string& objectId : mechanism.bodyObjectIds) {
+        bodyObjects.append(fromUtf8(objectId));
+    }
+    QJsonArray axes;
+    for (const DatumAxis& axis : mechanism.axes) {
+        axes.append(QJsonObject{
+            {QStringLiteral("id"), fromUtf8(axis.id)},
+            {QStringLiteral("name"), fromUtf8(axis.name)},
+            {QStringLiteral("type"), fromUtf8(datumAxisTypeName(axis.type))},
+            {QStringLiteral("baseObjectId"), fromUtf8(axis.baseObjectId)},
+            {QStringLiteral("movingObjectId"), fromUtf8(axis.movingObjectId)},
+            {QStringLiteral("originInBaseFrameM"), encodeVector(axis.originInBaseFrameM)},
+            {QStringLiteral("directionInBaseFrame"), encodeVector(axis.directionInBaseFrame)},
+            {QStringLiteral("actuatorMotorId"), axis.actuatorMotorId.has_value()
+                 ? QJsonValue(fromUtf8(*axis.actuatorMotorId))
+                 : QJsonValue(QJsonValue::Null)},
+        });
+    }
+    return {
+        {QStringLiteral("id"), fromUtf8(mechanism.id)},
+        {QStringLiteral("name"), fromUtf8(mechanism.name)},
+        {QStringLiteral("bodyObjectIds"), bodyObjects},
+        {QStringLiteral("axes"), axes},
+    };
+}
+
+DatumMechanism decodeMechanism(const QJsonObject& object)
+{
+    DatumMechanism mechanism;
+    mechanism.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    mechanism.name = toUtf8(requiredString(object, QStringLiteral("name")));
+    const QJsonValue bodyObjectsValue = object.value(QStringLiteral("bodyObjectIds"));
+    if (!bodyObjectsValue.isArray()) {
+        fail(QStringLiteral("Mechanism bodyObjectIds must be an array."));
+    }
+    for (const QJsonValue& bodyValue : bodyObjectsValue.toArray()) {
+        if (!bodyValue.isString()) {
+            fail(QStringLiteral("Mechanism bodyObjectIds entries must be strings."));
+        }
+        mechanism.bodyObjectIds.push_back(toUtf8(bodyValue.toString()));
+    }
+    const QJsonValue axesValue = object.value(QStringLiteral("axes"));
+    if (!axesValue.isArray()) {
+        fail(QStringLiteral("Mechanism axes must be an array."));
+    }
+    for (const QJsonValue& axisValue : axesValue.toArray()) {
+        if (!axisValue.isObject()) {
+            fail(QStringLiteral("Mechanism axis entry must be an object."));
+        }
+        const QJsonObject axisObject = axisValue.toObject();
+        DatumAxis axis;
+        axis.id = toUtf8(requiredString(axisObject, QStringLiteral("id")));
+        axis.name = toUtf8(requiredString(axisObject, QStringLiteral("name")));
+        const auto axisType = datumAxisTypeFromName(toUtf8(requiredString(axisObject, QStringLiteral("type"))));
+        if (!axisType.has_value()) {
+            fail(QStringLiteral("Axis type is unsupported."));
+        }
+        axis.type = *axisType;
+        axis.baseObjectId = toUtf8(requiredString(axisObject, QStringLiteral("baseObjectId")));
+        axis.movingObjectId = toUtf8(requiredString(axisObject, QStringLiteral("movingObjectId")));
+        axis.originInBaseFrameM = decodeVector(axisObject.value(QStringLiteral("originInBaseFrameM")),
+                                               QStringLiteral("axis.originInBaseFrameM"));
+        axis.directionInBaseFrame = decodeVector(axisObject.value(QStringLiteral("directionInBaseFrame")),
+                                                 QStringLiteral("axis.directionInBaseFrame"));
+        if (!axisObject.contains(QStringLiteral("actuatorMotorId"))) {
+            fail(QStringLiteral("Axis actuatorMotorId is missing."));
+        }
+        const QJsonValue motorValue = axisObject.value(QStringLiteral("actuatorMotorId"));
+        if (motorValue.isString()) {
+            axis.actuatorMotorId = toUtf8(motorValue.toString());
+        } else if (!motorValue.isNull() && !motorValue.isUndefined()) {
+            fail(QStringLiteral("Axis actuatorMotorId must be a motor UUID or null."));
+        }
+        mechanism.axes.push_back(std::move(axis));
+    }
+    return mechanism;
+}
+
+QJsonObject encodeMotor(const DatumMotor& motor)
+{
+    QJsonValue inertiaValue(QJsonValue::Null);
+    if (motor.inertiaTensorKgM2.has_value()) {
+        QJsonArray inertia;
+        for (double component : *motor.inertiaTensorKgM2) {
+            inertia.append(component);
+        }
+        inertiaValue = inertia;
+    }
+    QJsonArray torqueCurve;
+    for (const DatumMotorTorquePoint& point : motor.torqueCurve) {
+        torqueCurve.append(QJsonObject{
+            {QStringLiteral("speedRadPerSec"), point.speedRadPerSec},
+            {QStringLiteral("torqueNm"), point.torqueNm},
+        });
+    }
+    QJsonArray mountingReferences;
+    for (const DatumMountingReference& reference : motor.mountingReferences) {
+        mountingReferences.append(QJsonObject{
+            {QStringLiteral("role"), fromUtf8(reference.role)},
+            {QStringLiteral("objectId"), fromUtf8(reference.objectId)},
+            {QStringLiteral("topologyReferenceId"), reference.topologyReferenceId.has_value()
+                 ? QJsonValue(fromUtf8(*reference.topologyReferenceId))
+                 : QJsonValue(QJsonValue::Null)},
+        });
+    }
+    QJsonValue encoderValue(QJsonValue::Null);
+    if (motor.encoder.has_value()) {
+        encoderValue = QJsonObject{
+            {QStringLiteral("type"), fromUtf8(motor.encoder->type)},
+            {QStringLiteral("countsPerRevolution"), QString::number(motor.encoder->countsPerRevolution)},
+        };
+    }
+    QJsonValue supplierValue(QJsonValue::Null);
+    if (motor.supplierData.has_value()) {
+        supplierValue = QJsonObject{
+            {QStringLiteral("manufacturer"), encodeOptionalString(motor.supplierData->manufacturer)},
+            {QStringLiteral("partNumber"), encodeOptionalString(motor.supplierData->partNumber)},
+            {QStringLiteral("datasheetUrl"), encodeOptionalString(motor.supplierData->datasheetUrl)},
+        };
+    }
+    return {
+        {QStringLiteral("id"), fromUtf8(motor.id)},
+        {QStringLiteral("mechanismId"), fromUtf8(motor.mechanismId)},
+        {QStringLiteral("name"), fromUtf8(motor.name)},
+        {QStringLiteral("cadRepresentationObjectId"), motor.cadRepresentationObjectId.has_value()
+             ? QJsonValue(fromUtf8(*motor.cadRepresentationObjectId))
+             : QJsonValue(QJsonValue::Null)},
+        {QStringLiteral("massKg"), encodeOptionalNumber(motor.massKg)},
+        {QStringLiteral("inertiaTensorKgM2"), inertiaValue},
+        {QStringLiteral("centerOfMassLocalM"), motor.centerOfMassLocalM.has_value()
+             ? QJsonValue(encodeVector(*motor.centerOfMassLocalM))
+             : QJsonValue(QJsonValue::Null)},
+        {QStringLiteral("ratedSpeedRadPerSec"), encodeOptionalNumber(motor.ratedSpeedRadPerSec)},
+        {QStringLiteral("maximumSpeedRadPerSec"), encodeOptionalNumber(motor.maximumSpeedRadPerSec)},
+        {QStringLiteral("ratedTorqueNm"), encodeOptionalNumber(motor.ratedTorqueNm)},
+        {QStringLiteral("peakTorqueNm"), encodeOptionalNumber(motor.peakTorqueNm)},
+        {QStringLiteral("torqueCurve"), torqueCurve},
+        {QStringLiteral("electrical"), QJsonObject{
+            {QStringLiteral("ratedVoltageV"), encodeOptionalNumber(motor.electrical.ratedVoltageV)},
+            {QStringLiteral("ratedCurrentA"), encodeOptionalNumber(motor.electrical.ratedCurrentA)},
+            {QStringLiteral("peakCurrentA"), encodeOptionalNumber(motor.electrical.peakCurrentA)},
+        }},
+        {QStringLiteral("thermal"), QJsonObject{
+            {QStringLiteral("thermalResistanceKPerW"), encodeOptionalNumber(motor.thermal.thermalResistanceKPerW)},
+            {QStringLiteral("thermalCapacityJPerK"), encodeOptionalNumber(motor.thermal.thermalCapacityJPerK)},
+            {QStringLiteral("maximumWindingTemperatureK"), encodeOptionalNumber(motor.thermal.maximumWindingTemperatureK)},
+        }},
+        {QStringLiteral("encoder"), encoderValue},
+        {QStringLiteral("mountingReferences"), mountingReferences},
+        {QStringLiteral("supplierData"), supplierValue},
+    };
+}
+
+DatumMotor decodeMotor(const QJsonObject& object)
+{
+    DatumMotor motor;
+    motor.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    motor.mechanismId = toUtf8(requiredString(object, QStringLiteral("mechanismId")));
+    motor.name = toUtf8(requiredString(object, QStringLiteral("name")));
+    motor.cadRepresentationObjectId = decodeOptionalString(object, QStringLiteral("cadRepresentationObjectId"));
+    motor.massKg = decodeOptionalNumber(object, QStringLiteral("massKg"));
+    const QJsonValue inertiaValue = object.value(QStringLiteral("inertiaTensorKgM2"));
+    if (inertiaValue.isArray()) {
+        const QJsonArray array = inertiaValue.toArray();
+        if (array.size() != 6) {
+            fail(QStringLiteral("Motor inertiaTensorKgM2 must contain six symmetric tensor values."));
+        }
+        DatumInertiaTensorKgM2 inertia{};
+        for (qsizetype index = 0; index < array.size(); ++index) {
+            inertia[static_cast<std::size_t>(index)] = requiredFiniteNumber(
+                array.at(index), QStringLiteral("motor.inertiaTensorKgM2[%1]").arg(index));
+        }
+        motor.inertiaTensorKgM2 = inertia;
+    } else if (!inertiaValue.isNull()) {
+        fail(QStringLiteral("Motor inertiaTensorKgM2 must be a six-value array or null."));
+    }
+    const QJsonValue centerValue = object.value(QStringLiteral("centerOfMassLocalM"));
+    if (centerValue.isArray()) {
+        motor.centerOfMassLocalM = decodeVector(centerValue, QStringLiteral("motor.centerOfMassLocalM"));
+    } else if (!centerValue.isNull()) {
+        fail(QStringLiteral("Motor centerOfMassLocalM must be a three-vector or null."));
+    }
+    motor.ratedSpeedRadPerSec = decodeOptionalNumber(object, QStringLiteral("ratedSpeedRadPerSec"));
+    motor.maximumSpeedRadPerSec = decodeOptionalNumber(object, QStringLiteral("maximumSpeedRadPerSec"));
+    motor.ratedTorqueNm = decodeOptionalNumber(object, QStringLiteral("ratedTorqueNm"));
+    motor.peakTorqueNm = decodeOptionalNumber(object, QStringLiteral("peakTorqueNm"));
+    const QJsonValue curveValue = object.value(QStringLiteral("torqueCurve"));
+    if (!curveValue.isArray()) {
+        fail(QStringLiteral("Motor torqueCurve must be an array."));
+    }
+    for (const QJsonValue& pointValue : curveValue.toArray()) {
+        if (!pointValue.isObject()) {
+            fail(QStringLiteral("Motor torqueCurve entries must be objects."));
+        }
+        const QJsonObject pointObject = pointValue.toObject();
+        motor.torqueCurve.push_back({
+            requiredFiniteNumber(pointObject.value(QStringLiteral("speedRadPerSec")),
+                                 QStringLiteral("motor.torqueCurve.speedRadPerSec")),
+            requiredFiniteNumber(pointObject.value(QStringLiteral("torqueNm")),
+                                 QStringLiteral("motor.torqueCurve.torqueNm")),
+        });
+    }
+    const QJsonValue electricalValue = object.value(QStringLiteral("electrical"));
+    if (!electricalValue.isObject()) {
+        fail(QStringLiteral("Motor electrical model must be an object."));
+    }
+    const QJsonObject electrical = electricalValue.toObject();
+    motor.electrical.ratedVoltageV = decodeOptionalNumber(electrical, QStringLiteral("ratedVoltageV"));
+    motor.electrical.ratedCurrentA = decodeOptionalNumber(electrical, QStringLiteral("ratedCurrentA"));
+    motor.electrical.peakCurrentA = decodeOptionalNumber(electrical, QStringLiteral("peakCurrentA"));
+
+    const QJsonValue thermalValue = object.value(QStringLiteral("thermal"));
+    if (!thermalValue.isObject()) {
+        fail(QStringLiteral("Motor thermal model must be an object."));
+    }
+    const QJsonObject thermal = thermalValue.toObject();
+    motor.thermal.thermalResistanceKPerW = decodeOptionalNumber(thermal, QStringLiteral("thermalResistanceKPerW"));
+    motor.thermal.thermalCapacityJPerK = decodeOptionalNumber(thermal, QStringLiteral("thermalCapacityJPerK"));
+    motor.thermal.maximumWindingTemperatureK = decodeOptionalNumber(thermal, QStringLiteral("maximumWindingTemperatureK"));
+
+    const QJsonValue encoderValue = object.value(QStringLiteral("encoder"));
+    if (encoderValue.isObject()) {
+        const QJsonObject encoder = encoderValue.toObject();
+        const QString counts = requiredString(encoder, QStringLiteral("countsPerRevolution"));
+        const QByteArray encodedCounts = counts.toLatin1();
+        std::uint64_t count = 0;
+        const auto parsed = std::from_chars(encodedCounts.constData(),
+                                            encodedCounts.constData() + encodedCounts.size(), count);
+        if (parsed.ec != std::errc{} || parsed.ptr != encodedCounts.constData() + encodedCounts.size() || count == 0) {
+            fail(QStringLiteral("Motor encoder countsPerRevolution must be a positive uint64 decimal string."));
+        }
+        motor.encoder = DatumMotorEncoder{toUtf8(requiredString(encoder, QStringLiteral("type"))), count};
+    } else if (!encoderValue.isNull()) {
+        fail(QStringLiteral("Motor encoder must be an object or null."));
+    }
+
+    const QJsonValue mountingsValue = object.value(QStringLiteral("mountingReferences"));
+    if (!mountingsValue.isArray()) {
+        fail(QStringLiteral("Motor mountingReferences must be an array."));
+    }
+    for (const QJsonValue& mountingValue : mountingsValue.toArray()) {
+        if (!mountingValue.isObject()) {
+            fail(QStringLiteral("Motor mounting reference entries must be objects."));
+        }
+        const QJsonObject mounting = mountingValue.toObject();
+        DatumMountingReference reference;
+        reference.role = toUtf8(requiredString(mounting, QStringLiteral("role")));
+        reference.objectId = toUtf8(requiredString(mounting, QStringLiteral("objectId")));
+        if (!mounting.contains(QStringLiteral("topologyReferenceId"))) {
+            fail(QStringLiteral("Motor mounting topologyReferenceId is missing."));
+        }
+        const QJsonValue topologyValue = mounting.value(QStringLiteral("topologyReferenceId"));
+        if (topologyValue.isString()) {
+            reference.topologyReferenceId = toUtf8(topologyValue.toString());
+        } else if (!topologyValue.isNull() && !topologyValue.isUndefined()) {
+            fail(QStringLiteral("Motor mounting topologyReferenceId must be a UUID or null."));
+        }
+        motor.mountingReferences.push_back(std::move(reference));
+    }
+
+    const QJsonValue supplierValue = object.value(QStringLiteral("supplierData"));
+    if (supplierValue.isObject()) {
+        const QJsonObject supplier = supplierValue.toObject();
+        motor.supplierData = DatumMotorSupplierData{
+            decodeOptionalString(supplier, QStringLiteral("manufacturer")),
+            decodeOptionalString(supplier, QStringLiteral("partNumber")),
+            decodeOptionalString(supplier, QStringLiteral("datasheetUrl")),
+        };
+    } else if (!supplierValue.isNull()) {
+        fail(QStringLiteral("Motor supplierData must be an object or null."));
+    }
+    return motor;
+}
+
+QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
+{
+    QJsonArray mechanisms;
+    for (const DatumMechanism& mechanism : model.mechanisms) {
+        mechanisms.append(encodeMechanism(mechanism));
+    }
+    QJsonArray motors;
+    for (const DatumMotor& motor : model.motors) {
+        motors.append(encodeMotor(motor));
+    }
+    return {
+        {QStringLiteral("mechanisms"), mechanisms},
+        {QStringLiteral("motors"), motors},
+    };
+}
+
+DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object)
+{
+    DatumEngineeringModel model;
+    const QJsonValue mechanismsValue = object.value(QStringLiteral("mechanisms"));
+    const QJsonValue motorsValue = object.value(QStringLiteral("motors"));
+    if (!mechanismsValue.isArray() || !motorsValue.isArray()) {
+        fail(QStringLiteral("Engineering model mechanisms and motors must be arrays."));
+    }
+    for (const QJsonValue& mechanismValue : mechanismsValue.toArray()) {
+        if (!mechanismValue.isObject()) {
+            fail(QStringLiteral("Engineering mechanism entries must be objects."));
+        }
+        model.mechanisms.push_back(decodeMechanism(mechanismValue.toObject()));
+    }
+    for (const QJsonValue& motorValue : motorsValue.toArray()) {
+        if (!motorValue.isObject()) {
+            fail(QStringLiteral("Engineering motor entries must be objects."));
+        }
+        model.motors.push_back(decodeMotor(motorValue.toObject()));
+    }
+    try {
+        model.validate();
+    } catch (const std::invalid_argument& error) {
+        fail(QStringLiteral("Engineering model is invalid: %1").arg(QString::fromUtf8(error.what())));
+    }
+    return model;
+}
+
 QJsonObject encodeTopologyReference(const DatumTopologyReference& reference)
 {
     QJsonArray adjacent;
@@ -436,7 +794,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     }
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
-    if (schemaNumber != 1.0 && schemaNumber != 2.0 &&
+    if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
@@ -590,6 +948,15 @@ DatumDocument decodeProject(const QJsonObject& root)
             }
         }
     }
+    const QJsonValue engineeringValue = root.value(QStringLiteral("engineeringModel"));
+    if (schemaNumber == static_cast<double>(DldProjectStore::SchemaVersion)) {
+        if (!engineeringValue.isObject()) {
+            fail(QStringLiteral("Project engineeringModel is missing or invalid."));
+        }
+        document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject()));
+    } else if (!engineeringValue.isUndefined()) {
+        fail(QStringLiteral("Project contains engineeringModel data unsupported by its schema version."));
+    }
     document.markSaved();
     return document;
 }
@@ -641,6 +1008,7 @@ void DldProjectStore::save(DatumDocument& document, const QString& filePath)
         }},
         {QStringLiteral("objects"), objects},
         {QStringLiteral("topologyReferences"), topologyReferences},
+        {QStringLiteral("engineeringModel"), encodeEngineeringModel(document.engineeringModel())},
     };
     const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Indented);
     QSaveFile file(filePath);

@@ -1,7 +1,7 @@
 # Native DatumLoop project format (`.dld`)
 
 The native application saves projects as UTF-8 JSON in a `.dld` file. Schema
-version 3 is provisional and stores the document state supported by the current
+version 4 is provisional and stores the document state supported by the current
 native core:
 
 - project UUID and name;
@@ -10,14 +10,17 @@ native core:
 - object-scoped feature definitions and selected output feature UUID;
 - exact OCCT B-Rep geometry, encoded as Base64 with its OCCT stream version;
 - persistent face, edge, and vertex references with owner identity, optional
-  feature identity, geometric/topological signatures, and parent references.
+  feature identity, geometric/topological signatures, and parent references;
+- engineering mechanisms and datum axes linked to CAD body object IDs;
+- motors with optional CAD representation, physical properties, actuator data,
+  mounting references, encoder, and supplier data.
 
 Example structure (the geometry payload is abbreviated):
 
 ```json
 {
   "format": "datumloop-project",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "project": { "id": "…", "name": "Assembly" },
   "objects": [{
     "id": "…",
@@ -60,11 +63,55 @@ Example structure (the geometry payload is abbreviated):
     },
     "parentReferenceIds": [],
     "transientIndexHint": 0
-  }]
+  }],
+  "engineeringModel": {
+    "mechanisms": [{
+      "id": "…",
+      "name": "Linear axis",
+      "bodyObjectIds": ["…", "…"],
+      "axes": [{
+        "id": "…",
+        "name": "X travel",
+        "type": "linear",
+        "baseObjectId": "…",
+        "movingObjectId": "…",
+        "originInBaseFrameM": [0, 0, 0],
+        "directionInBaseFrame": [1, 0, 0],
+        "actuatorMotorId": "…"
+      }]
+    }],
+    "motors": [{
+      "id": "…",
+      "mechanismId": "…",
+      "name": "Servo motor",
+      "cadRepresentationObjectId": "…",
+      "massKg": null,
+      "inertiaTensorKgM2": null,
+      "centerOfMassLocalM": null,
+      "ratedSpeedRadPerSec": null,
+      "maximumSpeedRadPerSec": null,
+      "ratedTorqueNm": null,
+      "peakTorqueNm": null,
+      "torqueCurve": [],
+      "electrical": {
+        "ratedVoltageV": null,
+        "ratedCurrentA": null,
+        "peakCurrentA": null
+      },
+      "thermal": {
+        "thermalResistanceKPerW": null,
+        "thermalCapacityJPerK": null,
+        "maximumWindingTemperatureK": null
+      },
+      "encoder": null,
+      "mountingReferences": [],
+      "supplierData": null
+    }]
+  }
 }
 ```
 
-Property types in version 3 are `bool`, signed `int64`, finite `double`, and
+Property types in version 4 are `bool`, signed `int64`, finite `double`, and
 UTF-8 `string`. Signed 64-bit values are decimal strings in JSON so integers
 above JavaScript's exact-number range remain lossless. Parent objects must
 precede children in the object array; this both validates parent identity and
@@ -90,10 +137,12 @@ replaces its document and clears the old command history. A failed load leaves
 the open document untouched. Saving uses `QSaveFile`; the document becomes
 clean only after the atomic file commit succeeds.
 
-Schema version 3 reads versions 1 and 2. Version 1 files receive initial face,
-edge, and vertex references; version 2 references and object identities are
-preserved. Unknown schema versions are rejected. An object feature graph is an
-append-ordered DAG with explicit feature UUIDs, owner, type, input feature UUIDs,
+Schema version 4 reads versions 1, 2, and 3. Version 1 files receive initial
+face, edge, and vertex references; version 2 and 3 references and object
+identities are preserved. Older schemas load with an empty engineering model;
+engineering data in a schema 1, 2, or 3 file is rejected. Unknown schema
+versions are rejected. The object feature graph is an append-ordered DAG with
+explicit feature UUIDs, owner, type, input feature UUIDs,
 parameters in millimetres, and a geometry backend identifier. The first native
 OCCT backend supports box, cylinder, sphere, and cone primitives, translation,
 and Boolean union, cut, and intersection. Inputs must refer to earlier features
@@ -105,8 +154,7 @@ B-Rep; individual intermediate B-Reps and display tessellation are not stored.
 Loading recomputes the graph and checks the final shape's volume, surface area,
 center of mass, and bounds against the persisted B-Rep before accepting it.
 These metrics provide a consistency guard, not proof of exact geometric
-identity. An
-unsupported backend or failed node is never silently routed through OCCT;
+identity. An unsupported backend or failed node is never silently routed through OCCT;
 failed recomputes retain their status/error and do not replace the last valid
 object shape.
 
@@ -114,14 +162,22 @@ Feature graph replacement is an undoable document command. It creates a new
 initial topology-reference set for that object's output; it does not yet
 preserve subshape UUIDs through arbitrary feature changes. Object-to-object
 references, sketch and manufacturing features, rotational transforms,
-assemblies, engineering entities, simulation state, and a general migration
-framework remain unsupported. Non-empty per-object `references` arrays are
-rejected rather than silently discarded. Geometry is embedded as Base64, which
-keeps the write atomic but increases file size; a future version may move large
+assembly relationships, joints, simulation state, and a general migration
+framework remain unsupported. `DatumEngineeringModel` currently supports
+mechanisms, linear/rotary datum axes, and motors only. An axis records body
+references, a metre-valued origin, and a dimensionless direction; it does not
+apply a kinematic constraint. Motor mass is in kg, inertia in kg m², center of
+mass and axis origin in m, speed in rad/s, torque in N·m, voltage in V, current
+in A, thermal resistance in K/W, thermal capacity in J/K, and temperature in
+K. Optional physical fields remain unknown when `null`; the application does
+not infer them from CAD or display tessellation. Non-empty per-object
+`references` arrays are rejected rather than silently discarded. Geometry is
+embedded as Base64, which keeps the write atomic but increases file size; a future version may move large
 geometry payloads into assets.
 
 The tests cover exact-shape and feature-graph round-trip, primitive and Boolean
 recompute, UUID identity, hierarchy, translation, all four property types, dirty
-tracking, schema-v1/v2 migration, face/edge/vertex reference resolution and
-point picking, ambiguity rejection, parent relationships, display tessellation
-regeneration, and rejection of unsupported or malformed data.
+tracking, schema-v1/v2/v3 migration, engineering-model round-trip and reference
+validation, face/edge/vertex reference resolution and point picking, ambiguity
+rejection, parent relationships, display tessellation regeneration, and
+rejection of unsupported or malformed data.
