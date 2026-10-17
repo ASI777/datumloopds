@@ -67,5 +67,4 @@ commits it as an undoable command or cancels it without changing the document.
 This is a foundation, not a replacement for Part Design, assemblies, project
 migration, engineering metadata, simulation, or the previous FreeCAD release
 gate. Those remain later work until their native equivalents are implemented
-and tested. The first native viewport presentation check is still pending a
-working graphics display.
+and tested. Pointer-level GUI interaction still needs an automated check.
