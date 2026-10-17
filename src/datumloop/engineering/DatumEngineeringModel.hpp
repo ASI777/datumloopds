@@ -4,6 +4,7 @@
 #include "datumloop/geometry/GeometryTypes.hpp"
 #include "datumloop/materials/MaterialModel.hpp"
 #include "datumloop/engineering/StructuralAnalysis.hpp"
+#include "datumloop/engineering/PartDesign.hpp"
 
 #include <array>
 #include <cstdint>
@@ -300,6 +301,7 @@ struct DatumEngineeringModel {
     std::vector<MechanismSpec> mechanisms;
     std::vector<DatumMotor> motors;
     std::vector<StructuralAnalysisStudy> structuralStudies;
+    std::vector<PartRequirements> partRequirements;
 
     void validate() const;
     [[nodiscard]] const MechanismSpec* mechanism(const std::string& id) const noexcept;

@@ -25,6 +25,7 @@ add_library(datumloop_core STATIC
     src/datumloop/core/DatumTopologyReference.cpp
     src/datumloop/engineering/DatumEngineeringModel.cpp
     src/datumloop/engineering/StructuralAnalysis.cpp
+    src/datumloop/engineering/PartDesign.cpp
     src/datumloop/knowledge/EquationRegistry.cpp
     src/datumloop/materials/MaterialModel.cpp
     src/datumloop/electronics/ElectronicsModel.cpp
@@ -45,6 +46,7 @@ add_library(datumloop_io STATIC
     src/datumloop/io/ElectronicsProjectCodec.cpp
     src/datumloop/io/CircuitJsonAdapter.cpp
     src/datumloop/io/KiCadPcbAdapter.cpp
+    src/datumloop/io/PartRequirementsCodec.cpp
 )
 target_include_directories(datumloop_io PUBLIC src)
 target_link_libraries(datumloop_io PUBLIC datumloop_core Qt6::Core)
@@ -171,6 +173,12 @@ if(BUILD_TESTING)
     add_executable(datumloop-io-tests tests/native/test_io.cpp)
     target_link_libraries(datumloop-io-tests PRIVATE datumloop_io Qt6::Core)
     add_test(NAME datumloop-io-tests COMMAND datumloop-io-tests)
+
+    add_executable(datumloop-part-design-tests tests/native/test_part_design.cpp)
+    target_link_libraries(datumloop-part-design-tests PRIVATE datumloop_io Qt6::Core)
+    target_compile_definitions(datumloop-part-design-tests PRIVATE
+        DATUMLOOP_PART_SOURCE="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/requirements.json")
+    add_test(NAME datumloop-part-design-tests COMMAND datumloop-part-design-tests)
 
     add_executable(datumloop-electronics-tests tests/native/test_electronics.cpp)
     target_link_libraries(datumloop-electronics-tests PRIVATE datumloop_io datumloop_solver Qt6::Core)

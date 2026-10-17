@@ -1,7 +1,7 @@
-# Native DatumLoop project format (`.dld`, schema 8)
+# Native DatumLoop project format (`.dld`, schema 9)
 
 The native application saves projects as UTF-8 JSON in a `.dld` file. Schema
-version 8 stores the document state supported by the current native core:
+version 9 stores the document state supported by the current native core:
 
 - project UUID and name;
 - object UUID, name, optional parent UUID, and typed scalar properties;
@@ -202,7 +202,7 @@ command history. A failed load leaves the open document untouched. Saving uses
 `QSaveFile`; the document becomes clean only after the atomic file commit
 succeeds.
 
-Schema version 8 reads versions 1 through 7. Version 1 files receive initial
+Schema version 9 reads versions 1 through 8. Version 1 files receive initial
 face, edge, and vertex references; version 2 through 4 references, object
 identities, and supported engineering data are preserved. Versions 1 through 3
 load with an empty engineering model; versions 1 through 4 load with an empty
@@ -264,3 +264,18 @@ tracking, schema-v1/v2/v3/v4/v5 migration, engineering and electronics/material
 round-trip and reference validation, face/edge/vertex reference resolution and point picking, ambiguity
 rejection, parent relationships, display tessellation regeneration, and
 rejection of unsupported or malformed data.
+
+## Part requirements (schema 9)
+
+`engineeringModel.partRequirements` stores versioned, DatumLoop-owned
+requirements sets. Each contains its source references and optional SHA256,
+reviewed evidence with page/section, scalar or text values, original units and
+tolerances, requirement status, fixed/bounded parameter roles, mating interface
+records, design constraints and parameter-change reasons. Unknown requirements
+carry null values. Source-only requirements can be stored before any geometry
+exists. Versions 1–8 migrate with an empty requirements collection. Nonempty
+part requirements in an older schema are rejected to prevent silent data loss.
+
+Ingestion accepts reviewed JSON source records through `PartRequirementsCodec`;
+it does not claim OCR or automatic PDF dimension recognition. See the
+[Maxon source ledger](../examples/parts/maxon-ecx-flat-22-l/README.md).

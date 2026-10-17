@@ -23,6 +23,7 @@ bool finite(const Vector3& value)
 
 bool hasEngineeringIdentity(const DatumEngineeringModel& model, const std::string& id)
 {
+    for (const auto& part : model.partRequirements) if (part.id == id) return true;
     for (const DatumMechanism& mechanism : model.mechanisms) {
         if (mechanism.id == id ||
             std::any_of(mechanism.bodies.begin(), mechanism.bodies.end(), [&id](const auto& body) {
@@ -74,6 +75,7 @@ bool hasEngineeringIdentity(const DatumEngineeringModel& model, const std::strin
 void reserveEngineeringIdentities(const DatumEngineeringModel& model,
                                  std::unordered_set<std::string>& reservedIds)
 {
+    for (const auto& part : model.partRequirements) reservedIds.insert(part.id);
     for (const DatumMechanism& mechanism : model.mechanisms) {
         reservedIds.insert(mechanism.id);
         for (const DatumMechanismBody& body : mechanism.bodies) reservedIds.insert(body.id);
@@ -421,6 +423,19 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
         reservedIds.insert(reference.id);
     }
     reserveElectronicsIdentities(electronicsModel_, reservedIds);
+    for (const auto& part : model.partRequirements) {
+        if (!reservedIds.insert(part.id).second) {
+            throw std::invalid_argument("part requirements UUID collides with a document identity");
+        }
+        for (const auto& interface : part.interfaces) {
+            for (const auto& id : interface.topologyReferenceIds) {
+                if (std::none_of(topologyReferences_.begin(), topologyReferences_.end(),
+                                 [&](const auto& reference) { return reference.id == id; })) {
+                    throw std::invalid_argument("mechanical interface references unknown CAD topology");
+                }
+            }
+        }
+    }
     for (const DatumMechanism& mechanism : model.mechanisms) {
         if (!reservedIds.insert(mechanism.id).second) {
             throw std::invalid_argument("engineering entity UUID collides with an existing document identity");

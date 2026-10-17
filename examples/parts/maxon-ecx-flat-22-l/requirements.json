@@ -1,0 +1,564 @@
+{
+  "schemaVersion": 1,
+  "id": "b318233e-cbec-4c7b-bd80-57f536cdcb67",
+  "name": "ECX FLAT 22 L standard-flange mounting bracket requirements",
+  "revision": "source-study-1",
+  "sources": [
+    {
+      "id": "maxon.catalog.2025.p259",
+      "type": "DIMENSIONED_DRAWING",
+      "title": "ECX FLAT 22 L catalog, page 259",
+      "manufacturer": "maxon",
+      "partConfiguration": "2025 catalog standard flange; 18 V motor data column; actual configured order code unknown",
+      "revision": "2025 February edition; provisional data, subject to change",
+      "reference": "https://www.maxongroup.com/medias/sys_master/root/9399287709726/Cataloge-Page-EN-259.pdf",
+      "sha256": "9aa3139520c7f4c6cdd5c74c1dafe24df351556142f77a1e26500e9c2b405d17"
+    },
+    {
+      "id": "datumloop.machine-part.request",
+      "type": "ENGINEERING_SPECIFICATION",
+      "title": "DatumLoop machine-part milestone user requirements",
+      "manufacturer": "",
+      "partConfiguration": "10-head precision placement system; first motor bracket",
+      "revision": "2026-10-17 request",
+      "reference": "DatumLoop machine-part milestone request, Parts 1, 2, 5, 9 and 10",
+      "sha256": null
+    }
+  ],
+  "requirements": [
+    {
+      "id": "motor.mount.pcd",
+      "description": "Motor mounting pitch circle",
+      "status": "REQUIRED",
+      "value": 16,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Diameter callout on the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.count",
+      "description": "Motor fixing hole count",
+      "status": "REQUIRED",
+      "value": 3,
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Three mounting locations are shown at equal angular spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.spacing",
+      "description": "Motor fixing angular spacing",
+      "status": "REQUIRED",
+      "value": 120,
+      "unit": "deg",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Angular callout between the three fixing locations.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.nominal",
+      "description": "Motor internal thread nominal diameter",
+      "status": "REQUIRED",
+      "value": 2,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "M2 callout describes the motor internal thread, not the bracket clearance-hole diameter.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.depth",
+      "description": "Motor internal thread depth",
+      "status": "REQUIRED",
+      "value": 2.9,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Thread depth callout; this is not a bracket drill depth or an approved screw length.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.diameter",
+      "description": "Motor locating pilot outside diameter",
+      "status": "REQUIRED",
+      "value": 6,
+      "unit": "mm",
+      "lowerDeviation": -0.05,
+      "upperDeviation": 0,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Pilot dimension in side view; tolerance offsets belong to the motor pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.height",
+      "description": "Motor locating pilot projection",
+      "status": "REQUIRED",
+      "value": 1.7,
+      "unit": "mm",
+      "lowerDeviation": -0.2,
+      "upperDeviation": 0,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Axial pilot projection from the mounting face.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.body.diameter",
+      "description": "Motor flange envelope diameter",
+      "status": "REQUIRED",
+      "value": 22,
+      "unit": "mm",
+      "lowerDeviation": -0.1,
+      "upperDeviation": 0.1,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Outside diameter from the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.body.length.max",
+      "description": "Motor body length envelope",
+      "status": "REQUIRED",
+      "value": 17,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Maximum axial body length, independent of front shaft and pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mass",
+      "description": "Catalog motor mass",
+      "status": "REQUIRED",
+      "value": 32,
+      "unit": "g",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Motor data, row 31",
+        "kind": "PRINTED",
+        "interpretation": "Family catalog mass; configuration changes need review.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.nominal.torque",
+      "description": "18 V catalog continuous torque",
+      "status": "REQUIRED",
+      "value": 28.3,
+      "unit": "mN*m",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Motor data, row 5, 18 V column",
+        "kind": "PRINTED",
+        "interpretation": "18 V column; continuous nominal torque is not a peak design torque.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.motor.configuration",
+      "description": "Procured motor order code and flange configuration",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "Catalog reference selected for source study; actual order code is absent.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.gantry.pattern",
+      "description": "Gantry mating mounting pattern",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "No source for the mating gantry hole locations is present in the repository.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.acceleration",
+      "description": "Machine acceleration envelope",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "m/s^2",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "No sourced gantry acceleration requirement is available.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.interface.displacement",
+      "description": "Allowed relative motor-to-gantry interface displacement",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "um",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "Precision target has not been supplied as a machine requirement.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.interface.angle",
+      "description": "Allowed motor interface angular deflection",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "rad",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "Alignment error budget is not available.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.design.torque",
+      "description": "Peak bracket reaction torque including duty and faults",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "N*m",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "Nominal catalog torque does not establish the required peak machine load.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "bracket.pilot.fit",
+      "description": "Bracket precision bore fit and tolerance",
+      "status": "UNKNOWN",
+      "value": null,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.machine-part.request",
+        "pdfPage": null,
+        "section": "Machine interface and performance requirements",
+        "kind": "UNKNOWN",
+        "interpretation": "Motor pilot dimensions are known; bracket clearance, tolerance and datum scheme remain engineering choices.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    }
+  ],
+  "variables": [
+    {
+      "id": "motor.mount.pcd",
+      "requirementId": "motor.mount.pcd",
+      "role": "FIXED_INTERFACE",
+      "value": 16,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Diameter callout on the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.count",
+      "requirementId": "motor.mount.count",
+      "role": "FIXED_INTERFACE",
+      "value": 3,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Three mounting locations are shown at equal angular spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.spacing",
+      "requirementId": "motor.mount.spacing",
+      "role": "FIXED_INTERFACE",
+      "value": 120,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Angular callout between the three fixing locations.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.nominal",
+      "requirementId": "motor.mount.thread.nominal",
+      "role": "FIXED_INTERFACE",
+      "value": 2,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "M2 callout describes the motor internal thread, not the bracket clearance-hole diameter.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.depth",
+      "requirementId": "motor.mount.thread.depth",
+      "role": "FIXED_INTERFACE",
+      "value": 2.9,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Thread depth callout; this is not a bracket drill depth or an approved screw length.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.diameter",
+      "requirementId": "motor.pilot.diameter",
+      "role": "FIXED_INTERFACE",
+      "value": 6,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Pilot dimension in side view; tolerance offsets belong to the motor pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.height",
+      "requirementId": "motor.pilot.height",
+      "role": "FIXED_INTERFACE",
+      "value": 1.7,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Axial pilot projection from the mounting face.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "motor.mounting",
+      "name": "Motor mounting face, bolt pattern and pilot",
+      "matingPart": "Maxon ECX FLAT 22 L, catalog standard flange",
+      "parameterIds": [
+        "motor.mount.pcd",
+        "motor.mount.count",
+        "motor.mount.spacing",
+        "motor.mount.thread.nominal",
+        "motor.mount.thread.depth",
+        "motor.pilot.diameter",
+        "motor.pilot.height"
+      ],
+      "requirementIds": [
+        "machine.motor.configuration",
+        "bracket.pilot.fit"
+      ],
+      "topologyReferenceIds": []
+    },
+    {
+      "id": "gantry.mounting",
+      "name": "Gantry attachment interface",
+      "matingPart": "Placement gantry, definition pending",
+      "parameterIds": [],
+      "requirementIds": [
+        "machine.gantry.pattern"
+      ],
+      "topologyReferenceIds": []
+    }
+  ],
+  "constraints": [
+    {
+      "id": "precision.displacement",
+      "requirementId": "machine.interface.displacement",
+      "metric": "relative_interface_displacement",
+      "relation": "MAXIMUM"
+    },
+    {
+      "id": "precision.angle",
+      "requirementId": "machine.interface.angle",
+      "metric": "interface_angular_deflection",
+      "relation": "MAXIMUM"
+    }
+  ],
+  "changes": []
+}

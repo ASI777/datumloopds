@@ -1,5 +1,6 @@
 #include "datumloop/io/DldProjectStore.hpp"
 #include "datumloop/io/ElectronicsProjectCodec.hpp"
+#include "datumloop/io/PartRequirementsCodec.hpp"
 #include "datumloop/topology/DatumTopologyResolver.hpp"
 
 #include "datumloop/geometry/OcctKernel.hpp"
@@ -1359,6 +1360,8 @@ StructuralAnalysisStudy decodeStructuralStudy(const QJsonValue& value)
 
 QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
 {
+    QJsonArray parts;
+    for (const auto& part : model.partRequirements) parts.append(encodePartRequirements(part));
     QJsonArray mechanisms;
     for (const DatumMechanism& mechanism : model.mechanisms) {
         mechanisms.append(encodeMechanism(mechanism));
@@ -1375,12 +1378,23 @@ QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
         {QStringLiteral("mechanisms"), mechanisms},
         {QStringLiteral("motors"), motors},
         {QStringLiteral("structuralStudies"), studies},
+        {QStringLiteral("partRequirements"), parts},
     };
 }
 
 DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object, int projectSchemaVersion)
 {
     DatumEngineeringModel model;
+    const auto parts = object.value(QStringLiteral("partRequirements"));
+    if (projectSchemaVersion >= 9) {
+        if (!parts.isArray()) fail(QStringLiteral("Schema-nine partRequirements must be an array."));
+        for (const auto& part : parts.toArray()) {
+            if (!part.isObject()) fail(QStringLiteral("Part requirements entry must be an object."));
+            model.partRequirements.push_back(decodePartRequirements(part.toObject()));
+        }
+    } else if (!parts.isUndefined() && (!parts.isArray() || !parts.toArray().isEmpty())) {
+        fail(QStringLiteral("Part requirements require schema version nine or newer."));
+    }
     const QJsonValue mechanismsValue = object.value(QStringLiteral("mechanisms"));
     const QJsonValue motorsValue = object.value(QStringLiteral("motors"));
     if (!mechanismsValue.isArray() || !motorsValue.isArray()) {
@@ -1588,7 +1602,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
     if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
-        schemaNumber != 5.0 && schemaNumber != 6.0 && schemaNumber != 7.0 &&
+        schemaNumber != 5.0 && schemaNumber != 6.0 && schemaNumber != 7.0 && schemaNumber != 8.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }

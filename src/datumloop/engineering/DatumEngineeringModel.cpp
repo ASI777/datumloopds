@@ -512,6 +512,10 @@ const DatumMotor* DatumEngineeringModel::motor(const std::string& id) const noex
 void DatumEngineeringModel::validate() const
 {
     std::unordered_set<std::string> ids;
+    for (const auto& part : partRequirements) {
+        part.validate();
+        if (!ids.insert(part.id).second) throw std::invalid_argument("duplicate part requirements UUID");
+    }
     std::unordered_map<std::string, const MechanismSpec*> mechanismsById;
     std::unordered_map<std::string, const DatumMotor*> motorsById;
     ids.reserve(mechanisms.size() + motors.size() + structuralStudies.size());
