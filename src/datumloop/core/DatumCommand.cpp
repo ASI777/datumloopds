@@ -24,6 +24,31 @@ void MoveObjectCommand::undo(DatumDocument& document)
     }
 }
 
+SetFeatureGraphCommand::SetFeatureGraphCommand(std::string objectId, DatumFeatureGraph graph)
+    : objectId_(std::move(objectId)), graph_(std::move(graph))
+{
+}
+
+void SetFeatureGraphCommand::execute(DatumDocument& document)
+{
+    if (after_.has_value()) {
+        document.restoreObjectSnapshot(*after_);
+        return;
+    }
+    DatumObjectSnapshot before = document.snapshotObject(objectId_);
+    document.setFeatureGraph(objectId_, graph_);
+    before_ = std::move(before);
+    after_ = document.snapshotObject(objectId_);
+}
+
+void SetFeatureGraphCommand::undo(DatumDocument& document)
+{
+    if (!before_.has_value()) {
+        throw std::logic_error("feature graph command was not executed");
+    }
+    document.restoreObjectSnapshot(*before_);
+}
+
 void CommandHistory::execute(DatumDocument& document, std::unique_ptr<DatumCommand> command)
 {
     if (!command) {

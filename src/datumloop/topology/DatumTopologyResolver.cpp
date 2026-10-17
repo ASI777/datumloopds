@@ -441,7 +441,8 @@ DatumTopologyResolution DatumTopologyResolver::resolve(
     const DatumTopologyReference& reference,
     const std::string& currentObjectId,
     const TopoDS_Shape& currentShape,
-    const DatumTopologyResolveOptions& options)
+    const DatumTopologyResolveOptions& options,
+    const std::optional<std::string>& currentFeatureId)
 {
     DatumTopologyResolution result;
     if (!std::isfinite(options.maximumRelativeMeasureError) || options.maximumRelativeMeasureError < 0.0 ||
@@ -454,7 +455,7 @@ DatumTopologyResolution DatumTopologyResolver::resolve(
         result.status = DatumTopologyResolutionStatus::OwnerMismatch;
         return result;
     }
-    if (reference.featureId.has_value()) {
+    if (reference.featureId.has_value() && reference.featureId != currentFeatureId) {
         result.status = DatumTopologyResolutionStatus::UnsupportedFeature;
         return result;
     }
@@ -597,7 +598,8 @@ DatumTopologyHitResolution DatumTopologyResolver::resolveHitAtPoint(
     const Vector3& localPointMm,
     const std::optional<Vector3>& localNormal,
     double toleranceMm,
-    const DatumTopologyResolveOptions& options)
+    const DatumTopologyResolveOptions& options,
+    const std::optional<std::string>& currentFeatureId)
 {
     if (!isDatumUuid(objectId)) {
         throw std::invalid_argument("topology hit resolution requires a valid object UUID");
@@ -652,7 +654,7 @@ DatumTopologyHitResolution DatumTopologyResolver::resolveHitAtPoint(
         if (reference.objectId != objectId || reference.subshapeType != subshapeType) {
             continue;
         }
-        if (reference.featureId.has_value()) {
+        if (reference.featureId.has_value() && reference.featureId != currentFeatureId) {
             hasUnsupportedFeatureReference = true;
         } else {
             objectReferences.push_back(&reference);

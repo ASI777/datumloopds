@@ -64,7 +64,8 @@ bool PickingService::resolveSubshapeHit(const QString& objectId,
         const DatumTopologyHitResolution hit = DatumTopologyResolver::resolveHitAtPoint(
             document_->topologyReferences(), object->id, object->shape, *subshapeType,
             {localPointMm.x(), localPointMm.y(), localPointMm.z()},
-            Vector3{localNormal.x(), localNormal.y(), localNormal.z()}, toleranceMm);
+            Vector3{localNormal.x(), localNormal.y(), localNormal.z()}, toleranceMm, {},
+            object->featureGraph.outputFeatureId());
         if (hit.status == DatumTopologyResolutionStatus::Resolved &&
             documentModel_->selectTopologyReference(objectId, QString::fromStdString(hit.referenceId))) {
             return true;

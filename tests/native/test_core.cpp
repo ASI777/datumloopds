@@ -1,11 +1,14 @@
 #include "datumloop/core/DatumCommand.hpp"
 #include "datumloop/core/DatumDocument.hpp"
+#include "datumloop/core/DatumUuid.hpp"
 #include "datumloop/geometry/OcctKernel.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 
@@ -36,6 +39,10 @@ int main()
         require(close(part.metrics.surfaceArea, 5200.0), "OCCT box area is incorrect");
         require(close(part.metrics.minimum[0], -20.0), "OCCT box lower bound is incorrect");
         require(close(part.metrics.maximum[2], 10.0), "OCCT box upper bound is incorrect");
+        require(part.featureGraph.features().size() == 1 && part.featureGraph.outputSucceeded() &&
+                    part.featureGraph.features().front().type == datumloop::DatumFeatureType::Box &&
+                    !part.featureGraph.features().front().generatedShape.IsNull(),
+                "native box creation did not produce an exact parametric primitive feature");
 
         const datumloop::TriangleMesh mesh = datumloop::OcctKernel::tessellate(part.shape);
         require(mesh.triangleCount() > 0, "exact OCCT shape did not produce display triangles");
@@ -74,11 +81,153 @@ int main()
         require(history.redo(document), "move command could not be redone");
         require(close(document.object(id)->position[1], -3.0), "redo did not restore the moved position");
 
+        const auto makeFeatureId = [] { return datumloop::createDatumUuidV4(); };
+        const std::string boxAId = makeFeatureId();
+        const std::string boxBId = makeFeatureId();
+        const std::string translatedBId = makeFeatureId();
+        const std::string unionId = makeFeatureId();
+        const std::string cutId = makeFeatureId();
+        const std::string commonId = makeFeatureId();
+        datumloop::DatumFeature boxA;
+        boxA.id = boxAId;
+        boxA.ownerObjectId = id;
+        boxA.type = datumloop::DatumFeatureType::Box;
+        boxA.parameters = {{"xMm", 10.0}, {"yMm", 10.0}, {"zMm", 10.0}};
+        datumloop::DatumFeature boxB = boxA;
+        boxB.id = boxBId;
+        datumloop::DatumFeature translatedB;
+        translatedB.id = translatedBId;
+        translatedB.ownerObjectId = id;
+        translatedB.type = datumloop::DatumFeatureType::Translate;
+        translatedB.inputFeatureIds = {boxBId};
+        translatedB.parameters = {{"xMm", 5.0}, {"yMm", 0.0}, {"zMm", 0.0}};
+        datumloop::DatumFeature unionFeature;
+        unionFeature.id = unionId;
+        unionFeature.ownerObjectId = id;
+        unionFeature.type = datumloop::DatumFeatureType::BooleanUnion;
+        unionFeature.inputFeatureIds = {boxAId, translatedBId};
+        datumloop::DatumFeature cutFeature = unionFeature;
+        cutFeature.id = cutId;
+        cutFeature.type = datumloop::DatumFeatureType::BooleanCut;
+        datumloop::DatumFeature commonFeature = unionFeature;
+        commonFeature.id = commonId;
+        commonFeature.type = datumloop::DatumFeatureType::BooleanIntersection;
+        const std::vector<datumloop::DatumFeature> definitions{
+            boxA, boxB, translatedB, unionFeature, cutFeature, commonFeature};
+        const datumloop::DatumFeatureGraph unionGraph(id, definitions, unionId);
+        const datumloop::DatumFeatureGraph cutGraph(id, definitions, cutId);
+        const datumloop::DatumFeatureGraph commonGraph(id, definitions, commonId);
+        require(unionGraph.outputSucceeded() && close(datumloop::OcctKernel::measure(unionGraph.outputShape()).volume, 1500.0),
+                "exact Boolean union did not recompute the expected overlapping-box volume");
+        require(cutGraph.outputSucceeded() && close(datumloop::OcctKernel::measure(cutGraph.outputShape()).volume, 500.0),
+                "exact Boolean cut did not recompute the expected overlapping-box volume");
+        require(commonGraph.outputSucceeded() && close(datumloop::OcctKernel::measure(commonGraph.outputShape()).volume, 500.0),
+                "exact Boolean intersection did not recompute the expected overlap volume");
+        require(std::all_of(unionGraph.features().begin(), unionGraph.features().end(), [](const auto& feature) {
+                    return feature.status == datumloop::DatumFeatureStatus::Succeeded &&
+                           !feature.generatedShape.IsNull() && feature.error.empty();
+                }),
+                "feature graph did not retain exact successful outputs and status for every node");
+
+        datumloop::DatumFeature unsupportedBackend = boxA;
+        unsupportedBackend.id = makeFeatureId();
+        unsupportedBackend.kernelBackend = "smlib";
+        const datumloop::DatumFeatureGraph unsupportedGraph(id, {unsupportedBackend}, unsupportedBackend.id);
+        require(!unsupportedGraph.outputSucceeded() &&
+                    unsupportedGraph.features().front().status == datumloop::DatumFeatureStatus::Failed &&
+                    unsupportedGraph.features().front().error.find("Unsupported geometry backend") != std::string::npos,
+                "feature graph silently executed an unsupported backend through OCCT");
+
+        datumloop::DatumFeature cylinder;
+        cylinder.id = makeFeatureId();
+        cylinder.ownerObjectId = id;
+        cylinder.type = datumloop::DatumFeatureType::Cylinder;
+        cylinder.parameters = {{"radiusMm", 2.0}, {"heightMm", 10.0}};
+        datumloop::DatumFeature sphere;
+        sphere.id = makeFeatureId();
+        sphere.ownerObjectId = id;
+        sphere.type = datumloop::DatumFeatureType::Sphere;
+        sphere.parameters = {{"radiusMm", 3.0}};
+        datumloop::DatumFeature cone;
+        cone.id = makeFeatureId();
+        cone.ownerObjectId = id;
+        cone.type = datumloop::DatumFeatureType::Cone;
+        cone.parameters = {{"bottomRadiusMm", 2.0}, {"topRadiusMm", 1.0}, {"heightMm", 5.0}};
+        const std::vector<datumloop::DatumFeature> additionalPrimitives{cylinder, sphere, cone};
+        const datumloop::DatumFeatureGraph cylinderGraph(id, additionalPrimitives, cylinder.id);
+        const datumloop::DatumFeatureGraph sphereGraph(id, additionalPrimitives, sphere.id);
+        const datumloop::DatumFeatureGraph coneGraph(id, additionalPrimitives, cone.id);
+        require(cylinderGraph.outputSucceeded() &&
+                    close(datumloop::OcctKernel::measure(cylinderGraph.outputShape()).volume,
+                          40.0 * std::acos(-1.0), 1e-7),
+                "cylinder primitive feature did not produce the expected exact volume");
+        require(sphereGraph.outputSucceeded() &&
+                    close(datumloop::OcctKernel::measure(sphereGraph.outputShape()).volume,
+                          36.0 * std::acos(-1.0), 1e-7),
+                "sphere primitive feature did not produce the expected exact volume");
+        require(coneGraph.outputSucceeded() &&
+                    close(datumloop::OcctKernel::measure(coneGraph.outputShape()).volume,
+                          35.0 * std::acos(-1.0) / 3.0, 1e-7),
+                "cone primitive feature did not produce the expected exact volume");
+        datumloop::DatumFeature invalidBox = boxA;
+        invalidBox.id = makeFeatureId();
+        invalidBox.parameters["xMm"] = -10.0;
+        const datumloop::DatumFeatureGraph invalidGraph(id, {invalidBox}, invalidBox.id);
+        require(!invalidGraph.outputSucceeded() &&
+                    invalidGraph.features().front().status == datumloop::DatumFeatureStatus::Failed &&
+                    !invalidGraph.features().front().error.empty(),
+                "failed feature recompute did not retain an explicit status and error");
+
+        const std::vector<std::string> previousTopologyIds = [&document, &id] {
+            std::vector<std::string> values;
+            for (const auto& reference : document.topologyReferences()) {
+                if (reference.objectId == id) values.push_back(reference.id);
+            }
+            return values;
+        }();
+        datumloop::CommandHistory featureHistory;
+        featureHistory.execute(document, std::make_unique<datumloop::SetFeatureGraphCommand>(id, unionGraph));
+        require(close(document.object(id)->metrics.volume, 1500.0) &&
+                    document.object(id)->featureGraph.outputFeatureId() == unionId,
+                "feature graph command did not install its exact output into the document");
+        std::vector<std::string> featureTopologyIds;
+        for (const auto& reference : document.topologyReferences()) {
+            if (reference.objectId == id) featureTopologyIds.push_back(reference.id);
+        }
+        require(featureHistory.undo(document) && close(document.object(id)->metrics.volume, 24000.0) &&
+                    document.object(id)->featureGraph.features().size() == 1,
+                "feature graph command undo did not restore the previous document object");
+        std::vector<std::string> restoredTopologyIds;
+        for (const auto& reference : document.topologyReferences()) {
+            if (reference.objectId == id) restoredTopologyIds.push_back(reference.id);
+        }
+        require(restoredTopologyIds == previousTopologyIds,
+                "feature graph command undo did not restore persistent topology identities");
+        require(featureHistory.redo(document) && close(document.object(id)->metrics.volume, 1500.0),
+                "feature graph command redo did not restore its exact output");
+        std::vector<std::string> redoneTopologyIds;
+        for (const auto& reference : document.topologyReferences()) {
+            if (reference.objectId == id) redoneTopologyIds.push_back(reference.id);
+        }
+        require(redoneTopologyIds == featureTopologyIds,
+                "feature graph redo did not restore a stable topology-reference set");
+        require(previousTopologyIds.size() == 26,
+                "prior topology references were not retained for command undo");
+
+        featureHistory.execute(document, std::make_unique<datumloop::SetFeatureGraphCommand>(id, invalidGraph));
+        require(close(document.object(id)->metrics.volume, 1500.0) &&
+                    document.object(id)->featureGraph.features().front().status == datumloop::DatumFeatureStatus::Failed &&
+                    !document.object(id)->featureGraph.features().front().error.empty(),
+                "failed graph recompute replaced the last valid exact object shape or lost its error");
+        require(featureHistory.undo(document) && document.object(id)->featureGraph.outputFeatureId() == unionId &&
+                    close(document.object(id)->metrics.volume, 1500.0),
+                "undo did not restore the last valid feature graph after a failed recompute");
+
         const std::uint64_t revision = document.revision();
         require(!document.setPosition(id, {NAN, 0.0, 0.0}), "document accepted a non-finite position");
         require(document.revision() == revision, "invalid position changed the document revision");
 
-        std::cout << "Native DatumLoop core checks passed: exact OCCT box, metrics, tessellation, selection identity, and move undo/redo.\n";
+        std::cout << "Native DatumLoop core checks passed: parametric OCCT primitives, transforms, Booleans, graph status, exact display separation, and command undo/redo.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Native DatumLoop core check failed: " << error.what() << '\n';

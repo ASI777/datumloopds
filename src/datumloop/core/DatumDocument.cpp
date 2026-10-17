@@ -74,8 +74,18 @@ const DatumObject& DatumDocument::createBox(std::string name, const Vector3& dim
     if (name.find_first_not_of(" \t\n\r") == std::string::npos) {
         throw std::invalid_argument("object name must not be empty");
     }
-
-    return addObject(createDatumUuidV4(), std::move(name), OcctKernel::box(dimensions));
+    const std::string objectId = createDatumUuidV4();
+    const std::string featureId = createDatumUuidV4();
+    (void)addObject(objectId, std::move(name), OcctKernel::box(dimensions),
+                    {0.0, 0.0, 0.0}, std::nullopt, false);
+    DatumFeature feature;
+    feature.id = featureId;
+    feature.ownerObjectId = objectId;
+    feature.type = DatumFeatureType::Box;
+    feature.parameters = {{"xMm", dimensions[0]}, {"yMm", dimensions[1]}, {"zMm", dimensions[2]}};
+    DatumFeatureGraph graph(objectId, {std::move(feature)}, featureId);
+    setFeatureGraph(objectId, std::move(graph));
+    return *object(objectId);
 }
 
 const DatumObject& DatumDocument::addObject(std::string id,
@@ -92,6 +102,10 @@ const DatumObject& DatumDocument::addObject(std::string id,
         throw std::invalid_argument("object name must not be empty");
     }
     if (object(id) != nullptr ||
+        std::any_of(objects_.begin(), objects_.end(), [&id](const DatumObject& existing) {
+            return std::any_of(existing.featureGraph.features().begin(), existing.featureGraph.features().end(),
+                               [&id](const DatumFeature& feature) { return feature.id == id; });
+        }) ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&id](const auto& reference) {
             return reference.id == id;
         })) {
@@ -128,6 +142,9 @@ const DatumObject& DatumDocument::addObject(std::string id,
         reservedIds.insert(object.id);
         for (const DatumObject& existing : objects_) {
             reservedIds.insert(existing.id);
+            for (const DatumFeature& feature : existing.featureGraph.features()) {
+                reservedIds.insert(feature.id);
+            }
         }
         for (const DatumTopologyReference& existing : topologyReferences_) {
             reservedIds.insert(existing.id);
@@ -203,7 +220,11 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
     if (!isDatumUuid(reference.id) || !isDatumUuid(reference.objectId)) {
         throw std::invalid_argument("topology reference and owner ids must be UUIDs");
     }
-    if (reference.id == projectId_ || object(reference.id) != nullptr ||
+    const bool featureIdCollision = std::any_of(objects_.begin(), objects_.end(), [&reference](const DatumObject& item) {
+        return std::any_of(item.featureGraph.features().begin(), item.featureGraph.features().end(),
+                           [&reference](const DatumFeature& feature) { return feature.id == reference.id; });
+    });
+    if (reference.id == projectId_ || object(reference.id) != nullptr || featureIdCollision ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&](const auto& existing) {
             return existing.id == reference.id;
         })) {
@@ -265,6 +286,163 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
     ++revision_;
     dirty_ = true;
     return topologyReferences_.back();
+}
+
+void DatumDocument::setFeatureGraph(const std::string& objectId,
+                                    DatumFeatureGraph graph,
+                                    bool captureTopologyReferences)
+{
+    DatumObject* target = nullptr;
+    for (DatumObject& candidate : objects_) {
+        if (candidate.id == objectId) {
+            target = &candidate;
+            break;
+        }
+    }
+    if (target == nullptr) {
+        throw std::invalid_argument("feature graph references an unknown object id");
+    }
+    if (graph.ownerObjectId() != objectId) {
+        throw std::invalid_argument("feature graph owner does not match its document object");
+    }
+    graph.recompute();
+
+    const bool hasValidOutput = graph.outputSucceeded();
+    TopoDS_Shape outputShape;
+    ShapeMetrics outputMetrics;
+    std::vector<DatumTopologyReference> generatedReferences;
+    std::unordered_set<std::string> reservedIds;
+    reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
+    reservedIds.insert(projectId_);
+    reservedIds.insert(objectId);
+    for (const DatumObject& existing : objects_) {
+        if (existing.id != objectId) {
+            reservedIds.insert(existing.id);
+            for (const DatumFeature& feature : existing.featureGraph.features()) {
+                reservedIds.insert(feature.id);
+            }
+        }
+    }
+    for (const DatumTopologyReference& reference : topologyReferences_) {
+        reservedIds.insert(reference.id);
+    }
+    for (const DatumFeature& feature : graph.features()) {
+        if (!reservedIds.insert(feature.id).second) {
+            throw std::invalid_argument("feature UUID is not unique within the document");
+        }
+    }
+    if (hasValidOutput) {
+        outputShape = graph.outputShape();
+        outputMetrics = OcctKernel::measure(outputShape);
+        if (!outputMetrics.valid) {
+            throw std::invalid_argument("feature graph output must be a valid exact OCCT B-Rep");
+        }
+        if (captureTopologyReferences) {
+            generatedReferences = DatumTopologyResolver::captureAll(
+                objectId, outputShape, graph.outputFeatureId());
+            for (const DatumTopologyReference& reference : generatedReferences) {
+                if (!reservedIds.insert(reference.id).second) {
+                    throw std::runtime_error("generated topology reference UUID is not unique within the document");
+                }
+            }
+        }
+    }
+
+    if (hasValidOutput && captureTopologyReferences) {
+        const std::size_t replacedReferenceCount = static_cast<std::size_t>(std::count_if(
+            topologyReferences_.begin(), topologyReferences_.end(), [&objectId](const auto& reference) {
+                return reference.objectId == objectId;
+            }));
+        topologyReferences_.reserve(topologyReferences_.size() - replacedReferenceCount + generatedReferences.size());
+    }
+
+    target->featureGraph = std::move(graph);
+    if (hasValidOutput) {
+        target->shape = std::move(outputShape);
+        target->metrics = outputMetrics;
+        if (captureTopologyReferences) {
+            std::erase_if(topologyReferences_, [&objectId](const DatumTopologyReference& reference) {
+                return reference.objectId == objectId;
+            });
+            topologyReferences_.insert(topologyReferences_.end(),
+                                       std::make_move_iterator(generatedReferences.begin()),
+                                       std::make_move_iterator(generatedReferences.end()));
+        }
+    }
+    ++revision_;
+    dirty_ = true;
+}
+
+DatumObjectSnapshot DatumDocument::snapshotObject(const std::string& objectId) const
+{
+    const DatumObject* target = object(objectId);
+    if (target == nullptr) {
+        throw std::invalid_argument("cannot snapshot an unknown document object");
+    }
+    DatumObjectSnapshot snapshot;
+    snapshot.object = *target;
+    std::copy_if(topologyReferences_.begin(), topologyReferences_.end(),
+                 std::back_inserter(snapshot.topologyReferences), [&objectId](const auto& reference) {
+                     return reference.objectId == objectId;
+                 });
+    return snapshot;
+}
+
+void DatumDocument::restoreObjectSnapshot(DatumObjectSnapshot snapshot)
+{
+    const auto objectIterator = std::find_if(objects_.begin(), objects_.end(), [&snapshot](const DatumObject& item) {
+        return item.id == snapshot.object.id;
+    });
+    if (objectIterator == objects_.end()) {
+        throw std::invalid_argument("cannot restore an object snapshot for an unknown object");
+    }
+    for (const DatumTopologyReference& reference : snapshot.topologyReferences) {
+        if (reference.objectId != snapshot.object.id) {
+            throw std::invalid_argument("object snapshot contains a topology reference for another object");
+        }
+    }
+    std::unordered_set<std::string> reservedIds;
+    reservedIds.insert(projectId_);
+    reservedIds.insert(snapshot.object.id);
+    for (const DatumObject& existing : objects_) {
+        if (existing.id != snapshot.object.id) {
+            reservedIds.insert(existing.id);
+            for (const DatumFeature& feature : existing.featureGraph.features()) {
+                reservedIds.insert(feature.id);
+            }
+        }
+    }
+    for (const DatumTopologyReference& reference : topologyReferences_) {
+        if (reference.objectId != snapshot.object.id) {
+            reservedIds.insert(reference.id);
+        }
+    }
+    for (const DatumFeature& feature : snapshot.object.featureGraph.features()) {
+        if (!reservedIds.insert(feature.id).second) {
+            throw std::invalid_argument("restored feature UUID collides with another document identity");
+        }
+    }
+    for (const DatumTopologyReference& reference : snapshot.topologyReferences) {
+        if (!reservedIds.insert(reference.id).second) {
+            throw std::invalid_argument("restored topology UUID collides with another document identity");
+        }
+    }
+
+    const std::size_t replacedReferenceCount = static_cast<std::size_t>(std::count_if(
+        topologyReferences_.begin(), topologyReferences_.end(), [&snapshot](const auto& reference) {
+            return reference.objectId == snapshot.object.id;
+        }));
+    topologyReferences_.reserve(topologyReferences_.size() - replacedReferenceCount +
+                                snapshot.topologyReferences.size());
+    *objectIterator = std::move(snapshot.object);
+    std::erase_if(topologyReferences_, [&objectIterator](const DatumTopologyReference& reference) {
+        return reference.objectId == objectIterator->id;
+    });
+    topologyReferences_.insert(topologyReferences_.end(),
+                               std::make_move_iterator(snapshot.topologyReferences.begin()),
+                               std::make_move_iterator(snapshot.topologyReferences.end()));
+    ++revision_;
+    dirty_ = true;
 }
 
 }  // namespace datumloop

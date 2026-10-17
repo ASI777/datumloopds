@@ -2,6 +2,7 @@
 
 #include "datumloop/geometry/GeometryTypes.hpp"
 #include "datumloop/core/DatumTopologyReference.hpp"
+#include "datumloop/core/DatumFeatureGraph.hpp"
 
 #include <TopoDS_Shape.hxx>
 
@@ -25,6 +26,12 @@ struct DatumObject {
     TopoDS_Shape shape;
     ShapeMetrics metrics;
     Vector3 position{0.0, 0.0, 0.0};
+    DatumFeatureGraph featureGraph;
+};
+
+struct DatumObjectSnapshot {
+    DatumObject object;
+    std::vector<DatumTopologyReference> topologyReferences;
 };
 
 class DatumDocument final {
@@ -55,6 +62,11 @@ public:
     [[nodiscard]] bool setPosition(const std::string& id, const Vector3& position) noexcept;
     void setProperty(const std::string& id, std::string key, DatumPropertyValue value);
     [[nodiscard]] const DatumTopologyReference& addTopologyReference(DatumTopologyReference reference);
+    void setFeatureGraph(const std::string& objectId,
+                         DatumFeatureGraph graph,
+                         bool captureTopologyReferences = true);
+    [[nodiscard]] DatumObjectSnapshot snapshotObject(const std::string& objectId) const;
+    void restoreObjectSnapshot(DatumObjectSnapshot snapshot);
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
 
 private:

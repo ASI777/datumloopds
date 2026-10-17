@@ -3,6 +3,7 @@
 #include "datumloop/core/DatumDocument.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,20 @@ private:
     std::string objectId_;
     Vector3 before_;
     Vector3 after_;
+};
+
+class SetFeatureGraphCommand final : public DatumCommand {
+public:
+    SetFeatureGraphCommand(std::string objectId, DatumFeatureGraph graph);
+    void execute(DatumDocument& document) override;
+    void undo(DatumDocument& document) override;
+    [[nodiscard]] std::string label() const override { return "Set Feature Graph"; }
+
+private:
+    std::string objectId_;
+    DatumFeatureGraph graph_;
+    std::optional<DatumObjectSnapshot> before_;
+    std::optional<DatumObjectSnapshot> after_;
 };
 
 class CommandHistory final {

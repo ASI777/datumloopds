@@ -91,7 +91,8 @@ int main(int argc, char* argv[])
         (void)document.addTopologyReference(persistedFeatureReference);
         const TopoDS_Shape regeneratedBox = datumloop::OcctKernel::box({40.0, 30.0, 20.0});
         for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
-            const auto resolution = datumloop::DatumTopologyResolver::resolve(reference, parentId, regeneratedBox);
+            const auto resolution = datumloop::DatumTopologyResolver::resolve(
+                reference, parentId, regeneratedBox, {}, document.object(parentId)->featureGraph.outputFeatureId());
             require(resolution.status == datumloop::DatumTopologyResolutionStatus::Resolved &&
                         !resolution.subshape.IsNull(),
                     "deterministic topology matching failed on identical regenerated box geometry");
@@ -101,7 +102,8 @@ int main(int argc, char* argv[])
                     : std::nullopt;
             const auto hit = datumloop::DatumTopologyResolver::resolveHitAtPoint(
                 capturedReferences, parentId, regeneratedBox, reference.subshapeType,
-                reference.geometrySignature.centroidMm, hitNormal, 0.5);
+                reference.geometrySignature.centroidMm, hitNormal, 0.5, {},
+                document.object(parentId)->featureGraph.outputFeatureId());
             require(hit.status == datumloop::DatumTopologyResolutionStatus::Resolved &&
                         hit.referenceId == reference.id,
                     "exact point picking did not resolve to the persistent face, edge, or vertex identity");
@@ -151,15 +153,18 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 2,
-                "saved project did not include the version-two schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 3,
+                "saved project did not include the version-three schema");
         require(root.value(QStringLiteral("topologyReferences")).toArray().size() ==
                     static_cast<qsizetype>(document.topologyReferences().size()),
                 "saved project omitted its persistent topology references");
         const QJsonArray savedObjects = root.value(QStringLiteral("objects")).toArray();
-        require(savedObjects.at(0).toObject().value(QStringLiteral("featureDefinitions")).toArray().isEmpty() &&
+        require(savedObjects.at(0).toObject().value(QStringLiteral("featureDefinitions")).toArray().size() == 1 &&
+                    savedObjects.at(0).toObject().value(QStringLiteral("outputFeatureId")).toString() ==
+                        QString::fromStdString(document.object(parentId)->featureGraph.outputFeatureId().value()) &&
+                    savedObjects.at(1).toObject().value(QStringLiteral("featureDefinitions")).toArray().isEmpty() &&
                     savedObjects.at(0).toObject().value(QStringLiteral("references")).toArray().isEmpty(),
-                "reserved feature and non-topological reference arrays should be empty");
+                "feature graph or reserved non-topological reference fields were not encoded correctly");
         require(savedObjects.at(0).toObject().value(QStringLiteral("geometry")).toObject()
                     .value(QStringLiteral("occtFormatVersion")).toInt() == TopTools_FormatVersion_CURRENT,
                 "saved B-Rep omitted its OCCT stream version");
@@ -175,6 +180,14 @@ int main(int argc, char* argv[])
         const datumloop::DatumObject* loadedChild = loaded.object(childId);
         require(loadedParent != nullptr && loadedChild != nullptr,
                 "stable object UUIDs did not survive round-trip");
+        require(loadedParent->featureGraph.features().size() == 1 &&
+                    loadedParent->featureGraph.outputSucceeded() &&
+                    loadedParent->featureGraph.outputFeatureId() ==
+                        document.object(parentId)->featureGraph.outputFeatureId(),
+                "parametric feature graph did not survive exact-geometry round-trip");
+        require(loadedParent->featureGraph.features().front().status == datumloop::DatumFeatureStatus::Succeeded &&
+                    !loadedParent->featureGraph.features().front().generatedShape.IsNull(),
+                "loaded feature graph did not recompute an exact generated shape");
         require(!loadedParent->parentId.has_value(), "root object acquired a parent during round-trip");
         require(loadedChild->parentId == parentId, "object hierarchy did not survive round-trip");
         require(close(loadedChild->position[0], 12.5) && close(loadedChild->position[1], -3.25) &&
@@ -219,6 +232,14 @@ int main(int argc, char* argv[])
         QJsonObject versionOne = root;
         versionOne.insert(QStringLiteral("schemaVersion"), 1);
         versionOne.remove(QStringLiteral("topologyReferences"));
+        QJsonArray legacyObjects = versionOne.value(QStringLiteral("objects")).toArray();
+        for (qsizetype index = 0; index < legacyObjects.size(); ++index) {
+            QJsonObject legacyObject = legacyObjects.at(index).toObject();
+            legacyObject.insert(QStringLiteral("featureDefinitions"), QJsonArray{});
+            legacyObject.remove(QStringLiteral("outputFeatureId"));
+            legacyObjects.replace(index, legacyObject);
+        }
+        versionOne.insert(QStringLiteral("objects"), legacyObjects);
         const QString versionOnePath = temporaryDirectory.filePath(QStringLiteral("schema-v1.dld"));
         writeObject(versionOnePath, versionOne);
         datumloop::DatumDocument migratedVersionOne = datumloop::DldProjectStore::load(versionOnePath);
@@ -232,6 +253,70 @@ int main(int argc, char* argv[])
                     datumloop::DldProjectStore::SchemaVersion &&
                     migratedRoot.value(QStringLiteral("topologyReferences")).toArray().size() == 52,
                 "saving a schema-v1 project did not write the current schema");
+
+        QJsonObject versionTwo = versionOne;
+        versionTwo.insert(QStringLiteral("schemaVersion"), 2);
+        versionTwo.insert(QStringLiteral("topologyReferences"), root.value(QStringLiteral("topologyReferences")));
+        QJsonArray versionTwoReferences = versionTwo.value(QStringLiteral("topologyReferences")).toArray();
+        for (qsizetype index = 0; index < versionTwoReferences.size(); ++index) {
+            QJsonObject reference = versionTwoReferences.at(index).toObject();
+            reference.insert(QStringLiteral("featureId"), QJsonValue(QJsonValue::Null));
+            versionTwoReferences.replace(index, reference);
+        }
+        versionTwo.insert(QStringLiteral("topologyReferences"), versionTwoReferences);
+        const QString versionTwoPath = temporaryDirectory.filePath(QStringLiteral("schema-v2.dld"));
+        writeObject(versionTwoPath, versionTwo);
+        datumloop::DatumDocument migratedVersionTwo = datumloop::DldProjectStore::load(versionTwoPath);
+        require(migratedVersionTwo.topologyReferences().size() == 53 &&
+                    migratedVersionTwo.object(parentId)->featureGraph.features().empty() &&
+                    !migratedVersionTwo.isDirty(),
+                "schema-v2 project did not migrate as exact-geometry-only document data");
+        datumloop::DldProjectStore::save(migratedVersionTwo, versionTwoPath);
+        QFile migratedV2Manifest(versionTwoPath);
+        require(migratedV2Manifest.open(QIODevice::ReadOnly), "migrated schema-v2 project could not be reopened");
+        const QJsonObject migratedV2Root = QJsonDocument::fromJson(migratedV2Manifest.readAll()).object();
+        require(migratedV2Root.value(QStringLiteral("schemaVersion")).toInt() == 3,
+                "saving a schema-v2 project did not write the current schema");
+
+        datumloop::DatumDocument booleanDocument("Boolean feature round-trip");
+        const std::string booleanObjectId = booleanDocument.createBox("Boolean result", {8.0, 8.0, 8.0}).id;
+        const std::string leftId = uuid().toStdString();
+        const std::string rightId = uuid().toStdString();
+        const std::string translatedId = uuid().toStdString();
+        const std::string cutFeatureId = uuid().toStdString();
+        datumloop::DatumFeature leftFeature;
+        leftFeature.id = leftId;
+        leftFeature.ownerObjectId = booleanObjectId;
+        leftFeature.type = datumloop::DatumFeatureType::Box;
+        leftFeature.parameters = {{"xMm", 10.0}, {"yMm", 10.0}, {"zMm", 10.0}};
+        datumloop::DatumFeature rightFeature = leftFeature;
+        rightFeature.id = rightId;
+        datumloop::DatumFeature translatedFeature;
+        translatedFeature.id = translatedId;
+        translatedFeature.ownerObjectId = booleanObjectId;
+        translatedFeature.type = datumloop::DatumFeatureType::Translate;
+        translatedFeature.inputFeatureIds = {rightId};
+        translatedFeature.parameters = {{"xMm", 5.0}, {"yMm", 0.0}, {"zMm", 0.0}};
+        datumloop::DatumFeature cutFeature;
+        cutFeature.id = cutFeatureId;
+        cutFeature.ownerObjectId = booleanObjectId;
+        cutFeature.type = datumloop::DatumFeatureType::BooleanCut;
+        cutFeature.inputFeatureIds = {leftId, translatedId};
+        datumloop::DatumFeatureGraph booleanGraph(
+            booleanObjectId, {leftFeature, rightFeature, translatedFeature, cutFeature}, cutFeatureId);
+        booleanDocument.setFeatureGraph(booleanObjectId, std::move(booleanGraph));
+        const QString booleanProjectPath = temporaryDirectory.filePath(QStringLiteral("boolean-features.dld"));
+        datumloop::DldProjectStore::save(booleanDocument, booleanProjectPath);
+        const datumloop::DatumDocument loadedBoolean = datumloop::DldProjectStore::load(booleanProjectPath);
+        const datumloop::DatumObject* loadedBooleanObject = loadedBoolean.object(booleanObjectId);
+        require(loadedBooleanObject != nullptr && loadedBooleanObject->featureGraph.features().size() == 4 &&
+                    loadedBooleanObject->featureGraph.outputFeatureId() == cutFeatureId &&
+                    close(loadedBooleanObject->metrics.volume, 500.0) &&
+                    std::all_of(loadedBooleanObject->featureGraph.features().begin(),
+                                loadedBooleanObject->featureGraph.features().end(), [](const auto& feature) {
+                                    return feature.status == datumloop::DatumFeatureStatus::Succeeded;
+                                }),
+                "Boolean feature DAG did not recompute and round-trip through schema 3");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");

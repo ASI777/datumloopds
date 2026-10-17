@@ -86,6 +86,84 @@ QJsonObject encodeProperty(const DatumPropertyValue& value)
     return result;
 }
 
+QJsonObject encodeFeature(const DatumFeature& feature)
+{
+    QJsonArray inputs;
+    for (const std::string& inputId : feature.inputFeatureIds) {
+        inputs.append(fromUtf8(inputId));
+    }
+    QJsonObject parameters;
+    for (const auto& [name, value] : feature.parameters) {
+        parameters.insert(fromUtf8(name), value);
+    }
+    return {
+        {QStringLiteral("id"), fromUtf8(feature.id)},
+        {QStringLiteral("ownerObjectId"), fromUtf8(feature.ownerObjectId)},
+        {QStringLiteral("type"), fromUtf8(datumFeatureTypeName(feature.type))},
+        {QStringLiteral("inputFeatureIds"), inputs},
+        {QStringLiteral("parameters"), parameters},
+        {QStringLiteral("kernelBackend"), fromUtf8(feature.kernelBackend)},
+    };
+}
+
+DatumFeature decodeFeature(const QJsonObject& object, const std::string& expectedOwnerId)
+{
+    DatumFeature feature;
+    feature.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    feature.ownerObjectId = toUtf8(requiredString(object, QStringLiteral("ownerObjectId")));
+    if (feature.ownerObjectId != expectedOwnerId) {
+        fail(QStringLiteral("Feature '%1' belongs to a different object.").arg(fromUtf8(feature.id)));
+    }
+    const auto type = datumFeatureTypeFromName(toUtf8(requiredString(object, QStringLiteral("type"))));
+    if (!type.has_value()) {
+        fail(QStringLiteral("Feature '%1' uses an unsupported type.").arg(fromUtf8(feature.id)));
+    }
+    feature.type = *type;
+    const QJsonValue inputsValue = object.value(QStringLiteral("inputFeatureIds"));
+    if (!inputsValue.isArray()) {
+        fail(QStringLiteral("Feature '%1' inputFeatureIds must be an array.").arg(fromUtf8(feature.id)));
+    }
+    for (const QJsonValue& input : inputsValue.toArray()) {
+        if (!input.isString()) {
+            fail(QStringLiteral("Feature '%1' contains a non-string input id.").arg(fromUtf8(feature.id)));
+        }
+        feature.inputFeatureIds.push_back(toUtf8(input.toString()));
+    }
+    const QJsonValue parametersValue = object.value(QStringLiteral("parameters"));
+    if (!parametersValue.isObject()) {
+        fail(QStringLiteral("Feature '%1' parameters must be an object.").arg(fromUtf8(feature.id)));
+    }
+    const QJsonObject parameters = parametersValue.toObject();
+    for (auto iterator = parameters.begin(); iterator != parameters.end(); ++iterator) {
+        feature.parameters.emplace(toUtf8(iterator.key()),
+                                   requiredFiniteNumber(iterator.value(),
+                                                        QStringLiteral("feature.parameters.%1").arg(iterator.key())));
+    }
+    feature.kernelBackend = toUtf8(requiredString(object, QStringLiteral("kernelBackend")));
+    return feature;
+}
+
+bool closeMetric(double left, double right)
+{
+    return std::abs(left - right) <= 1e-9 * std::max({1.0, std::abs(left), std::abs(right)});
+}
+
+bool sameShapeMetrics(const ShapeMetrics& left, const ShapeMetrics& right)
+{
+    if (left.valid != right.valid || !closeMetric(left.volume, right.volume) ||
+        !closeMetric(left.surfaceArea, right.surfaceArea)) {
+        return false;
+    }
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+        if (!closeMetric(left.centerOfMass[axis], right.centerOfMass[axis]) ||
+            !closeMetric(left.minimum[axis], right.minimum[axis]) ||
+            !closeMetric(left.maximum[axis], right.maximum[axis])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 DatumPropertyValue decodeProperty(const QJsonObject& property, const QString& key)
 {
     const QString type = requiredString(property, QStringLiteral("type"));
@@ -131,6 +209,10 @@ QJsonObject encodeObject(const DatumObject& object)
     for (const double component : object.position) {
         translation.append(component);
     }
+    QJsonArray featureDefinitions;
+    for (const DatumFeature& feature : object.featureGraph.features()) {
+        featureDefinitions.append(encodeFeature(feature));
+    }
 
     std::ostringstream brepStream(std::ios::out | std::ios::binary);
     BRepTools::Write(object.shape,
@@ -159,7 +241,10 @@ QJsonObject encodeObject(const DatumObject& object)
              ? QJsonValue(fromUtf8(*object.parentId))
              : QJsonValue(QJsonValue::Null)},
         {QStringLiteral("properties"), properties},
-        {QStringLiteral("featureDefinitions"), QJsonArray{}},
+        {QStringLiteral("featureDefinitions"), featureDefinitions},
+        {QStringLiteral("outputFeatureId"), object.featureGraph.outputFeatureId().has_value()
+             ? QJsonValue(fromUtf8(*object.featureGraph.outputFeatureId()))
+             : QJsonValue(QJsonValue::Null)},
         {QStringLiteral("references"), QJsonArray{}},
         {QStringLiteral("transform"), transform},
         {QStringLiteral("geometry"), geometry},
@@ -351,7 +436,8 @@ DatumDocument decodeProject(const QJsonObject& root)
     }
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
-    if (schemaNumber != 1.0 && schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
+    if (schemaNumber != 1.0 && schemaNumber != 2.0 &&
+        schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
     const QJsonValue projectValue = root.value(QStringLiteral("project"));
@@ -380,9 +466,14 @@ DatumDocument decodeProject(const QJsonObject& root)
             if (!reservedValue.isArray()) {
                 fail(QStringLiteral("Object '%1' field '%2' must be an array.").arg(name, reservedArray));
             }
-            if (!reservedValue.toArray().isEmpty()) {
+            if (reservedArray == QStringLiteral("references") && !reservedValue.toArray().isEmpty()) {
                 fail(QStringLiteral("Object '%1' contains unsupported '%2' entries; this schema cannot preserve them yet.")
                          .arg(name, reservedArray));
+            }
+            if (reservedArray == QStringLiteral("featureDefinitions") && schemaNumber < 3.0 &&
+                !reservedValue.toArray().isEmpty()) {
+                fail(QStringLiteral("Object '%1' contains feature definitions unsupported by this schema version.")
+                         .arg(name));
             }
         }
 
@@ -432,10 +523,42 @@ DatumDocument decodeProject(const QJsonObject& root)
             fail(QStringLiteral("Object '%1' geometry is missing or invalid.").arg(name));
         }
         TopoDS_Shape shape = decodeShape(geometryValue.toObject(), name);
+        const ShapeMetrics storedMetrics = OcctKernel::measure(shape);
         const DatumObject& loaded = document.addObject(toUtf8(id), toUtf8(name), std::move(shape), position,
                                                        std::move(parentId), false);
         for (auto& [key, value] : properties) {
             document.setProperty(loaded.id, key, std::move(value));
+        }
+        if (schemaNumber >= 3.0) {
+            std::vector<DatumFeature> features;
+            const QJsonArray featureDefinitions = objectJson.value(QStringLiteral("featureDefinitions")).toArray();
+            features.reserve(static_cast<std::size_t>(featureDefinitions.size()));
+            for (const QJsonValue& featureValue : featureDefinitions) {
+                if (!featureValue.isObject()) {
+                    fail(QStringLiteral("Object '%1' contains an invalid feature definition.").arg(name));
+                }
+                features.push_back(decodeFeature(featureValue.toObject(), toUtf8(id)));
+            }
+            const QJsonValue outputValue = objectJson.value(QStringLiteral("outputFeatureId"));
+            std::optional<std::string> outputFeatureId;
+            if (outputValue.isString()) {
+                outputFeatureId = toUtf8(outputValue.toString());
+            } else if (!outputValue.isNull()) {
+                fail(QStringLiteral("Object '%1' outputFeatureId must be a feature UUID or null.").arg(name));
+            }
+            if (!features.empty() || outputFeatureId.has_value()) {
+                DatumFeatureGraph graph(toUtf8(id), std::move(features), outputFeatureId);
+                if (graph.outputFeatureId().has_value() && graph.outputSucceeded() &&
+                    !sameShapeMetrics(storedMetrics, OcctKernel::measure(graph.outputShape()))) {
+                    fail(QStringLiteral("Object '%1' cached B-Rep does not agree with its feature graph output.")
+                             .arg(name));
+                }
+                document.setFeatureGraph(toUtf8(id), std::move(graph), false);
+            }
+        } else if (objectJson.contains(QStringLiteral("outputFeatureId")) &&
+                   !objectJson.value(QStringLiteral("outputFeatureId")).isNull()) {
+            fail(QStringLiteral("Object '%1' has an outputFeatureId unsupported by this schema version.")
+                     .arg(name));
         }
     }
 
@@ -458,10 +581,11 @@ DatumDocument decodeProject(const QJsonObject& root)
         const bool hasObjectTopologyReferences = std::any_of(
             document.topologyReferences().begin(), document.topologyReferences().end(),
             [&object](const DatumTopologyReference& reference) {
-                return reference.objectId == object.id && !reference.featureId.has_value();
+                return reference.objectId == object.id;
             });
         if (!hasObjectTopologyReferences) {
-            for (DatumTopologyReference& reference : DatumTopologyResolver::captureAll(object.id, object.shape)) {
+            for (DatumTopologyReference& reference : DatumTopologyResolver::captureAll(
+                     object.id, object.shape, object.featureGraph.outputFeatureId())) {
                 (void)document.addTopologyReference(std::move(reference));
             }
         }

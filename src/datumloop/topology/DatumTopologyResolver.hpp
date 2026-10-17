@@ -55,7 +55,8 @@ public:
         const DatumTopologyReference& reference,
         const std::string& currentObjectId,
         const TopoDS_Shape& currentShape,
-        const DatumTopologyResolveOptions& options = {});
+        const DatumTopologyResolveOptions& options = {},
+        const std::optional<std::string>& currentFeatureId = std::nullopt);
 
     // Maps an exact renderer hit in object-local millimetres to a unique
     // persisted reference. Transient ordering is used only to pair candidates
@@ -69,7 +70,8 @@ public:
         const Vector3& localPointMm,
         const std::optional<Vector3>& localNormal = std::nullopt,
         double toleranceMm = 1.0,
-        const DatumTopologyResolveOptions& options = {});
+        const DatumTopologyResolveOptions& options = {},
+        const std::optional<std::string>& currentFeatureId = std::nullopt);
 };
 
 }  // namespace datumloop
