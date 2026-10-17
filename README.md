@@ -1,25 +1,28 @@
 # DatumLoop DS
 
-DatumLoop DS is an open-source desktop platform for developing and evaluating
-industrial mechanisms. It uses FreeCAD for CAD documents, assembly editing, and
-the 3D viewport. The product workbench and engineering services live in this
-repository; branding and any FreeCAD core changes belong in the dedicated
-FreeCAD fork.
+DatumLoop DS is an open-source engineering application for designing and
+evaluating industrial mechanisms. The current Python workbench and geometry
+adapters run inside FreeCAD. The product is moving toward a standalone Qt 6 / QML
+application with DatumLoop-owned documents and commands and OCCT as its primary
+exact-geometry kernel. The FreeCAD workbench remains available as a compatibility
+and migration path until native workflows replace it.
 
 ## Status
 
-Milestone 1 is in progress. The public [DatumLoop DS repository](https://github.com/ASI777/datumloopds)
-contains the workbench, project shell, package metadata, and local checks. The
+The repository contains the FreeCAD compatibility workbench, geometry adapters,
+and the new native C++/Qt application slice. The public [DatumLoop DS repository](https://github.com/ASI777/datumloopds)
+contains both paths. The
 public [FreeCAD fork](https://github.com/ASI777/FreeCAD) and
 [smlibpy fork](https://github.com/ASI777/smlibpy) are available. The FreeCAD
 fork's `codex/datumloop-ds-1.1.3` branch contains the branding and isolated
-application identity changes. A clean branded 1.1.3 build and desktop viewport
-verification remain release gates; the installed development copy is 1.1.1.
+application identity changes. The standalone application migration is tracked in
+[`docs/native-migration-dependencies.md`](docs/native-migration-dependencies.md).
 
 ## Development
 
-The workbench targets Linux and Python 3.11 or newer. It uses only the Python
-standard library and the FreeCAD/PySide runtime supplied by FreeCAD.
+The compatibility workbench targets Linux and Python 3.11 or newer. It uses the
+FreeCAD/PySide runtime supplied by FreeCAD. The native application targets C++20,
+Qt 6 Quick/QML, and OCCT; it does not require FreeCAD.
 
 Run the test suite and build the Python package with:
 
@@ -29,13 +32,28 @@ make freecad-check
 make build
 ```
 
+Build and run the native application and its C++ core and UI-model checks with:
+
+```sh
+make native-check
+./build/native/apps/datumloop-desktop/DatumLoopDS
+```
+
+`make native-smoke` starts the native window and verifies that Qt Quick
+presented a frame; run it from a desktop session with a working graphics
+display. `make native-qml-smoke` verifies QML and OCCT-derived viewport data
+initialization in headless environments; it does not verify 3D rendering. The
+app can also be built and run without FreeCAD.
+
 ## Exact geometry backends
 
-FreeCAD/OCCT remains DatumLoop's production CAD backend for native documents,
-assemblies, STEP/IGES workflows, and manufacturing geometry. The new
-`datumloopds.geometry` boundary keeps native shapes behind adapters and reports
-unsupported operations with `UnsupportedKernelOperation`; it never falls back
-to tessellated meshes for exact modeling.
+OCCT is the target production geometry kernel for native documents, assemblies,
+STEP/IGES workflows, and manufacturing geometry. The existing
+`datumloopds.geometry` boundary keeps FreeCAD `Part` and SMLib native shapes
+behind adapters and reports unsupported operations with
+`UnsupportedKernelOperation`; it never falls back to tessellated meshes for
+exact modeling. The native C++ geometry API is being added beside this Python
+compatibility layer.
 
 SMLib is an optional second B-Rep/NURBS backend for geometry experiments and
 USD B-Rep workflows. The adapter targets smlibpy 0.3.4, which exposes the
@@ -96,7 +114,9 @@ installation.
 
 ## Repository layout
 
-- `src/datumloopds/` — engine-independent project metadata and FreeCAD GUI code.
+- `apps/datumloop-desktop/` — standalone Qt 6 application entry point.
+- `src/datumloop/` — native DatumLoop core, document, workspace, OCCT, and UI models.
+- `src/datumloopds/` — Python project metadata and retained FreeCAD compatibility code.
 - `src/datumloopds/geometry/` — backend-neutral geometry values, capabilities,
   OCCT and optional SMLib adapters, exact STEP conversion, and benchmark fixtures.
 - `freecad/DatumLoopDS/` — FreeCAD workbench entry points and resources.
@@ -104,6 +124,7 @@ installation.
 - `docs/` — architecture and milestone decisions.
 - `tests/` — repeatable checks; the FreeCADCmd smoke also exercises real OCCT
   modeling operations without changing a project document.
+- `qml/` — native application workspaces, editor components, and design tokens.
 
 ## License
 

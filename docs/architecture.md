@@ -1,19 +1,18 @@
-# Architecture and Milestone 1
+# Architecture and Migration
 
-## Application split
+## Current compatibility stack
 
-DatumLoop DS has four layers:
+The existing application shell runs as a FreeCAD workbench. FreeCAD currently
+owns document lifecycle, the center viewport, `.FCStd` persistence, GUI
+selection, and the host undo stack. The repository owns project metadata,
+workbench panels, exact-geometry adapters, and engineering services. The
+`datumloopds.geometry` OCCT adapter wraps FreeCAD's `Part` API; the optional
+SMLib adapter is independent of FreeCAD. See the direct dependency inventory in
+[`native-migration-dependencies.md`](native-migration-dependencies.md).
 
-1. A branded FreeCAD desktop build owns the application identity, CAD document
-   lifecycle, assembly editing, and 3D viewport.
-2. The main DatumLoop DS repository owns the product workbench, engineering
-   model, orchestration, solver adapters, and product checks.
-3. Solver processes run in isolated, pinned environments. They communicate
-   through versioned JSON-RPC over standard input and output; they never mutate
-   a live FreeCAD document.
-4. Engineering geometry services call the backend-neutral
-   `datumloopds.geometry` API. FreeCAD/OCCT is the production backend; SMLib is
-   an optional exact-geometry backend for experiments and USD B-Rep workflows.
+Solver processes run in isolated, pinned environments. They communicate through
+versioned JSON-RPC over standard input and output; they never mutate a live
+application document.
 
 The FreeCAD GUI thread owns document changes. Workers return outputs and
 proposed changes; the GUI applies accepted changes as undoable transactions.
@@ -30,12 +29,12 @@ file exchange. Each adapter publishes a `KernelCapabilities` value. Unsupported
 calls raise `UnsupportedKernelOperation`; there is no implicit OCCT fallback
 and no mesh conversion in exact modeling operations.
 
-### OCCT / FreeCAD
+### OCCT compatibility adapter
 
-The OCCT adapter wraps FreeCAD's `Part` and `TopoShape` APIs. It is the reference
-implementation and keeps FreeCAD documents, Part Design, assemblies, healing,
-STEP import/export, and existing machine geometry on the production path.
-`.FCStd` project compatibility is not changed by the geometry abstraction.
+The current Python OCCT adapter wraps FreeCAD's `Part` and `TopoShape` APIs. It
+keeps existing FreeCAD documents, Part Design, assemblies, healing, STEP
+import/export, and existing machine geometry on the compatibility path. It is
+not the architecture owner for new native features.
 
 ### SMLib / smlibpy
 
@@ -89,14 +88,56 @@ FreeCAD's tessellation interface exposes chord tolerance but no angular
 tolerance, while SMLib accepts both. The report calls this out and treats
 triangle counts as approximate display comparisons.
 
-## Milestone 1 scope
+## Native target architecture
 
-The first shell adds a dedicated **DatumLoop DS** workbench while keeping the
-FreeCAD viewport in the center. The left panel provides project actions,
-workflow navigation, and a mechanism tree. The right panel provides selection
-properties and engineering context. The lower panel reserves space for jobs,
-playback, plots, and evidence. Project creation, open, and save use native
-FreeCAD documents.
+The standalone application is being built with C++20, Qt 6 Quick/QML, a
+DatumLoop-owned workspace and editor model, and direct OCCT geometry APIs. The
+native core will own documents, stable object identities, commands and undo,
+selection, engineering metadata, and `.dld` persistence. The viewport renderer
+will display tessellation derived from exact OCCT shapes; that render mesh will
+not replace the exact B-Rep. SMLib remains an optional secondary geometry
+backend. FreeCAD remains behind the compatibility/migration boundary until
+native project and engineering workflows provide equivalent functionality.
+
+```text
+Qt Quick / QML
+    |
+DatumLoop workspace, editors, tools
+    |
+Commands and view models
+    |
+DatumLoop document and engineering core
+    |
+OCCT primary geometry API ---- SMLib optional adapter
+    |
+Renderer and solver jobs
+```
+
+The first implementation slice is limited to the Design workspace, a minimal
+document with one exact OCCT solid, resizable Viewport/Outliner/Properties
+editors, selection, basic camera navigation, and a previewable modal move
+command. Further editors and engineering workflows follow only after this slice
+has a runnable native executable and tests.
+
+### Current native implementation status
+
+The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
+derives its display triangles, and loads the Qt Quick Design workspace without
+loading FreeCAD. Core and UI-model tests cover geometry measures, stable object
+IDs, preview/cancel/commit behavior, input validation, and move undo/redo. The
+headless QML smoke loads the component tree and OCCT display data. The offscreen
+platform cannot render Qt Quick 3D, so the frame smoke uses Xvfb; it presented
+three frames and visual inspection confirmed the solid and editor layout. A
+separate pointer-level interaction check is still pending.
+
+## Legacy FreeCAD shell
+
+The existing **DatumLoop DS** workbench remains available while the native
+shell is built. Its left panel provides project actions, workflow navigation,
+and a mechanism tree. The right panel provides selection properties and
+engineering context. The lower panel reserves space for jobs, playback, plots,
+and evidence. Project creation, open, and save currently use native FreeCAD
+documents.
 
 The project targets FreeCAD 1.1.3. The local workbench can be exercised against
 an installed FreeCAD copy for development, but it does not substitute for a
@@ -110,22 +151,25 @@ in a `branding.xml` installed alongside the application. That source change
 belongs in the FreeCAD fork. The workbench provides its own menu name and icon,
 but those do not complete the branded application gate by themselves.
 
-## Decisions
+## Compatibility decisions
 
-- Use standard `.FCStd` documents for the first project shell. The mechanism
-  model and study manifests will be layered onto those documents in later
-  milestones.
-- Keep the product core dependency-free. The host supplies FreeCAD and PySide;
-  the Python build backend is pinned in `requirements-build.lock`.
+- Keep the existing `.FCStd` workbench path available during migration.
+- New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
+  FreeCAD or PySide.
+- The native document will own its stable IDs, geometry, commands, and future
+  `.dld` persistence. The previous FreeCAD document model remains the
+  compatibility path until native import/export and project workflows are
+  verified.
 - Keep all solver work out of the GUI process. No simulation code is introduced
-  in this shell milestone.
+  in this shell slice.
 
-## Current gate status
+## Compatibility release status
 
 The public DatumLoop DS repository and full FreeCAD and smlibpy forks are
 available. The FreeCAD 1.1.3 branding integration is on
 `ASI777/FreeCAD:codex/datumloop-ds-1.1.3`; it retains the upstream CAD engine and
 uses `ExeName=DatumLoopDS` so its preferences and user data are separate. The
-gate still requires a successful branded FreeCAD 1.1.3 build and a desktop GUI
-launch with a functioning viewport. Current local constraints are recorded in
-the milestone report.
+earlier branded FreeCAD 1.1.3 build remains a useful compatibility release
+check, but does not satisfy the standalone-native application gate. Current
+native migration status is tracked in
+[`native-migration-dependencies.md`](native-migration-dependencies.md).

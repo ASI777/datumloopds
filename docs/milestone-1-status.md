@@ -45,10 +45,10 @@ OpenGL viewport check still need verification.
 
 ## Checks run
 
-- `make check` — 14 tests run, 13 pass, and the optional real SMLib test is
+- `make check` — 16 tests run, 15 pass, and the optional real SMLib test is
   skipped when smlibpy is not installed in the default Python environment.
-- SMLib-enabled geometry tests — 8 tests pass against the pinned smlibpy 0.3.4
-  wheel, including STEP and USD B-Rep round-trips.
+- SMLib-enabled full suite — all 16 tests pass against the pinned smlibpy
+  0.3.4 wheel, including STEP and USD B-Rep round-trips.
 - `make freecad-check` — project save/reopen and real OCCT geometry operations
   pass in FreeCADCmd 1.1.1.
 - `make build` — builds the `datumloopds` wheel.
