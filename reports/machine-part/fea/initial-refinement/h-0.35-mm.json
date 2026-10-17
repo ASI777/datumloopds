@@ -1,0 +1,74 @@
+{
+    "angular_deflection_rad": 0.0010945371314144095,
+    "applied_force_n": [
+        1.7763568394002505e-15,
+        -2.6645352591003757e-15,
+        3.192519660231675
+    ],
+    "cad_face_groups": 14,
+    "checks": [
+        {
+            "id": "precision.displacement",
+            "measured": 25.653080131207037,
+            "reason": "19736de1-7429-4b96-b842-677488ae8fdc",
+            "status": "FAIL"
+        },
+        {
+            "id": "precision.angle",
+            "measured": 0.0010945371314144095,
+            "reason": "19736de1-7429-4b96-b842-677488ae8fdc",
+            "status": "FAIL"
+        },
+        {
+            "id": "stress.screening",
+            "measured": 11.510248275613254,
+            "reason": "19736de1-7429-4b96-b842-677488ae8fdc",
+            "status": "PASS"
+        }
+    ],
+    "dof": 178377,
+    "geometry_sha256": "08adcf963f03911803cd5a10812e7c1d1ac09b356748452414be1c5d092472ee",
+    "iterations": 2437,
+    "maximum_displacement_m": 3.1097963901043195e-05,
+    "maximum_edge_ratio": 3.031169939706845,
+    "maximum_interface_displacement_m": 2.5653080131207035e-05,
+    "maximum_von_mises_stress_pa": 11510248.275613254,
+    "mean_motor_displacement_m": [
+        -1.9788060414796683e-07,
+        4.259770124895166e-11,
+        1.5656118144926107e-05
+    ],
+    "mesh_revision_id": "3e73a6ee-8ce6-41a2-a8a2-79b0464e39d2",
+    "meshing_wall_time_s": 27.2731771119943,
+    "minimum_vertex_scaled_jacobian": 0.156640193627147,
+    "motor_rotation_rad": [
+        0.0010943655269066049,
+        -2.717357432969481e-07,
+        1.937915692179091e-05
+    ],
+    "nodes": 59459,
+    "normal_stiffness_n_per_m": 178349.82938634302,
+    "reaction_force_n": [
+        -2.0229482151912226e-11,
+        -9.910467585472205e-11,
+        -3.1925196602607593
+    ],
+    "relative_angle_change": 0.06605463261868806,
+    "relative_energy_change": 0.06297503559226812,
+    "relative_force_balance_error": 3.2967331048698553e-11,
+    "relative_interface_displacement_change": 0.06715698691381997,
+    "relative_probe_stress_change": 0.7929271047987262,
+    "relative_residual": 9.764205316488611e-11,
+    "requested_size_m": 0.00035,
+    "requirements_passed": false,
+    "section_normal_stress_yy_pa": 1085712.3926610886,
+    "section_sample_position_m": [
+        0,
+        -0.003,
+        0.0005625000000000001
+    ],
+    "solve_and_field_wall_time_s": 64.254601632,
+    "solver_run_id": "19736de1-7429-4b96-b842-677488ae8fdc",
+    "strain_energy_j": 2.578098467941412e-05,
+    "tetrahedra": 251845
+}

@@ -67,6 +67,7 @@ struct AnalysisMesh {
     std::string geometrySha256;
     std::string backendBuildInfo;
     double meshingWallTimeS = 0.0;
+    std::uint64_t mesherPeakMemoryBytes = 0;
     std::vector<std::string> mesherLog;
     std::vector<std::string> topologyReferenceIds;
     std::vector<AnalysisNode> nodes;

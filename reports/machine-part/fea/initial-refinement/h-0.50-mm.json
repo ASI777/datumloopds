@@ -1,0 +1,70 @@
+{
+    "angular_deflection_rad": 0.001022237883311318,
+    "applied_force_n": [
+        1.7763568394002505e-15,
+        -2.6645352591003757e-15,
+        3.192566936055003
+    ],
+    "cad_face_groups": 14,
+    "checks": [
+        {
+            "id": "precision.displacement",
+            "measured": 23.93029656453639,
+            "reason": "120a07dd-81a8-4369-8d12-8f5d252b29e2",
+            "status": "FAIL"
+        },
+        {
+            "id": "precision.angle",
+            "measured": 0.001022237883311318,
+            "reason": "120a07dd-81a8-4369-8d12-8f5d252b29e2",
+            "status": "FAIL"
+        },
+        {
+            "id": "stress.screening",
+            "measured": 10.569032575673887,
+            "reason": "120a07dd-81a8-4369-8d12-8f5d252b29e2",
+            "status": "PASS"
+        }
+    ],
+    "dof": 97623,
+    "geometry_sha256": "08adcf963f03911803cd5a10812e7c1d1ac09b356748452414be1c5d092472ee",
+    "iterations": 1889,
+    "maximum_displacement_m": 2.9003618449354743e-05,
+    "maximum_edge_ratio": 3.0260335563531626,
+    "maximum_interface_displacement_m": 2.393029656453639e-05,
+    "maximum_von_mises_stress_pa": 10569032.575673888,
+    "mean_motor_displacement_m": [
+        -1.9769870773979672e-07,
+        1.495054254816917e-10,
+        1.4594613164306882e-05
+    ],
+    "mesh_revision_id": "f0cc7f46-628b-4138-80a6-05a3da6810ac",
+    "meshing_wall_time_s": 13.98952277200442,
+    "minimum_vertex_scaled_jacobian": 0.15589639743270994,
+    "motor_rotation_rad": [
+        0.0010220546467914545,
+        -4.5590796371497774e-07,
+        1.9348932702555928e-05
+    ],
+    "nodes": 32541,
+    "normal_stiffness_n_per_m": 191321.68619781357,
+    "reaction_force_n": [
+        5.900070709774496e-11,
+        -7.091639081524548e-11,
+        -3.1925669360581477
+    ],
+    "relative_force_balance_error": 2.8913287297010564e-11,
+    "relative_residual": 9.661318095097012e-11,
+    "requested_size_m": 5e-04,
+    "requirements_passed": false,
+    "section_normal_stress_yy_pa": 1946603.1768179433,
+    "section_sample_position_m": [
+        0,
+        -0.003,
+        0.0005625000000000001
+    ],
+    "solve_and_field_wall_time_s": 23.2828353,
+    "solver_run_id": "120a07dd-81a8-4369-8d12-8f5d252b29e2",
+    "strain_energy_j": 2.4157426251624298e-05,
+    "tetrahedra": 130906
+}

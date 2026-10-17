@@ -180,14 +180,16 @@ def main() -> None:
             relative_volume_error=volume_error, maximum_boundary_area_relative_error=maximum_area_error,
             wall_time_s=time.perf_counter()-started, log=gmsh.logger.get())
         args.result.write_text(json.dumps(result,separators=(",",":")),encoding="utf-8")
-        print(json.dumps(dict(status="passed", nodes=len(nodes), elements=count, boundary_faces=len(regions))))
     finally:
         gmsh.finalize()
+    # Measure after writing the large result and releasing the native backend.
+    print(json.dumps(dict(status="passed", nodes=len(nodes), elements=count, boundary_faces=len(regions),
+                          peak_memory_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024)))
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        print(f"Gmsh worker failed: {error}", file=sys.stderr)
+        print(f"Gmsh worker failed: {type(error).__name__}: {error}", file=sys.stderr)
         sys.exit(1)

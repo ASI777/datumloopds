@@ -112,6 +112,13 @@ AnalysisMesh GmshProcessMesher::generate(const DatumDocument& document,const Ana
     AnalysisMesh mesh;mesh.cadObjectId=object->id;mesh.sourceProjectId=document.projectId();
     mesh.backendBuildInfo=result.value("build_info").toString().toStdString();
     mesh.meshingWallTimeS=number(result.value("wall_time_s"));
+    const auto workerStatus=QJsonDocument::fromJson(process.readAllStandardOutput());
+    need(workerStatus.isObject()&&workerStatus.object().value("status").toString()=="passed",
+         "worker returned no successful completion/resource record");
+    const double peakMemory=number(workerStatus.object().value("peak_memory_bytes"));
+    need(peakMemory>=0&&peakMemory<=static_cast<double>(worker_.maximumMemoryMiB)*1024*1024,
+         "worker memory provenance exceeds its configured limit");
+    mesh.mesherPeakMemoryBytes=static_cast<std::uint64_t>(peakMemory);
     need(mesh.backendBuildInfo.find("OpenCASCADE")!=std::string::npos&&mesh.meshingWallTimeS>=0,"missing worker build or timing provenance");
     for(const auto& entry:array(result,"log")) {need(entry.isString(),"invalid worker log entry");mesh.mesherLog.push_back(entry.toString().toStdString());}
     mesh.sourceDocumentRevision=document.revision();mesh.geometrySha256=digest;

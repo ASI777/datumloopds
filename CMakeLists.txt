@@ -133,6 +133,17 @@ target_include_directories(datumloop_ui PUBLIC src)
 target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io datumloop_numerics Qt6::Core Qt6::Gui)
 target_compile_options(datumloop_ui PRIVATE -Wall -Wextra -Wpedantic)
 
+if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+    add_library(datumloop_part_analysis STATIC src/datumloop/engineering/CarrierStructuralDesign.cpp)
+    target_include_directories(datumloop_part_analysis PUBLIC src)
+    target_link_libraries(datumloop_part_analysis PUBLIC datumloop_mfem_backend datumloop_meshing)
+    target_compile_options(datumloop_part_analysis PRIVATE -Wall -Wextra -Wpedantic)
+    add_executable(datumloop-carrier-analysis apps/carrier-analysis/main.cpp)
+    target_link_libraries(datumloop-carrier-analysis PRIVATE datumloop_part_analysis datumloop_io)
+    target_compile_definitions(datumloop-carrier-analysis PRIVATE
+        DATUMLOOP_GMSH_WORKER="${CMAKE_SOURCE_DIR}/scripts/gmsh_analysis_worker.py")
+endif()
+
 qt_add_executable(DatumLoopDS
     apps/datumloop-desktop/main.cpp
     src/datumloop/ui/ExactShapeGeometry.cpp
@@ -238,6 +249,12 @@ if(BUILD_TESTING)
         ENVIRONMENT "DATUMLOOP_MJCF_OUTPUT=${DATUMLOOP_MJCF_OUTPUT}")
 
     if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+        add_executable(datumloop-carrier-structural-tests tests/native/test_carrier_structural_design.cpp)
+        target_link_libraries(datumloop-carrier-structural-tests PRIVATE datumloop_part_analysis datumloop_io)
+        target_compile_definitions(datumloop-carrier-structural-tests PRIVATE
+            DATUMLOOP_CARRIER_STUDY="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/design-study.json")
+        add_test(NAME datumloop-carrier-structural-tests COMMAND datumloop-carrier-structural-tests)
+
         add_executable(datumloop-mfem-tet-tests tests/native/test_mfem_tetrahedra.cpp)
         target_link_libraries(datumloop-mfem-tet-tests PRIVATE datumloop_mfem_backend datumloop_meshing datumloop_ui)
         target_compile_definitions(datumloop-mfem-tet-tests PRIVATE
