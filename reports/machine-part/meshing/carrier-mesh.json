@@ -1,0 +1,115 @@
+{
+    "backend": "gmsh.occ.external",
+    "backend_build": "Version: 4.15.2; License: GNU General Public License; Build OS: Linux64-sdk; Build date: 20260324; Build host: gmsh.info; Build options: 64Bit ALGLIB[contrib] ANN[contrib] Bamg Blas[petsc] Blossom Cgns DIntegration Dlopen DomHex Eigen[contrib] Fltk Gmm[contrib] Hxt Jpeg Kbipack Lapack[petsc] LinuxJoystick MathEx[contrib] Med Mesh Metis[contrib] Mmg Mpeg Netgen Nii2mesh ONELAB ONELABMetamodel OpenCASCADE OpenCASCADE-CAF OpenGL OpenMP OptHom PETSc Parser Plugins Png Post QuadMeshingTools QuadTri Solver TetGen/BR TinyXML2[contrib] Untangle Voro++[contrib] WinslowUntangler Zlib tinyobjloader; FLTK version: 1.3.11; PETSc version: 3.14.4 (real arithmtic); OCC version: 7.8.1; MED version: 4.1.0; Packaged by: geuzaine; Web site: https://gmsh.info; Issue tracker: https://gitlab.onelab.info/gmsh/gmsh/issues",
+    "boundary_area_relative_error_limit": 0.01,
+    "boundary_groups": [
+        {
+            "attribute": 1,
+            "cad_area_m2": 2.12057504117311e-05,
+            "face_uuid": "13ae5478-0b2c-4bd4-afe6-ab673a84c4be",
+            "mesh_area_m2": 2.11585839398937e-05
+        },
+        {
+            "attribute": 2,
+            "cad_area_m2": 1.4137166941154069e-05,
+            "face_uuid": "20a8cd03-fb19-49d1-a1e2-0df3250b7ad4",
+            "mesh_area_m2": 1.4107825057474608e-05
+        },
+        {
+            "attribute": 3,
+            "cad_area_m2": 2.12057504117311e-05,
+            "face_uuid": "4231ea39-c82d-4121-94bc-8d17222c5748",
+            "mesh_area_m2": 2.1158692797891442e-05
+        },
+        {
+            "attribute": 4,
+            "cad_area_m2": 1.0367255756846317e-05,
+            "face_uuid": "5406d4c7-76bc-4eee-88a9-efbc90267c0e",
+            "mesh_area_m2": 1.034584438377389e-05
+        },
+        {
+            "attribute": 5,
+            "cad_area_m2": 1.0367255756846317e-05,
+            "face_uuid": "5fc47a2e-d6d9-44c0-8c8d-cd1fb12f078e",
+            "mesh_area_m2": 1.0346223908349131e-05
+        },
+        {
+            "attribute": 6,
+            "cad_area_m2": 6.599999999999999e-05,
+            "face_uuid": "67b5177e-8705-43f7-a94c-b8ff2bb3040e",
+            "mesh_area_m2": 6.6e-05
+        },
+        {
+            "attribute": 7,
+            "cad_area_m2": 0.0014101870825079291,
+            "face_uuid": "7f9df246-e57d-48d4-bc6a-c97b329c7ac6",
+            "mesh_area_m2": 0.001411163982813438
+        },
+        {
+            "attribute": 8,
+            "cad_area_m2": 5.1e-05,
+            "face_uuid": "b030401c-7508-4077-82ae-42d5a7d04c19",
+            "mesh_area_m2": 5.099999999999998e-05
+        },
+        {
+            "attribute": 9,
+            "cad_area_m2": 2.836858166191583e-05,
+            "face_uuid": "b23aa98d-bfaa-4962-af93-791234d128f0",
+            "mesh_area_m2": 2.8305885410366177e-05
+        },
+        {
+            "attribute": 10,
+            "cad_area_m2": 6.599999999999999e-05,
+            "face_uuid": "e72670a8-d5c4-43ac-9dc4-a593d9e7c450",
+            "mesh_area_m2": 6.6e-05
+        },
+        {
+            "attribute": 11,
+            "cad_area_m2": 0.0014101870825079291,
+            "face_uuid": "ea0612e0-1dfc-4812-977e-16ff6aeb10ed",
+            "mesh_area_m2": 0.0014111639828134415
+        },
+        {
+            "attribute": 12,
+            "cad_area_m2": 5.1e-05,
+            "face_uuid": "f9a93dc8-019c-41bb-8c53-bdc4064e905e",
+            "mesh_area_m2": 5.0999999999999986e-05
+        },
+        {
+            "attribute": 13,
+            "cad_area_m2": 1.4137166941154069e-05,
+            "face_uuid": "f9c9066d-a9b1-4499-a1eb-aa62ddfbbd4d",
+            "mesh_area_m2": 1.4108246424788782e-05
+        },
+        {
+            "attribute": 14,
+            "cad_area_m2": 1.0367255756846317e-05,
+            "face_uuid": "fecd33d1-2184-4851-b603-c6d1b8eb2ab0",
+            "mesh_area_m2": 1.0346149770267091e-05
+        }
+    ],
+    "boundary_triangles": 18838,
+    "exact_cad_volume_m3": 2.115280623761895e-06,
+    "fea_status": "not_run",
+    "geometry_sha256": "08adcf963f03911803cd5a10812e7c1d1ac09b356748452414be1c5d092472ee",
+    "inverted_elements_rejected": true,
+    "maximum_edge_ratio": 3.383090736830878,
+    "maximum_edge_ratio_limit": 12,
+    "maximum_element_count": 250000,
+    "mesh_volume_m3": 2.116400547865093e-06,
+    "meshing_wall_time_s": 4.890837319995626,
+    "minimum_scaled_jacobian_limit": 0.001,
+    "minimum_vertex_scaled_jacobian": 0.14670744421333193,
+    "missing_boundary_rejected": true,
+    "nodes": 12938,
+    "nominal_geometry_preserved": true,
+    "requested_maximum_element_size_m": 0.0012,
+    "resource_cap_rejected": true,
+    "source_document_revision": "9",
+    "source_project_id": "77d1b795-5c00-422b-ad78-d8a03c871ecd",
+    "swapped_cad_face_mapping_rejected": true,
+    "tetrahedra": 48119,
+    "version": "4.15.2",
+    "volume_relative_error": 0.0005294446942960539,
+    "volume_relative_error_limit": 0.01
+}

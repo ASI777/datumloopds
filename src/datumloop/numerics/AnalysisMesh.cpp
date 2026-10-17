@@ -21,6 +21,7 @@
 #include <unordered_set>
 
 namespace datumloop {
+void validateTetrahedralAnalysisMesh(const AnalysisMesh& mesh);
 namespace {
 
 enum class BoxSide : std::size_t {
@@ -145,12 +146,16 @@ void addBoundaryElement(AnalysisMesh& mesh,
 
 void AnalysisMesh::validate() const
 {
+    if (!tetrahedra.empty() || provenance.elementType == "tetrahedron4") {
+        validateTetrahedralAnalysisMesh(*this);
+        return;
+    }
     if (!isDatumUuid(provenance.revisionId) || !isDatumUuid(cadObjectId) ||
         provenance.generator != "datumloop.occt-rectangular-solid-structured-hex" ||
         provenance.generatorVersion != "1.0.0" || provenance.elementType != "hexahedron8" ||
         provenance.nodeCount != nodes.size() || provenance.elementCount != elements.size() ||
         nodes.size() < 8 || elements.empty() || boundaryElements.empty() ||
-        boundaryRegions.size() != 6 || topologyReferenceIds.size() != 6) {
+        boundaryRegions.size() != 6 || topologyReferenceIds.size() != 6 || !boundaryTriangles.empty()) {
         throw std::invalid_argument("analysis mesh identity, topology, or element counts are invalid");
     }
     if (!std::isfinite(provenance.requestedMaximumElementSizeM) ||
@@ -307,6 +312,8 @@ AnalysisMesh OcctPrismAnalysisMesher::generate(const DatumDocument& document,
     mesh.provenance.maximumAspectRatio = aspectRatio;
     mesh.cadObjectId = cadObjectId;
     mesh.sourceDocumentRevision = document.revision();
+    mesh.sourceProjectId = document.projectId();
+    mesh.geometrySha256 = analysisGeometrySha256(*object);
 
     for (std::size_t side = 0; side < resolvedFaces.size(); ++side) {
         ResolvedBoxFace& face = *resolvedFaces[side];

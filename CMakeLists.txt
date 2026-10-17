@@ -3,6 +3,7 @@ project(DatumLoopDS VERSION 0.1.0 LANGUAGES CXX)
 
 option(DATUMLOOP_ENABLE_MFEM "Build the optional MFEM finite-element adapter when available" ON)
 set(DATUMLOOP_MUJOCO_PYTHON "" CACHE FILEPATH "Python interpreter with the MuJoCo package installed")
+set(DATUMLOOP_GMSH_PYTHON "" CACHE FILEPATH "Optional isolated Python with pinned Gmsh 4.15.2")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -73,11 +74,18 @@ add_library(datumloop_numerics STATIC
     src/datumloop/numerics/CantileverBeamFEM.cpp
     src/datumloop/numerics/FemSolver.cpp
     src/datumloop/numerics/AnalysisMesh.cpp
+    src/datumloop/numerics/AnalysisTetMesh.cpp
+    src/datumloop/numerics/CadAnalysisSource.cpp
     src/datumloop/numerics/StructuralReducedModel.cpp
 )
 target_include_directories(datumloop_numerics PUBLIC src)
-target_link_libraries(datumloop_numerics PUBLIC datumloop_core)
+target_link_libraries(datumloop_numerics PUBLIC datumloop_core Qt6::Core)
 target_compile_options(datumloop_numerics PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(datumloop_meshing STATIC src/datumloop/meshing/GmshProcessMesher.cpp)
+target_include_directories(datumloop_meshing PUBLIC src)
+target_link_libraries(datumloop_meshing PUBLIC datumloop_numerics Qt6::Core)
+target_compile_options(datumloop_meshing PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_digitaltwin STATIC
     src/datumloop/digitaltwin/ModelEvidence.cpp
@@ -189,6 +197,16 @@ if(BUILD_TESTING)
     target_compile_definitions(datumloop-motor-carrier-tests PRIVATE
         DATUMLOOP_CARRIER_STUDY="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/design-study.json")
     add_test(NAME datumloop-motor-carrier-tests COMMAND datumloop-motor-carrier-tests)
+
+    add_executable(datumloop-tet-mesh-tests tests/native/test_tet_meshing.cpp)
+    target_link_libraries(datumloop-tet-mesh-tests PRIVATE datumloop_meshing datumloop_io Qt6::Core)
+    target_compile_definitions(datumloop-tet-mesh-tests PRIVATE
+        DATUMLOOP_CARRIER_STUDY="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/design-study.json"
+        DATUMLOOP_GMSH_PYTHON="${DATUMLOOP_GMSH_PYTHON}"
+        DATUMLOOP_GMSH_WORKER="${CMAKE_SOURCE_DIR}/scripts/gmsh_analysis_worker.py")
+    add_test(NAME datumloop-tet-mesh-tests COMMAND datumloop-tet-mesh-tests
+        --report "${CMAKE_CURRENT_BINARY_DIR}/reports/motor-carrier-mesh.json")
+    set_tests_properties(datumloop-tet-mesh-tests PROPERTIES SKIP_RETURN_CODE 77)
 
     add_executable(datumloop-electronics-tests tests/native/test_electronics.cpp)
     target_link_libraries(datumloop-electronics-tests PRIVATE datumloop_io datumloop_solver Qt6::Core)
