@@ -49,19 +49,22 @@ configured package and Python environment to `make native-check`, for example:
 make native-check NATIVE_CMAKE_ARGS="-DMFEM_DIR=/path/to/mfem-config-dir -DDATUMLOOP_MUJOCO_PYTHON=/path/to/python-with-mujoco"
 ```
 
-The native shell can open and save schema-seven `.dld` projects. The provisional
+The native shell can open and save schema-eight `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
 face/edge/vertex references, a recomputable primitive/transform/Boolean feature
 graph, mechanism bodies, joints, actuators, contact pairs and requirements,
 motors, sourced materials, circuit/PCB models, CAD-linked structural studies,
-MFEM fields, mesh convergence and solver provenance. Engineering quantities use
-SI units and missing optional data remains unknown. The initial structural
-path is bounded to one axis-aligned rectangular solid and numerical verification;
-it does not establish experimental validation. The circuit solver returns a
+MFEM mesh snapshots and fields, mesh convergence, and solver provenance. The
+native viewport can display displacement, von Mises stress, and equivalent
+strain from persisted fields with an explicit deformation scale. Engineering
+quantities use SI units and missing optional data remains unknown. The initial
+structural path is bounded to one axis-aligned rectangular solid and numerical
+verification; it does not establish experimental validation. The circuit solver returns a
 resistor DC operating point and power placeholder only; it does not solve
 thermal fields. See
-[`docs/native-project-format.md`](docs/native-project-format.md).
+[`docs/native-project-format.md`](docs/native-project-format.md) and
+[`docs/native-field-visualization.md`](docs/native-field-visualization.md).
 
 The mechanism-definition foundation and its current limits are tracked in
 [`docs/milestone-2-mechanism-definition.md`](docs/milestone-2-mechanism-definition.md).

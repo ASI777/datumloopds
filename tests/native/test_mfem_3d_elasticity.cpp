@@ -6,6 +6,7 @@
 #include "datumloop/numerics/MfemLinearElasticitySolver.hpp"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -22,6 +23,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -382,6 +384,19 @@ int main(int argc, char* argv[])
             const auto run = solver.solve(document, study, mesh);
             require(run.converged && run.relativeResidual < 1e-8 && run.iterations > 0,
                     "MFEM 3D elasticity did not converge with a recorded residual");
+            require(run.meshSnapshot.has_value() &&
+                        run.meshSnapshot->nodePositionsM.size() == mesh.nodes.size() &&
+                        run.meshSnapshot->hexahedra.size() == mesh.elements.size() &&
+                        run.meshSnapshot->meshRevisionId == mesh.provenance.revisionId,
+                    "MFEM result did not retain its exact mesh coordinates and element connectivity");
+            for (std::size_t node = 0; node < mesh.nodes.size(); ++node) {
+                require(run.meshSnapshot->nodePositionsM[node] == mesh.nodes[node].positionM,
+                        "persisted mesh snapshot changed a CAD-derived node coordinate");
+            }
+            for (std::size_t element = 0; element < mesh.elements.size(); ++element) {
+                require(run.meshSnapshot->hexahedra[element] == mesh.elements[element].nodeIndices,
+                        "persisted mesh snapshot changed an MFEM hexahedron's field indexing");
+            }
             require(run.provenance.temperatureRangeVerified == false &&
                         run.provenance.analysisTemperatureK == std::optional<double>(293.15),
                     "material temperature uncertainty was incorrectly presented as verified");
@@ -463,7 +478,46 @@ int main(int argc, char* argv[])
                     loaded.engineeringModel().structuralStudies.front() == study &&
                     loaded.electronicsModel().materials == document.electronicsModel().materials &&
                     loaded.electronicsModel().materialStates == document.electronicsModel().materialStates,
-                "DLD v7 round trip did not preserve sourced material, state, structural fields, and provenance");
+                "DLD v8 round trip did not preserve sourced material, state, mesh snapshots, fields, and provenance");
+
+        datumloop::DatumDocument legacySource = document;
+        datumloop::DatumEngineeringModel legacyEngineering = legacySource.engineeringModel();
+        legacyEngineering.structuralStudies.front().runs = {runs.front()};
+        legacyEngineering.structuralStudies.front().meshConvergence.reset();
+        legacySource.setEngineeringModel(std::move(legacyEngineering));
+        const QString legacyPath = temporaryDirectory.filePath(QStringLiteral("schema-v7-fields.dld"));
+        datumloop::DldProjectStore::save(legacySource, legacyPath);
+        QFile legacyFile(legacyPath);
+        require(legacyFile.open(QIODevice::ReadOnly), "could not open the schema-v7 migration fixture");
+        QJsonObject legacyRoot = QJsonDocument::fromJson(legacyFile.readAll()).object();
+        legacyFile.close();
+        legacyRoot.insert(QStringLiteral("schemaVersion"), 7);
+        QJsonObject legacyModel = legacyRoot.value(QStringLiteral("engineeringModel")).toObject();
+        QJsonArray legacyStudies = legacyModel.value(QStringLiteral("structuralStudies")).toArray();
+        QJsonObject legacyStudy = legacyStudies.at(0).toObject();
+        QJsonArray legacyRuns = legacyStudy.value(QStringLiteral("runs")).toArray();
+        QJsonObject legacyRun = legacyRuns.at(0).toObject();
+        legacyRun.remove(QStringLiteral("meshSnapshot"));
+        legacyRuns.replace(0, legacyRun);
+        legacyStudy.insert(QStringLiteral("runs"), legacyRuns);
+        legacyStudies.replace(0, legacyStudy);
+        legacyModel.insert(QStringLiteral("structuralStudies"), legacyStudies);
+        legacyRoot.insert(QStringLiteral("engineeringModel"), legacyModel);
+        require(legacyFile.open(QIODevice::WriteOnly | QIODevice::Truncate),
+                "could not write the schema-v7 migration fixture");
+        const QByteArray legacyBytes = QJsonDocument(legacyRoot).toJson(QJsonDocument::Indented);
+        require(legacyFile.write(legacyBytes) == legacyBytes.size(),
+                "could not finish writing the schema-v7 migration fixture");
+        legacyFile.close();
+        datumloop::DatumDocument migratedLegacy = datumloop::DldProjectStore::load(legacyPath);
+        const auto& migratedRun = migratedLegacy.engineeringModel().structuralStudies.front().runs.front();
+        require(!migratedRun.meshSnapshot.has_value() && migratedRun.fields == runs.front().fields &&
+                    migratedRun.provenance == runs.front().provenance,
+                "schema-v7 structural fields or provenance were not preserved without a mesh snapshot");
+        datumloop::DldProjectStore::save(migratedLegacy, legacyPath);
+        const datumloop::DatumDocument resavedLegacy = datumloop::DldProjectStore::load(legacyPath);
+        require(!resavedLegacy.engineeringModel().structuralStudies.front().runs.front().meshSnapshot.has_value(),
+                "resaving a schema-v7 field result did not preserve its unavailable-mesh state");
 
         if (argc == 3 && std::string(argv[1]) == "--report") {
             writeReport(argv[2], study, runs, *sourcedMaterial, youngsModulusPa,
@@ -472,7 +526,7 @@ int main(int argc, char* argv[])
             throw std::invalid_argument("usage: datumloop-mfem-elasticity-tests [--report path]");
         }
         std::cout << "MFEM " << solver.solverVersion()
-                  << " CAD-derived 3D elasticity, reactions, fields, four-mesh refinement, and DLD provenance passed.\n";
+                  << " CAD-derived 3D elasticity, reactions, indexed mesh snapshots, fields, four-mesh refinement, and DLD provenance passed.\n";
     } catch (const std::exception& error) {
         std::cerr << "MFEM CAD 3D elasticity test failed: " << error.what() << '\n';
         return 1;

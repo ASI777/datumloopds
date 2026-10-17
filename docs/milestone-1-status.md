@@ -15,12 +15,13 @@
 - The Python geometry contract defines portable shape/value types, capabilities, typed unsupported-operation errors, and backend adapters. Its FreeCAD Part adapter remains the compatibility CAD path. The native C++ application with direct OCCT APIs is the primary architecture; SMLib remains optional.
 - Exact cross-kernel conversion goes through STEP. Tessellation remains a display and analysis representation, not an exact modeling source.
 - The deterministic seven-case OCCT / SMLib benchmark matched volume, area, bounds, center of mass, and validity tolerances in all seven cases for FreeCAD 1.1.1 / SMLib 0.3.4. Exact topology counts are reported separately because the kernels may split the same geometry differently. See [the comparison report](../reports/geometry-benchmark/comparison.md) and its JSON reports.
-- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates exact OCCT solids, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object/face/edge/vertex picks through stable IDs, and supports camera navigation and previewable Move. The initial feature DAG evaluates box/cylinder/sphere/cone primitives, translation, and exact Boolean union/cut/intersection; generated `TopoDS_Shape` values remain authoritative and feature graph replacement is undoable. Native `.dld` schema 7 stores feature definitions, exact B-Rep results, the versioned mechanism-definition foundation, motors, sourced materials, circuits, PCB models, structural studies, mesh convergence, fields, and solver provenance; it reads v1-v6 projects and preserves supported prior engineering data. The topology matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Large-model acceleration and distinct subshape highlight geometry remain open.
+- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates exact OCCT solids, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object/face/edge/vertex picks through stable IDs, and supports camera navigation and previewable Move. The initial feature DAG evaluates box/cylinder/sphere/cone primitives, translation, and exact Boolean union/cut/intersection; generated `TopoDS_Shape` values remain authoritative and feature graph replacement is undoable. Native `.dld` schema 8 stores feature definitions, exact B-Rep results, the versioned mechanism-definition foundation, motors, sourced materials, circuits, PCB models, structural studies, mesh convergence, field data, solver provenance, and the exact FE mesh snapshot used by each new result; it reads v1-v7 projects and preserves supported prior engineering data. The topology matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Large-model acceleration and distinct subshape highlight geometry remain open.
 
 ## Checks run
 
 - Native CMake build with MFEM 4.10 and the isolated MuJoCo 3.16.0 Python runtime configured — all 11 CTest targets pass. Coverage includes geometry/document/electronics/UI, Equation Registry and dimensional checks, model evidence and agent routing, the MFEM cantilever/ROM checks, four CAD-derived 3D elasticity meshes with a 5% convergence gate, and runtime load/step of the exact MJCF emitted by the C++ robotics exporter. The camera placeholder still returns no frame or pixels, and hardware actuator writes remain rejected.
 - `make native-qml-smoke` — workspace, common host, three editors, and OCCT-derived mesh data initialize. Qt Quick 3D cannot render in the offscreen plugin, as expected.
+- The latest native-field build passed all 11 configured CTest targets, including MFEM 3D elasticity, persistence migration, and result-display checks. The reproducible native script passed its default build, native-independence check, CTest set, and offscreen QML load smoke. The offscreen plugin still cannot present 3D. A current XCB/Xvfb attempt could not start because the installed Qt platform plugin requires the missing `xcb-cursor0` library; the earlier baseline software-rendered Xvfb checks do not establish hardware-GPU behavior.
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The reproducible native CI container now runs this check too.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
 - Native XTest pointer smoke — passes under Xvfb with software OpenGL, including object/face selection, camera controls, and Move cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified; see [the baseline report](native-baseline.md).
@@ -34,11 +35,19 @@
 
 ## Remaining work
 
-- Native field visualization, reduced-order model generation, and the
-  MuJoCo-plus-ROM comparison remain future slices. The present 3D elasticity
-  result is a numerically verified model, not an experimentally validated
-  digital twin.
-- Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
+- The native viewport now displays displacement magnitude, von Mises stress,
+  and equivalent strain from persisted solver fields, with an explicit
+  deformation scale and source-run provenance. The result mesh is disposable
+  render data; the exact OCCT solid remains the nominal geometry. The first
+  mesh/display path is limited to an axis-aligned rectangular solid and
+  8-node hexahedra. Schema-7 results remain loadable but need a new solve to
+  display because they do not include the FE coordinates/connectivity snapshot.
+- Generate a reduced model from the real 3D MFEM case, validate it on held-out
+  load/material samples, then connect it to MuJoCo and compare high-fidelity
+  and fast responses. The current 3D result is a numerically verified model,
+  not an experimentally validated digital twin.
+- Verify result-overlay rendering, selection, and camera movement on a
+  hardware GPU; hardware rendering remains unverified.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - FreeCAD is limited to `.FCStd` migration, regression/reference checks, import/export assistance, and concrete compatibility defects. Return to its build only when one of those use cases requires it.
 - Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.

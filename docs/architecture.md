@@ -106,9 +106,9 @@ dirty and revision state, topology reference signatures, an object-scoped
 feature graph, and separate engineering and electronics models.
 `DatumElectronicsModel` owns shared material definitions/states, circuits, and
 PCB boards; PCB layers and material regions reference that same material
-collection. `DldProjectStore` reads and writes the version-seven `.dld` manifest
+collection. `DldProjectStore` reads and writes the version-eight `.dld` manifest
 using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates display
-tessellation after load. Schema v1 through v6 projects migrate while preserving
+tessellation after load. Schema v1 through v8 projects migrate while preserving
 supported engineering and electronics data where the older schema allowed it.
 Feature-backed
 objects persist their feature inputs and recompute exact shapes on load; direct
@@ -149,10 +149,13 @@ selection changes. It resolves object IDs directly and resolves face, edge,
 and vertex hits against the exact OCCT shape, matching a stored topology UUID
 and current output feature when available. Ambiguous or unsupported results
 remain unresolved. The native viewport supports Object, Face, Edge, and Vertex
-modes. Large-model acceleration and distinct subshape highlight geometry
-remain future work.
+modes. Structural results can be displayed as derived colored boundary meshes
+for displacement magnitude, von Mises stress, and equivalent strain. The
+field mesh snapshot is persisted with the run; the exact OCCT shape remains the
+nominal CAD definition. Large-model acceleration and distinct subshape
+highlight geometry remain future work.
 
-`DatumEngineeringModel` stores schema-seven mechanism definitions and structural
+`DatumEngineeringModel` stores schema-eight mechanism definitions and structural
 study records separately
 from CAD objects: stable body IDs and geometry-source references, sourced
 optional mass properties, body-local joint frames, supported joint types,
@@ -209,7 +212,7 @@ FreeCAD Python workbench -> separate compatibility path
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
-version-seven `.dld` save/open with an initial recomputable feature graph,
+version-eight `.dld` save/open with an initial recomputable feature graph,
 mechanism body/joint/actuator/contact/requirement data, motors, and native
 material/circuit/PCB models, material sources/states, topology-linked static
 structural studies, mesh provenance, and MFEM field results. The first 3D

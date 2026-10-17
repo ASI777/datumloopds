@@ -25,6 +25,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace datumloop {
@@ -556,6 +557,17 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     run.provenance.solverId = solverId();
     run.provenance.solverVersion = solverVersion();
     run.provenance.mesh = mesh.provenance;
+    AnalysisMeshSnapshot meshSnapshot;
+    meshSnapshot.meshRevisionId = mesh.provenance.revisionId;
+    meshSnapshot.nodePositionsM.reserve(mesh.nodes.size());
+    for (const AnalysisNode& node : mesh.nodes) {
+        meshSnapshot.nodePositionsM.push_back(node.positionM);
+    }
+    meshSnapshot.hexahedra.reserve(mesh.elements.size());
+    for (const AnalysisHexElement& element : mesh.elements) {
+        meshSnapshot.hexahedra.push_back(element.nodeIndices);
+    }
+    run.meshSnapshot = std::move(meshSnapshot);
     run.provenance.topologyReferenceIds = mesh.topologyReferenceIds;
     run.provenance.absoluteTolerance = settings.absoluteTolerance;
     run.provenance.relativeTolerance = settings.relativeTolerance;

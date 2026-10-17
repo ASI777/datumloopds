@@ -173,6 +173,27 @@ std::optional<FieldLocation> fieldLocationFromName(const std::string& name)
     return std::nullopt;
 }
 
+void AnalysisMeshSnapshot::validate(const AnalysisMeshProvenance& provenance) const
+{
+    if (meshRevisionId != provenance.revisionId || nodePositionsM.size() != provenance.nodeCount ||
+        hexahedra.size() != provenance.elementCount || nodePositionsM.size() < 8 || hexahedra.empty()) {
+        throw std::invalid_argument("analysis mesh snapshot does not match its mesh provenance");
+    }
+    for (const Vector3& position : nodePositionsM) {
+        if (!finiteVector(position)) {
+            throw std::invalid_argument("analysis mesh snapshot coordinates must be finite SI values");
+        }
+    }
+    for (const auto& hexahedron : hexahedra) {
+        std::unordered_set<std::uint32_t> uniqueNodes;
+        for (const std::uint32_t nodeIndex : hexahedron) {
+            if (nodeIndex >= nodePositionsM.size() || !uniqueNodes.insert(nodeIndex).second) {
+                throw std::invalid_argument("analysis mesh snapshot contains an invalid hexahedron node index");
+            }
+        }
+    }
+}
+
 void FieldDataset::validate(std::uint64_t nodeCount,
                             std::uint64_t elementCount,
                             const std::string& expectedMeshRevisionId,
@@ -216,6 +237,9 @@ void StructuralAnalysisRun::validate(
     }
     if (provenance.boundaryConditionIds != expectedBoundaryConditionIds) {
         throw std::invalid_argument("analysis run provenance does not match the study boundary conditions");
+    }
+    if (meshSnapshot.has_value()) {
+        meshSnapshot->validate(provenance.mesh);
     }
     const auto has = [this](FieldType type, FieldLocation location, std::size_t components,
                             const std::string& units) {

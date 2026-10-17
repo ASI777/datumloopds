@@ -86,6 +86,19 @@ struct AnalysisMeshProvenance {
     friend bool operator==(const AnalysisMeshProvenance&, const AnalysisMeshProvenance&) = default;
 };
 
+// The solver's mesh is stored with a run so field sample indices retain their
+// exact spatial meaning after the project is reopened. This is derived analysis
+// data; the OCCT B-Rep remains the nominal CAD definition.
+struct AnalysisMeshSnapshot {
+    std::string meshRevisionId;
+    std::vector<Vector3> nodePositionsM;
+    std::vector<std::array<std::uint32_t, 8>> hexahedra;
+
+    void validate(const AnalysisMeshProvenance& provenance) const;
+
+    friend bool operator==(const AnalysisMeshSnapshot&, const AnalysisMeshSnapshot&) = default;
+};
+
 enum class FieldType {
     Displacement,
     DisplacementMagnitude,
@@ -151,6 +164,7 @@ struct AnalysisRunProvenance {
 
 struct StructuralAnalysisRun {
     AnalysisRunProvenance provenance;
+    std::optional<AnalysisMeshSnapshot> meshSnapshot;
     bool converged = false;
     std::uint32_t iterations = 0;
     double relativeResidual = 0.0;

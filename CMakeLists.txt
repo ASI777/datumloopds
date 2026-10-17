@@ -110,11 +110,12 @@ target_link_libraries(datumloop_robotics PUBLIC datumloop_core)
 target_compile_options(datumloop_robotics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_ui STATIC
+    src/datumloop/ui/AnalysisResultDisplay.cpp
     src/datumloop/ui/DocumentViewModel.cpp
     src/datumloop/ui/PickingService.cpp
 )
 target_include_directories(datumloop_ui PUBLIC src)
-target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io Qt6::Core Qt6::Gui)
+target_link_libraries(datumloop_ui PUBLIC datumloop_core datumloop_io datumloop_numerics Qt6::Core Qt6::Gui)
 target_compile_options(datumloop_ui PRIVATE -Wall -Wextra -Wpedantic)
 
 qt_add_executable(DatumLoopDS

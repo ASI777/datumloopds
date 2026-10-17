@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace datumloop {
 namespace {
@@ -1038,6 +1039,21 @@ QJsonObject encodeFieldDataset(const FieldDataset& field)
             {QStringLiteral("values"), values}};
 }
 
+QJsonObject encodeAnalysisMeshSnapshot(const AnalysisMeshSnapshot& snapshot)
+{
+    QJsonArray nodes;
+    for (const Vector3& position : snapshot.nodePositionsM) nodes.append(encodeVector(position));
+    QJsonArray hexahedra;
+    for (const auto& element : snapshot.hexahedra) {
+        QJsonArray indices;
+        for (const std::uint32_t index : element) indices.append(static_cast<double>(index));
+        hexahedra.append(indices);
+    }
+    return {{QStringLiteral("meshRevisionId"), fromUtf8(snapshot.meshRevisionId)},
+            {QStringLiteral("nodePositionsM"), nodes},
+            {QStringLiteral("hexahedra"), hexahedra}};
+}
+
 FieldDataset decodeFieldDataset(const QJsonValue& value)
 {
     if (!value.isObject()) fail(QStringLiteral("Structural field dataset entries must be objects."));
@@ -1157,7 +1173,12 @@ QJsonObject encodeStructuralRun(const StructuralAnalysisRun& run)
 {
     QJsonArray fields;
     for (const FieldDataset& field : run.fields) fields.append(encodeFieldDataset(field));
+    QJsonValue meshSnapshot(QJsonValue::Null);
+    if (run.meshSnapshot.has_value()) {
+        meshSnapshot = encodeAnalysisMeshSnapshot(*run.meshSnapshot);
+    }
     return {{QStringLiteral("provenance"), encodeAnalysisRunProvenance(run.provenance)},
+            {QStringLiteral("meshSnapshot"), meshSnapshot},
             {QStringLiteral("converged"), run.converged},
             {QStringLiteral("iterations"), static_cast<double>(run.iterations)},
             {QStringLiteral("relativeResidual"), run.relativeResidual},
@@ -1179,6 +1200,53 @@ StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value)
     const QJsonObject object = value.toObject();
     StructuralAnalysisRun run;
     run.provenance = decodeAnalysisRunProvenance(object.value(QStringLiteral("provenance")));
+    const QJsonValue snapshotValue = object.value(QStringLiteral("meshSnapshot"));
+    if (snapshotValue.isObject()) {
+        const QJsonObject snapshotObject = snapshotValue.toObject();
+        AnalysisMeshSnapshot snapshot;
+        snapshot.meshRevisionId = toUtf8(requiredString(snapshotObject, QStringLiteral("meshRevisionId")));
+        const QJsonValue nodesValue = snapshotObject.value(QStringLiteral("nodePositionsM"));
+        const QJsonValue hexahedraValue = snapshotObject.value(QStringLiteral("hexahedra"));
+        if (!nodesValue.isArray() || !hexahedraValue.isArray()) {
+            fail(QStringLiteral("Structural mesh snapshot nodes and hexahedra must be arrays."));
+        }
+        const QJsonArray nodes = nodesValue.toArray();
+        const QJsonArray hexahedra = hexahedraValue.toArray();
+        if (static_cast<std::uint64_t>(nodes.size()) != run.provenance.mesh.nodeCount ||
+            static_cast<std::uint64_t>(hexahedra.size()) != run.provenance.mesh.elementCount) {
+            fail(QStringLiteral("Structural mesh snapshot counts do not match their run provenance."));
+        }
+        snapshot.nodePositionsM.reserve(static_cast<std::size_t>(nodes.size()));
+        for (const QJsonValue& nodeValue : nodes) {
+            snapshot.nodePositionsM.push_back(decodeVector(nodeValue, QStringLiteral("meshSnapshot.nodePositionsM[]")));
+        }
+        snapshot.hexahedra.reserve(static_cast<std::size_t>(hexahedra.size()));
+        for (const QJsonValue& elementValue : hexahedra) {
+            if (!elementValue.isArray() || elementValue.toArray().size() != 8) {
+                fail(QStringLiteral("Structural mesh snapshot elements must contain eight node indices."));
+            }
+            const QJsonArray element = elementValue.toArray();
+            std::array<std::uint32_t, 8> indices{};
+            for (qsizetype index = 0; index < element.size(); ++index) {
+                const double nodeIndex = requiredFiniteNumber(
+                    element.at(index), QStringLiteral("meshSnapshot.hexahedra[][]"));
+                if (nodeIndex < 0.0 || std::floor(nodeIndex) != nodeIndex ||
+                    nodeIndex > std::numeric_limits<std::uint32_t>::max()) {
+                    fail(QStringLiteral("Structural mesh snapshot node indices must be non-negative 32-bit integers."));
+                }
+                indices[static_cast<std::size_t>(index)] = static_cast<std::uint32_t>(nodeIndex);
+            }
+            snapshot.hexahedra.push_back(indices);
+        }
+        try {
+            snapshot.validate(run.provenance.mesh);
+        } catch (const std::invalid_argument& error) {
+            fail(QStringLiteral("Structural mesh snapshot is invalid: %1").arg(QString::fromUtf8(error.what())));
+        }
+        run.meshSnapshot = std::move(snapshot);
+    } else if (!snapshotValue.isNull() && !snapshotValue.isUndefined()) {
+        fail(QStringLiteral("Structural run meshSnapshot must be an object or null."));
+    }
     const QJsonValue converged = object.value(QStringLiteral("converged"));
     if (!converged.isBool()) fail(QStringLiteral("Structural run converged must be boolean."));
     run.converged = converged.toBool();
@@ -1520,7 +1588,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
     if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
-        schemaNumber != 5.0 && schemaNumber != 6.0 &&
+        schemaNumber != 5.0 && schemaNumber != 6.0 && schemaNumber != 7.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }

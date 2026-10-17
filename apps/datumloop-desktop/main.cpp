@@ -110,11 +110,13 @@ int main(int argc, char* argv[])
 
     QObject* root = engine.rootObjects().front();
     auto* geometry = root->findChild<datumloop::ExactShapeGeometry*>(QStringLiteral("cadGeometry"));
-    if (geometry == nullptr) {
-        qCritical() << "DatumLoop viewport geometry item was not created.";
+    auto* analysisGeometry = root->findChild<datumloop::ExactShapeGeometry*>(
+        QStringLiteral("analysisResultGeometry"));
+    if (geometry == nullptr || analysisGeometry == nullptr) {
+        qCritical() << "DatumLoop viewport CAD or analysis geometry item was not created.";
         return 2;
     }
-    datumloop::QtQuick3DRenderer renderer(geometry);
+    datumloop::QtQuick3DRenderer renderer(geometry, analysisGeometry);
     renderer.setDisplayMesh(displayMesh);
     const auto updateSelectedDisplayMesh = [&]() {
         const datumloop::DatumObject* selected =
@@ -127,6 +129,12 @@ int main(int argc, char* argv[])
                      &app, updateSelectedDisplayMesh);
     QObject::connect(&documentModel, &datumloop::DocumentViewModel::selectionChanged,
                      &app, updateSelectedDisplayMesh);
+    const auto updateAnalysisDisplayMesh = [&]() {
+        renderer.setAnalysisDisplayMesh(documentModel.analysisDisplayMesh());
+    };
+    QObject::connect(&documentModel, &datumloop::DocumentViewModel::analysisDisplayChanged,
+                     &app, updateAnalysisDisplayMesh);
+    updateAnalysisDisplayMesh();
 
     auto* window = qobject_cast<QQuickWindow*>(root);
     if (window == nullptr) {
@@ -205,6 +213,10 @@ int main(int argc, char* argv[])
             !hasItem(QStringLiteral("outlinerEditor")) ||
             !hasItem(QStringLiteral("viewportEditor")) ||
             !hasItem(QStringLiteral("selectionModeToolbar")) ||
+            !hasItem(QStringLiteral("analysisModeSelector")) ||
+            !hasItem(QStringLiteral("datumLoopAnalysisResult")) ||
+            !hasItem(QStringLiteral("analysisResultLegend")) ||
+            !hasItem(QStringLiteral("analysisResultStatusLabel")) ||
             !hasItem(QStringLiteral("propertiesEditor")) ||
             initialObject == nullptr || !initialObject->metrics.valid || displayMesh.triangleCount() == 0) {
             qCritical() << "DatumLoop workspace, editor components, or OCCT-derived viewport data did not initialize.";

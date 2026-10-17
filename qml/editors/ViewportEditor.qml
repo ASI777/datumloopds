@@ -48,6 +48,7 @@ Item {
             id: solidModel
             objectName: "datumLoopExactSolid"
             property string datumObjectId: documentModel.displayObjectId
+            visible: !documentModel.analysisResultAvailable || documentModel.analysisDisplayMode === "Geometry"
             geometry: ExactShapeGeometry {
                 id: cadGeometry
                 objectName: "cadGeometry"
@@ -59,7 +60,25 @@ Item {
                 roughness: 0.32
             }
             castsShadows: true
-            pickable: true
+            pickable: documentModel.analysisDisplayMode === "Geometry"
+        }
+
+        Model {
+            id: analysisResultModel
+            objectName: "datumLoopAnalysisResult"
+            visible: documentModel.analysisResultAvailable && documentModel.analysisDisplayMode !== "Geometry"
+            position: documentModel.displayPosition
+            geometry: ExactShapeGeometry {
+                objectName: "analysisResultGeometry"
+            }
+            materials: PrincipledMaterial {
+                baseColor: "white"
+                vertexColorsEnabled: true
+                metalness: 0.0
+                roughness: 0.72
+            }
+            castsShadows: false
+            pickable: false
         }
     }
 
@@ -129,7 +148,7 @@ Item {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.margins: editor.theme.space3
-        width: 164
+        width: 190
         height: 33
         radius: editor.theme.panelRadius
         color: editor.theme.surfacePrimary
@@ -139,9 +158,20 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: editor.theme.space2
             anchors.rightMargin: editor.theme.space2
-            Text { text: "DESIGN / PART"; color: editor.theme.textSecondary; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall; font.weight: Font.DemiBold }
+            Text {
+                text: documentModel.analysisDisplayMode === "Geometry" ? "DESIGN / PART" : "ANALYSIS / RESULTS"
+                color: editor.theme.textSecondary
+                font.family: editor.theme.fontFamily
+                font.pixelSize: editor.theme.fontSizeSmall
+                font.weight: Font.DemiBold
+            }
             Item { Layout.fillWidth: true }
-            Text { text: "●"; color: editor.theme.engineeringNominal; font.pixelSize: editor.theme.fontSizeSmall }
+            Text {
+                text: "●"
+                color: documentModel.analysisDisplayMode === "Geometry"
+                       ? editor.theme.engineeringNominal : editor.theme.selectionPrimary
+                font.pixelSize: editor.theme.fontSizeSmall
+            }
         }
     }
 
@@ -193,6 +223,39 @@ Item {
                 camera.orbitPitch = 88
             }
         }
+    }
+
+    ComboBox {
+        id: analysisModeSelector
+        objectName: "analysisModeSelector"
+        anchors.right: parent.right
+        anchors.top: viewSelector.bottom
+        anchors.topMargin: editor.theme.space1
+        width: 176
+        height: editor.theme.controlHeight
+        model: ["Geometry", "Displacement", "von Mises Stress", "Strain"]
+        currentIndex: Math.max(0, model.indexOf(documentModel.analysisDisplayMode))
+        enabled: documentModel.analysisResultAvailable
+        font.family: editor.theme.fontFamily
+        font.pixelSize: editor.theme.fontSizeSmall
+        onActivated: function(index) {
+            documentModel.setAnalysisDisplayMode(model[index])
+        }
+    }
+
+    Text {
+        objectName: "analysisResultStatusLabel"
+        visible: !documentModel.analysisResultAvailable &&
+                 documentModel.analysisResultStatus !== "No structural result for this part."
+        anchors.right: parent.right
+        anchors.top: analysisModeSelector.bottom
+        anchors.topMargin: editor.theme.space1
+        width: analysisModeSelector.width
+        text: documentModel.analysisResultStatus
+        color: editor.theme.textMuted
+        font.family: editor.theme.fontFamily
+        font.pixelSize: editor.theme.fontSizeSmall
+        wrapMode: Text.WordWrap
     }
 
     Column {
@@ -306,6 +369,8 @@ Item {
     }
 
     Rectangle {
+        id: viewportAxisLegend
+        objectName: "viewportAxisLegend"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: editor.theme.space3
@@ -324,6 +389,108 @@ Item {
             Text { text: "Z"; color: editor.theme.axisZ; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall; font.weight: Font.Bold }
             Item { Layout.fillWidth: true }
             Text { text: "mm"; color: editor.theme.textMuted; font.family: editor.theme.fontFamily; font.pixelSize: editor.theme.fontSizeSmall }
+        }
+    }
+
+    Rectangle {
+        id: analysisResultLegend
+        objectName: "analysisResultLegend"
+        visible: documentModel.analysisResultAvailable && documentModel.analysisDisplayMode !== "Geometry"
+        anchors.right: parent.right
+        anchors.bottom: viewportAxisLegend.top
+        anchors.bottomMargin: editor.theme.space2
+        anchors.rightMargin: editor.theme.space3
+        width: 252
+        height: 184
+        radius: editor.theme.panelRadius
+        color: editor.theme.surfacePrimary
+        border.color: editor.theme.borderSubtle
+        border.width: editor.theme.borderWidth
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: editor.theme.space2
+            spacing: editor.theme.space1
+            Text {
+                text: documentModel.analysisLegendTitle
+                color: editor.theme.textPrimary
+                font.family: editor.theme.fontFamily
+                font.pixelSize: editor.theme.fontSizeSmall
+                font.weight: Font.DemiBold
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                height: 12
+                radius: 4
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#0e38b8" }
+                    GradientStop { position: 0.333333; color: "#00c7df" }
+                    GradientStop { position: 0.666667; color: "#f9d232" }
+                    GradientStop { position: 1.0; color: "#c70f19" }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: documentModel.analysisLegendMinimum
+                    color: editor.theme.textSecondary
+                    font.family: editor.theme.fontFamily
+                    font.pixelSize: editor.theme.fontSizeSmall
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: documentModel.analysisLegendMaximum
+                    color: editor.theme.textSecondary
+                    font.family: editor.theme.fontFamily
+                    font.pixelSize: editor.theme.fontSizeSmall
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    text: "Deformation scale"
+                    color: editor.theme.textSecondary
+                    font.family: editor.theme.fontFamily
+                    font.pixelSize: editor.theme.fontSizeSmall
+                }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: "%1×".arg(Number(documentModel.analysisDeformationScale).toFixed(0))
+                    color: editor.theme.textPrimary
+                    font.family: editor.theme.fontFamily
+                    font.pixelSize: editor.theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                }
+            }
+            Slider {
+                id: deformationScaleSlider
+                objectName: "deformationScaleSlider"
+                Layout.fillWidth: true
+                from: 0
+                to: 1000
+                stepSize: 1
+                value: documentModel.analysisDeformationScale
+                onMoved: documentModel.setAnalysisDeformationScale(value)
+            }
+            Text {
+                text: documentModel.analysisResultProvenance
+                color: editor.theme.textMuted
+                font.family: editor.theme.fontFamily
+                font.pixelSize: editor.theme.fontSizeSmall
+                Layout.fillWidth: true
+                maximumLineCount: 2
+                wrapMode: Text.WordWrap
+                elide: Text.ElideRight
+            }
+        }
+    }
+
+    Connections {
+        target: documentModel
+        function onAnalysisDisplayChanged() {
+            deformationScaleSlider.value = documentModel.analysisDeformationScale
         }
     }
 
