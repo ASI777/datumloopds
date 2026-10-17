@@ -1,0 +1,19 @@
+"""FreeCADCmd entry point for the OCCT side of the geometry benchmark."""
+
+import os
+import sys
+
+from datumloopds.geometry.benchmark import all_cases_succeeded, run_benchmark, step_file_specs_from_json
+
+
+output = os.environ.get("DATUMLOOPDS_BENCHMARK_OUTPUT")
+if not output:
+    raise RuntimeError("set DATUMLOOPDS_BENCHMARK_OUTPUT to the OCCT JSON output path")
+step_files = step_file_specs_from_json(os.environ.get("DATUMLOOPDS_STEP_FILES_JSON"))
+report = run_benchmark("occt", output, step_files=step_files)
+if not all_cases_succeeded(report):
+    App = __import__("FreeCAD")
+    App.Console.PrintError("DATUMLOOPDS_BENCHMARK_FAIL: one or more OCCT cases failed\n")
+else:
+    App = __import__("FreeCAD")
+    App.Console.PrintMessage("DATUMLOOPDS_BENCHMARK_PASS: OCCT cases completed\n")

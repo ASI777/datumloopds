@@ -7,6 +7,7 @@ import tempfile
 import types
 
 import FreeCAD as App
+import Part
 from PySide import QtWidgets
 
 
@@ -38,6 +39,8 @@ sys.modules["FreeCADGui"] = gui_stub
 
 from datumloopds.freecad import project_actions
 from datumloopds.freecad.workbench import register
+from datumloopds.geometry import Axis3D
+from datumloopds.geometry.occt import OCCTBackend
 
 
 register()
@@ -55,6 +58,52 @@ from datumloopds.freecad import shell
 for dock_name in shell.DOCK_OBJECT_NAMES:
     assert main_window.findChild(QtWidgets.QDockWidget, dock_name) is not None, dock_name
 assert main_window.centralWidget() is viewport_placeholder
+
+kernel = OCCTBackend()
+assert kernel.capabilities.primitive_creation
+assert kernel.capabilities.boolean_union and kernel.capabilities.boolean_cut
+assert kernel.capabilities.fillet and kernel.capabilities.tessellation
+
+box = kernel.box(20, 20, 20)
+cylinder = kernel.cylinder(3, 30)
+union = kernel.union(box, cylinder)
+cut = kernel.cut(box, cylinder)
+fillet = kernel.fillet(kernel.box(20, 20, 20), 1)
+assert abs(kernel.volume(box) - 8000.0) < 1e-6
+assert kernel.volume(union) > kernel.volume(box)
+assert kernel.volume(cut) < kernel.volume(box)
+assert kernel.volume(fillet) < kernel.volume(box)
+assert kernel.is_valid(box) and kernel.is_valid(union) and kernel.is_valid(cut) and kernel.is_valid(fillet)
+assert kernel.bounding_box(box).minimum == (-10.0, -10.0, -10.0)
+
+extrusion_wire = Part.makePolygon([
+    App.Vector(-5, -3, 0), App.Vector(5, -3, 0), App.Vector(5, 3, 0),
+    App.Vector(-5, 3, 0), App.Vector(-5, -3, 0),
+])
+extrusion = kernel.extrude(kernel.wrap_native(Part.Face(extrusion_wire)), (0, 0, 1), 5)
+revolution_wire = Part.makePolygon([
+    App.Vector(10, -20, 0), App.Vector(20, -20, 0), App.Vector(20, 20, 0),
+    App.Vector(10, 20, 0), App.Vector(10, -20, 0),
+])
+revolution = kernel.revolve(
+    kernel.wrap_native(Part.Face(revolution_wire)), Axis3D(direction=(0, 1, 0))
+)
+loft_start = Part.makePolygon([
+    App.Vector(-5, -5, 0), App.Vector(5, -5, 0), App.Vector(5, 5, 0),
+    App.Vector(-5, 5, 0), App.Vector(-5, -5, 0),
+])
+loft_end = Part.makePolygon([
+    App.Vector(-3, -3, 10), App.Vector(3, -3, 10), App.Vector(3, 3, 10),
+    App.Vector(-3, 3, 10), App.Vector(-3, -3, 10),
+])
+loft = kernel.loft((kernel.wrap_native(loft_start), kernel.wrap_native(loft_end)))
+sweep_path = Part.Wire([Part.makeLine(App.Vector(0, 0, 0), App.Vector(0, 0, 20))])
+sweep_profile = Part.Wire([Part.makeCircle(2, App.Vector(0, 0, 0), App.Vector(0, 0, 1))])
+sweep = kernel.sweep(kernel.wrap_native(sweep_profile), kernel.wrap_native(sweep_path))
+assert all(kernel.is_valid(shape) for shape in (extrusion, revolution, loft, sweep))
+assert all(kernel.volume(shape) > 0 for shape in (extrusion, revolution, loft, sweep))
+assert kernel.tessellate(cut, tolerance=0.2).triangle_count > 0
+App.Console.PrintMessage("DATUMLOOP_GEOMETRY_KERNEL_SMOKE_PASS: OCCT operations and measures\n")
 
 temp_root = tempfile.mkdtemp(prefix="datumloopds-freecad-smoke-")
 project_path = os.path.join(temp_root, "smoke.FCStd")

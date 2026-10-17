@@ -184,9 +184,7 @@ class EngineeringPanel(QtWidgets.QWidget):
     def set_workflow_stage(self, current, previous=None) -> None:
         stage = current.text() if current is not None else "Requirements"
         self.context_copy.setText(
-            f"{stage}
-
-Engineering guidance will appear here as requirements and studies are added."
+            f"{stage}\n\nEngineering guidance will appear here as requirements and studies are added."
         )
 
     def refresh(self) -> None:

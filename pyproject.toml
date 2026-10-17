@@ -13,6 +13,8 @@ license-files = ["LICENSE"]
 authors = [{ name = "DatumLoop DS contributors" }]
 dependencies = []
 
+[project.optional-dependencies]
+smlib = ["smlibpy==0.3.4"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
-
