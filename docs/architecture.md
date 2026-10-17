@@ -192,10 +192,11 @@ DatumElectronicsModel -> Circuit JSON / KiCad format adapters
                      -> PcbShapeBuilder -> OCCT preview geometry
                      -> ICircuitSolver -> isolated ngspice worker
 
-EquationRegistry -> generic physics solver requests/results
-                 -> analytical checks and one educational cantilever FEM
+EquationRegistry -> ScientificTask routing and structured proposals
+                 -> maturity-gated SolverRequest -> numerical adapter
+                 -> analytical checks and educational cantilever FEM/MFEM
 RobotModel -> backend-neutral observation/action contracts
-           -> deterministic fixture environment -> MJCF text export
+           -> deterministic fixture environment -> MJCF export -> MuJoCo runtime check
            -> simulated StateInterface / hardware writes disabled
 
 FreeCAD Python workbench -> separate compatibility path
@@ -207,9 +208,11 @@ selection, basic camera navigation, previewable Move with undo/redo, and
 version-five `.dld` save/open with an initial recomputable feature graph,
 mechanism/motor metadata, and native material/circuit/PCB models. Separate
 engineering prototypes add an E0-E6 equation registry, generic solver
-contracts, a verified 1D cantilever FEM example, a reduced beam response, and a
-simulated-only one-axis robot/RL environment with MJCF text export. Those
-prototypes are not persisted in `.dld` or exposed in the Qt workspace.
+contracts, a 1D cantilever reference and optional MFEM adapter, a held-out
+reduced beam response, provider-neutral scientific-agent routing, and a
+simulated-only one-axis robot/RL environment. The exact exported MJCF runs in
+the MuJoCo runtime check. These engineering prototypes are not persisted in
+`.dld` or exposed in the Qt workspace.
 Renderer/display-mesh separation,
 workspace/editor composition, picking-service
 boundary, and native independence are guarded by architecture checks. An XTest
@@ -222,8 +225,9 @@ viewport-data initialization. Hardware-GPU behavior remains unverified. See
 The first electronics slice imports supported Circuit JSON and KiCad PCB
 profiles, builds a display-only OCCT preview, and runs a small ngspice DC
 resistor/source example in a worker process. Result power is only a thermal
-source placeholder. The worker cannot mutate the document, and no thermal,
-structural, CFD, EM, chemistry, metallurgy, or coupled solve is implemented.
+source placeholder. The worker cannot mutate the document. No general
+thermal, structural, CFD, EM, chemistry, metallurgy, or coupled production
+solver is implemented; the cantilever is a narrow verification benchmark.
 See [`electronics-materials-multiphysics.md`](electronics-materials-multiphysics.md)
 for the material, physics, coupling, digital-twin, format, and license plan.
 
@@ -232,7 +236,8 @@ response, and the simulated-only robot/RL/control interfaces are documented in
 [`engineering-equation-governance.md`](engineering-equation-governance.md),
 [`numerical-verification.md`](numerical-verification.md),
 [`multifidelity-simulation.md`](multifidelity-simulation.md),
-[`robot-learning-architecture.md`](robot-learning-architecture.md), and
+[`robot-learning-architecture.md`](robot-learning-architecture.md),
+[`scientific-agent-routing.md`](scientific-agent-routing.md), and
 [`sim-to-real.md`](sim-to-real.md). These provide verified examples and
 interfaces; they are not production machine solvers or deployment readiness.
 
@@ -240,14 +245,15 @@ interfaces; they are not production machine solvers or deployment readiness.
 
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
-workspace without loading FreeCAD. Six CTest targets cover geometry measures,
+workspace without loading FreeCAD. Ten CTest targets cover geometry measures,
 `.dld` round-trip and v1-v4 migration, typed properties, hierarchy, dirty state,
 exact primitive/transform/Boolean recompute, feature status and error
 reporting, engineering/electronics model validation and persistence, stable-ID
 object and subshape picking, move/feature-graph undo/redo, Circuit JSON/KiCad
 imports and ngspice, equation/unit gates, analytical checks, cantilever mesh
-convergence, reduced-response error, robotics timing/action contracts, MJCF
-well-formedness, and disabled hardware writes. The headless QML smoke checks
+convergence, MFEM cross-backend results, held-out ROM error, model evidence,
+scientific-agent routing, robotics timing/action contracts, actual MJCF loading
+and stepping in MuJoCo, and disabled hardware writes. The headless QML smoke checks
 the common host and all three editor components. `make native-independence-check` finds no
 FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The
 offscreen platform cannot render Qt Quick 3D; this environment also lacks the

@@ -28,18 +28,32 @@ struct UnitDimension {
 
     void validate() const;
     [[nodiscard]] bool sameDimension(const UnitDimension& other) const noexcept;
+    [[nodiscard]] UnitDimension addCompatible(const UnitDimension& other) const;
+    [[nodiscard]] UnitDimension multiply(const UnitDimension& other) const;
+    [[nodiscard]] UnitDimension divide(const UnitDimension& other) const;
+    [[nodiscard]] UnitDimension pow(int exponent) const;
 
     [[nodiscard]] static UnitDimension dimensionless();
     [[nodiscard]] static UnitDimension kilogram();
     [[nodiscard]] static UnitDimension meter();
     [[nodiscard]] static UnitDimension second();
+    [[nodiscard]] static UnitDimension ampere();
+    [[nodiscard]] static UnitDimension mole();
+    [[nodiscard]] static UnitDimension candela();
     [[nodiscard]] static UnitDimension newton();
     [[nodiscard]] static UnitDimension pascal();
+    [[nodiscard]] static UnitDimension joule();
+    [[nodiscard]] static UnitDimension watt();
     [[nodiscard]] static UnitDimension kelvin();
     [[nodiscard]] static UnitDimension wattPerCubicMeter();
 };
 
-enum class EquationQuantityType { Scalar, Vector, Tensor };
+enum class EquationQuantityType {
+    Scalar,
+    Vector,
+    Tensor2,
+    Tensor = Tensor2,
+};
 
 struct EquationVariable {
     std::string symbol;
@@ -47,6 +61,7 @@ struct EquationVariable {
     UnitDimension dimension;
     EquationQuantityType quantityType = EquationQuantityType::Scalar;
     std::string referenceFrame;
+    std::string coordinateSystem;
 
     void validate() const;
 };
@@ -95,10 +110,13 @@ struct EquationDefinition {
     std::string name;
     std::string domain;
     std::string symbolicForm;
+    std::string strongForm;
+    std::optional<std::string> weakForm;
     std::vector<EquationVariable> variables;
     std::vector<EquationTerm> leftTerms;
     std::vector<EquationTerm> rightTerms;
     std::vector<std::string> assumptions;
+    std::vector<std::string> constitutiveRelationships;
     std::string validityRange;
     std::vector<std::string> boundaryConditions;
     std::vector<std::string> initialConditions;

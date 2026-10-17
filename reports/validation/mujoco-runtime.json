@@ -1,0 +1,29 @@
+{
+  "backend": "MuJoCo",
+  "version": "3.16.0",
+  "mjcf": "build/native/mujoco-runtime/one-axis-fixture.xml",
+  "model_name": "One-axis <fixture>",
+  "joint": "slider_x",
+  "joint_range_m": [
+    -0.2,
+    0.2
+  ],
+  "body_mass_kg": 1.0,
+  "body_principal_inertia_kg_m2": [
+    0.001,
+    0.0015,
+    0.002
+  ],
+  "actuator": "Ideal force actuator",
+  "control_range_n": [
+    -5.0,
+    5.0
+  ],
+  "initial_position_m": 0.0,
+  "final_position_m": 0.005499999999999998,
+  "final_velocity_m_per_s": 0.09999999999999995,
+  "encoder_position_m": 0.005499999999999998,
+  "encoder_velocity_m_per_s": 0.09999999999999995,
+  "steps": 10,
+  "runtime": "passed"
+}

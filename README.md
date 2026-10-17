@@ -40,6 +40,13 @@ make native-independence-check
 ./build/native/apps/datumloop-desktop/DatumLoopDS
 ```
 
+To include the optional MFEM and MuJoCo integration checks, pass their
+configured package and Python environment to `make native-check`, for example:
+
+```sh
+make native-check NATIVE_CMAKE_ARGS="-DMFEM_DIR=/path/to/mfem-config-dir -DDATUMLOOP_MUJOCO_PYTHON=/path/to/python-with-mujoco"
+```
+
 The native shell can open and save version-five `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
@@ -68,6 +75,7 @@ response, and the simulated-only robot/RL/control interfaces are documented in
 [`docs/numerical-verification.md`](docs/numerical-verification.md),
 [`docs/multifidelity-simulation.md`](docs/multifidelity-simulation.md),
 [`docs/robot-learning-architecture.md`](docs/robot-learning-architecture.md),
+[`docs/scientific-agent-routing.md`](docs/scientific-agent-routing.md),
 and [`docs/sim-to-real.md`](docs/sim-to-real.md). These are small engineering
 foundations; they do not claim a general-purpose multiphysics solver, trained
 policy, or hardware-ready control path.

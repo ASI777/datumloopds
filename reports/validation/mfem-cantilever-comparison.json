@@ -1,0 +1,21 @@
+{
+  "benchmark_id": "timoshenko-cantilever-uniform-load-v1",
+  "equation_definition_id": "structural.timoshenko-beam.isotropic.v1",
+  "equation_maturity": "E4",
+  "units": "SI",
+  "model": {"length_m": 1, "young_modulus_pa": 200000000000, "second_moment_m4": 0.00001, "shear_stiffness_n": 20000000, "distributed_load_n_per_m": 1000},
+  "high_fidelity_solver": "mfem.serial-h1-timoshenko-cantilever",
+  "high_fidelity_version": "4.10.0",
+  "reference_solver": "datumloop.reference-timoshenko-fem",
+  "reference_version": "1.0",
+  "mesh_refinement": [
+    {"elements": 1, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.4523809523809535e-05, "mfem_relative_error": 0.034013605442176582, "mfem_relative_residual": 2.4005366262034789e-16, "mfem_strain_energy_j": 0.019742063492063491, "mfem_execution_seconds": 0.000114009, "mfem_converged": true, "reference_tip_m": 5.9090909090909083e-05, "reference_relative_error": 0.32467532467532467, "relative_difference_vs_reference": 0.29066171923314804},
+    {"elements": 2, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.7291666666666792e-05, "mfem_relative_error": 0.002380952380950787, "mfem_relative_residual": 1.0715665297401985e-15, "mfem_strain_energy_j": 0.020746527777777801, "mfem_execution_seconds": 1.3271999999999999e-05, "mfem_converged": true, "reference_tip_m": 7.6724137931034452e-05, "reference_relative_error": 0.12315270935960612, "relative_difference_vs_reference": 0.12077175697865533},
+    {"elements": 4, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.7486576460481531e-05, "mfem_relative_error": 0.00015341188021090457, "mfem_relative_residual": 3.1116476979174829e-15, "mfem_strain_energy_j": 0.020827572397623211, "mfem_execution_seconds": 1.6361000000000001e-05, "mfem_converged": true, "reference_tip_m": 8.4405940594059158e-05, "reference_relative_error": 0.035360678925038032, "relative_difference_vs_reference": 0.035207267044827129},
+    {"elements": 8, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.7499154491339559e-05, "mfem_relative_error": 9.6629561191645609e-06, "mfem_relative_residual": 1.1057794726882328e-13, "mfem_strain_energy_j": 0.02083296782698588, "mfem_execution_seconds": 3.2957999999999999e-05, "mfem_converged": true, "reference_tip_m": 8.6696658097685895e-05, "reference_relative_error": 0.009181050312161031, "relative_difference_vs_reference": 0.0091713873560418675},
+    {"elements": 16, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.7499947052561912e-05, "mfem_relative_error": 6.0511357798258485e-07, "mfem_relative_residual": 2.0015486375743377e-14, "mfem_strain_energy_j": 0.020833310403232209, "mfem_execution_seconds": 8.9955000000000002e-05, "mfem_converged": true, "reference_tip_m": 8.7297209604150959e-05, "reference_relative_error": 0.0023176045239888788, "relative_difference_vs_reference": 0.0023169994104108959},
+    {"elements": 32, "analytical_tip_m": 8.7499999999999986e-05, "mfem_tip_m": 8.7499996689175362e-05, "mfem_relative_error": 3.783799569550709e-08, "mfem_relative_residual": 2.9062666683267025e-13, "mfem_strain_energy_j": 0.020833331898855282, "mfem_execution_seconds": 0.00023577900000000001, "mfem_converged": true, "reference_tip_m": 8.7449178728242718e-05, "reference_relative_error": 0.00058081453436876725, "relative_difference_vs_reference": 0.00058077669637307181}
+  ],
+  "rom": {"id": "cantilever.linear-compliance-rom.v1", "source_solver": "mfem.serial-h1-timoshenko-cantilever", "source_version": "4.10.0", "training_mesh_elements": 8, "validation_mesh_elements": 32, "training_loads_n_per_m": [250, 500, 1000], "held_out_samples": [{"load_n_per_m": 350, "rom_prediction_m": 3.0624704071968841e-05, "mfem_reference_m": 3.0624998841213743e-05, "relative_error": 9.6251185650622636e-06}, {"load_n_per_m": 750, "rom_prediction_m": 6.5624365868504662e-05, "mfem_reference_m": 6.5624997516881576e-05, "relative_error": 9.6251184885935538e-06}], "maximum_held_out_relative_error": 9.6251185650622636e-06, "rms_held_out_relative_error": 9.6251185268279078e-06},
+  "status": "passed"
+}

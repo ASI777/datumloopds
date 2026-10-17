@@ -16,8 +16,8 @@ types. The first native definitions are in
 - `ObservationSpec` selects sensor IDs, and `ActionSpec` declares a bounded
   actuator command and unit.
 - `RLEnvironmentSpec` carries the simulation timestep, episode limit, mass
-  properties, initial state, target, random seed, and evidence-backed
-  uncertainty metadata.
+  properties, initial state, sourced joint-position limits, target, random
+  seed, and evidence-backed uncertainty metadata.
 
 ## One-axis environment
 
@@ -54,13 +54,20 @@ machine population.
 ## MuJoCo export
 
 `exportMuJoCoMjcf` maps the selected DatumLoop linear axis to an MJCF `slide`
-joint, transforms the axis origin through the sourced base-frame pose, uses the
-explicit fixture mass and three principal inertias, and emits a motor with the
-declared control bounds. It does not transfer CAD geometry, contacts,
-multiple mechanism bodies, cameras, or electronics. The test checks the
-generated XML text, but MuJoCo is unavailable in this environment, so no
-engine parse or dynamics parity test has run. Backend-neutral specs remain the
-DatumLoop contract; MuJoCo is only an export target at this stage.
+joint, transforms the axis origin through the sourced base-frame pose, uses
+explicit mass and principal inertias, emits sourced position limits, and
+connects the motor control bounds. For each selected encoder it emits MuJoCo
+joint-position and joint-velocity sensors. A camera placeholder remains
+invalid and contributes no camera sensor or pixel data. CAD geometry,
+contacts, multiple mechanism bodies, and electronics are not transferred.
+
+The native robotics test writes the actual exporter output for the optional
+runtime test. MuJoCo 3.16.0 loads and steps that MJCF, confirms its one slide
+joint, travel range, mass/inertia, actuator target, state change, and updated
+encoder values. The runtime record is
+[`reports/validation/mujoco-runtime.json`](../reports/validation/mujoco-runtime.json).
+This check does not establish parity with the in-house mass environment or
+validate a real machine. Backend-neutral specs remain the DatumLoop contract.
 
 Robot and RL environment records are not yet persisted in `.dld`, exposed in
 the Qt UI, or dispatched as a solver job. No policy trainer, reward-learning

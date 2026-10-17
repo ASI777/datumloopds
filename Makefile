@@ -1,4 +1,5 @@
 PYTHON ?= python3
+NATIVE_CMAKE_ARGS ?=
 
 .PHONY: check freecad-check geometry-benchmark native-check native-smoke native-qml-smoke native-pointer-smoke native-independence-check build clean
 
@@ -12,7 +13,7 @@ geometry-benchmark:
 	./scripts/run-geometry-benchmarks.sh
 
 native-check:
-	cmake -S . -B build/native -DBUILD_TESTING=ON
+	cmake -S . -B build/native -DBUILD_TESTING=ON $(NATIVE_CMAKE_ARGS)
 	cmake --build build/native --parallel 1
 	ctest --test-dir build/native --output-on-failure
 

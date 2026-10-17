@@ -40,24 +40,30 @@ equation past the evidence that test covers.
 
 ## Current registry
 
-The initial registry contains three equations:
+The registry retains the original three equations and adds the Timoshenko
+model used by the cantilever verification slice:
 
 | ID | Form | Current maturity | Implemented check |
 |---|---|---:|---|
 | `mechanics.newton.second-law.translation.v1` | `sum(F) = m a` | E3 | Constant-force 1D trajectory |
 | `thermal.heat-equation.isotropic.v1` | `rho cp dT/dt = div(k grad(T)) + Q` | E3 | Source-free 1D steady slab limit |
 | `materials.elasticity.uniaxial-linear.v1` | `sigma = E epsilon` | E3 | Axial rod extension and strain |
+| `structural.timoshenko-beam.isotropic.v1` | Coupled transverse displacement and rotation weak form | E4 | Analytical cantilever plus independent MFEM/reference cross-check |
 
-Each equation records a MIT OpenCourseWare source in the registry. The tests
-check dimensions and the stated analytical example. They do not provide an
-independent numerical backend, experimental correlation, or hardware
-validation, so E4-E6 are unavailable for these entries.
+The original three equations record MIT OpenCourseWare sources; the
+Timoshenko model records the TU Delft open text. Tests check dimensions and
+the stated analytical examples. Only the narrow cantilever benchmark has an
+independent numerical cross-check. None of these equations has experimental
+correlation or hardware validation; E5-E6 remain unavailable.
 
 The symbolic checks recorded today are explicit review statements checked for
 presence by the registry. There is no symbolic algebra engine, automatic
-derivative system, tensor contraction checker, or independent verification
-agent in this slice. Likewise, frame names are required on vector/tensor
-variables, but automatic frame transformations are not implemented.
+derivative system, tensor contraction checker, or live independent verification
+agent in this slice. Provider-neutral proposal, routing, and independent-review
+contracts have deterministic mock tests; they do not replace a separate
+numerical or experimental gate. Likewise, frame names are required on
+vector/tensor variables, but automatic frame transformations are not
+implemented.
 
 ## Missing values and source types
 
@@ -76,10 +82,14 @@ maturity.
 
 ## Scope boundary
 
-This registry is not yet persisted in `.dld`, connected to the document's
-materials, or used to execute a physics solver. Generic steady and transient
-solver interfaces exist, with request units, revision IDs, tolerances, and
-result provenance contracts. No structural, thermal, fluid, electromagnetic,
-chemical, metallurgical, or multiphysics backend is wired to them. See
-[`numerical-verification.md`](numerical-verification.md) for the analytical
-and FEM checks and [`sim-to-real.md`](sim-to-real.md) for hardware boundaries.
+This registry is not yet persisted in `.dld` or connected to document
+materials. Generic steady and transient solver interfaces exist, with request
+units, revision IDs, tolerances, and result provenance. The optional MFEM
+adapter runs only the registered 1D Timoshenko cantilever benchmark; the
+thermal equation demonstration selects an existing equation and creates a
+SolverRequest without running it. There is no general structural, thermal,
+fluid, electromagnetic, chemical, metallurgical, or multiphysics backend.
+See [`scientific-agent-routing.md`](scientific-agent-routing.md) for the
+proposal boundary, [`numerical-verification.md`](numerical-verification.md)
+for current analytical and FEM evidence, and [`sim-to-real.md`](sim-to-real.md)
+for hardware boundaries.

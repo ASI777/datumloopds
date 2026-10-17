@@ -141,6 +141,8 @@ struct RLEnvironmentSpec {
     SourcedVector3 movingBodyDiagonalInertia;
     SourcedScalar initialPosition;
     SourcedScalar initialVelocity;
+    SourcedScalar jointLowerPosition;
+    SourcedScalar jointUpperPosition;
     SourcedScalar targetPosition;
     SourcedScalar targetTolerance;
     std::uint64_t randomSeed = 0;

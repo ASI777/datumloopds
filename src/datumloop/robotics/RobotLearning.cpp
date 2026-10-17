@@ -314,8 +314,19 @@ void RLEnvironmentSpec::validate(const RobotModel& robot, const DatumEngineering
     requireUnit(initialPosition.dimension, lengthUnit(), "initial position must use metres");
     initialVelocity.validate();
     requireUnit(initialVelocity.dimension, velocityUnit(), "initial velocity must use metres per second");
+    jointLowerPosition.validate();
+    jointUpperPosition.validate();
+    requireUnit(jointLowerPosition.dimension, lengthUnit(), "lower joint position must use metres");
+    requireUnit(jointUpperPosition.dimension, lengthUnit(), "upper joint position must use metres");
+    if (jointLowerPosition.value >= jointUpperPosition.value ||
+        initialPosition.value < jointLowerPosition.value || initialPosition.value > jointUpperPosition.value) {
+        throw std::invalid_argument("joint position limits must be ordered and contain the initial position");
+    }
     targetPosition.validate();
     requireUnit(targetPosition.dimension, lengthUnit(), "target position must use metres");
+    if (targetPosition.value < jointLowerPosition.value || targetPosition.value > jointUpperPosition.value) {
+        throw std::invalid_argument("target position must be within the declared joint limits");
+    }
     targetTolerance.validate();
     requireUnit(targetTolerance.dimension, lengthUnit(), "target tolerance must use metres");
     if (targetTolerance.value <= 0.0) throw std::invalid_argument("target tolerance must be positive");
@@ -536,13 +547,24 @@ std::string exportMuJoCoMjcf(const RobotModel& robot,
         << number(robot.baseFrameInWorld.orientationWorldWxyz[2]) << ' '
         << number(robot.baseFrameInWorld.orientationWorldWxyz[3]) << "\">\n"
         << "      <joint name=\"" << xmlEscape(axis->name) << "\" type=\"slide\" axis=\""
-        << number(direction[0] / norm) << ' ' << number(direction[1] / norm) << ' ' << number(direction[2] / norm) << "\"/>\n"
+        << number(direction[0] / norm) << ' ' << number(direction[1] / norm) << ' ' << number(direction[2] / norm)
+        << "\" limited=\"true\" range=\"" << number(spec.jointLowerPosition.value) << ' '
+        << number(spec.jointUpperPosition.value) << "\"/>\n"
         << "      <inertial pos=\"0 0 0\" mass=\"" << number(spec.movingMass.value)
         << "\" diaginertia=\"" << number(spec.movingBodyDiagonalInertia.value[0]) << ' '
         << number(spec.movingBodyDiagonalInertia.value[1]) << ' '
         << number(spec.movingBodyDiagonalInertia.value[2]) << "\"/>\n"
         << "    </body>\n"
         << "  </worldbody>\n"
+        << "  <sensor>\n";
+    for (const std::string& sensorId : spec.observation.sensorIds) {
+        const SensorDefinition* sensor = robot.sensor(sensorId);
+        if (sensor == nullptr || sensor->type != SensorType::Encoder) continue;
+        const std::string sensorName = xmlEscape(sensor->id);
+        xml << "    <jointpos name=\"" << sensorName << "_position\" joint=\"" << xmlEscape(axis->name) << "\"/>\n"
+            << "    <jointvel name=\"" << sensorName << "_velocity\" joint=\"" << xmlEscape(axis->name) << "\"/>\n";
+    }
+    xml << "  </sensor>\n"
         << "  <actuator>\n"
         << "    <motor name=\"" << xmlEscape(robot.actuator.name) << "\" joint=\"" << xmlEscape(axis->name)
         << "\" gear=\"1\" ctrllimited=\"true\" ctrlrange=\""

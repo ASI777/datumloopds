@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 project(DatumLoopDS VERSION 0.1.0 LANGUAGES CXX)
 
+option(DATUMLOOP_ENABLE_MFEM "Build the optional MFEM finite-element adapter when available" ON)
+set(DATUMLOOP_MUJOCO_PYTHON "" CACHE FILEPATH "Python interpreter with the MuJoCo package installed")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -61,9 +64,39 @@ find_library(DATUMLOOP_NGSPICE_LIBRARY NAMES ngspice libngspice.so.0)
 
 add_library(datumloop_numerics STATIC
     src/datumloop/numerics/CantileverBeamFEM.cpp
+    src/datumloop/numerics/FemSolver.cpp
 )
 target_include_directories(datumloop_numerics PUBLIC src)
 target_compile_options(datumloop_numerics PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(datumloop_digitaltwin STATIC
+    src/datumloop/digitaltwin/ModelEvidence.cpp
+)
+target_include_directories(datumloop_digitaltwin PUBLIC src)
+target_link_libraries(datumloop_digitaltwin PUBLIC datumloop_core)
+target_compile_options(datumloop_digitaltwin PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(datumloop_science STATIC
+    src/datumloop/science/ScientificAgents.cpp
+)
+target_include_directories(datumloop_science PUBLIC src)
+target_link_libraries(datumloop_science PUBLIC datumloop_solver)
+target_compile_options(datumloop_science PRIVATE -Wall -Wextra -Wpedantic)
+
+if(DATUMLOOP_ENABLE_MFEM)
+    find_package(MFEM 4.10 QUIET CONFIG)
+endif()
+if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+    add_library(datumloop_mfem_backend STATIC
+        src/datumloop/numerics/MfemFemSolver.cpp
+    )
+    target_include_directories(datumloop_mfem_backend PUBLIC src)
+    target_link_libraries(datumloop_mfem_backend PUBLIC datumloop_numerics datumloop_solver mfem)
+    target_compile_options(datumloop_mfem_backend PRIVATE -Wall -Wextra -Wpedantic)
+    message(STATUS "DatumLoop MFEM adapter enabled (MFEM ${MFEM_VERSION})")
+elseif(DATUMLOOP_ENABLE_MFEM)
+    message(STATUS "MFEM 4.10 or newer not found; optional DatumLoop MFEM adapter disabled")
+endif()
 
 add_library(datumloop_robotics STATIC
     src/datumloop/robotics/RobotLearning.cpp
@@ -147,9 +180,42 @@ if(BUILD_TESTING)
     target_link_libraries(datumloop-knowledge-tests PRIVATE datumloop_core datumloop_solver datumloop_numerics)
     add_test(NAME datumloop-knowledge-tests COMMAND datumloop-knowledge-tests)
 
+    add_executable(datumloop-model-evidence-tests tests/native/test_model_evidence.cpp)
+    target_link_libraries(datumloop-model-evidence-tests PRIVATE datumloop_digitaltwin)
+    add_test(NAME datumloop-model-evidence-tests COMMAND datumloop-model-evidence-tests)
+
+    add_executable(datumloop-scientific-agent-tests tests/native/test_scientific_agents.cpp)
+    target_link_libraries(datumloop-scientific-agent-tests PRIVATE datumloop_science)
+    add_test(NAME datumloop-scientific-agent-tests COMMAND datumloop-scientific-agent-tests)
+
     add_executable(datumloop-robotics-tests tests/native/test_robotics.cpp)
     target_link_libraries(datumloop-robotics-tests PRIVATE datumloop_robotics Qt6::Core)
     add_test(NAME datumloop-robotics-tests COMMAND datumloop-robotics-tests)
+    set(DATUMLOOP_MJCF_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/mujoco-runtime/one-axis-fixture.xml")
+    set_tests_properties(datumloop-robotics-tests PROPERTIES
+        ENVIRONMENT "DATUMLOOP_MJCF_OUTPUT=${DATUMLOOP_MJCF_OUTPUT}")
+
+    if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+        add_executable(datumloop-mfem-tests tests/native/test_mfem_solver.cpp)
+        target_link_libraries(datumloop-mfem-tests PRIVATE datumloop_mfem_backend)
+        add_test(NAME datumloop-mfem-tests COMMAND datumloop-mfem-tests)
+    endif()
+
+    if(DATUMLOOP_MUJOCO_PYTHON)
+        execute_process(
+            COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" -c "import mujoco"
+            RESULT_VARIABLE DATUMLOOP_MUJOCO_IMPORT_STATUS
+            OUTPUT_QUIET ERROR_QUIET
+        )
+        if(DATUMLOOP_MUJOCO_IMPORT_STATUS EQUAL 0)
+            add_test(NAME datumloop-mujoco-runtime
+                COMMAND "${DATUMLOOP_MUJOCO_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_mujoco_runtime.py"
+                        "${DATUMLOOP_MJCF_OUTPUT}" --report "${CMAKE_CURRENT_BINARY_DIR}/reports/mujoco-runtime.json")
+            set_tests_properties(datumloop-mujoco-runtime PROPERTIES DEPENDS datumloop-robotics-tests)
+        else()
+            message(WARNING "DATUMLOOP_MUJOCO_PYTHON cannot import mujoco; runtime test is disabled")
+        endif()
+    endif()
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)
     target_link_libraries(datumloop-ui-tests PRIVATE datumloop_ui)

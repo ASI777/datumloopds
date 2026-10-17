@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -115,11 +116,22 @@ CantileverBeamResult solveCantileverBeam(const CantileverBeamModel& model, int e
     }
     const std::vector<double> displacement = solveDense(std::move(reduced), std::move(reducedLoad));
     const double tipDisplacement = displacement[displacement.size() - 2];
+    std::vector<double> fullDisplacement(static_cast<std::size_t>(degreeCount), 0.0);
+    std::copy(displacement.begin(), displacement.end(), fullDisplacement.begin() + 2);
+    double strainEnergy = 0.0;
+    for (int row = 0; row < degreeCount; ++row) {
+        for (int column = 0; column < degreeCount; ++column) {
+            strainEnergy += 0.5 * fullDisplacement[static_cast<std::size_t>(row)] *
+                            stiffness[static_cast<std::size_t>(row)][static_cast<std::size_t>(column)] *
+                            fullDisplacement[static_cast<std::size_t>(column)];
+        }
+    }
     const double analytical = model.distributedLoadNPerM * std::pow(model.lengthM, 4) /
                                   (8.0 * bendingRigidity) +
                               model.distributedLoadNPerM * model.lengthM * model.lengthM /
                                   (2.0 * model.shearStiffnessN);
-    return {elementCount, tipDisplacement, analytical, std::abs(tipDisplacement - analytical) / analytical};
+    return {elementCount, tipDisplacement, analytical, std::abs(tipDisplacement - analytical) / analytical,
+            strainEnergy};
 }
 
 double CantileverReducedModel::predictTipDisplacement(double distributedLoadNPerM) const
@@ -127,6 +139,11 @@ double CantileverReducedModel::predictTipDisplacement(double distributedLoadNPer
     if (!std::isfinite(distributedLoadNPerM) || distributedLoadNPerM < 0.0 ||
         !std::isfinite(complianceMPerNPerM) || complianceMPerNPerM <= 0.0) {
         throw std::invalid_argument("reduced beam model requires a non-negative load and positive finite compliance");
+    }
+    if (!std::isfinite(minimumTrainingLoadNPerM) || !std::isfinite(maximumTrainingLoadNPerM) ||
+        minimumTrainingLoadNPerM <= 0.0 || maximumTrainingLoadNPerM < minimumTrainingLoadNPerM ||
+        distributedLoadNPerM < minimumTrainingLoadNPerM || distributedLoadNPerM > maximumTrainingLoadNPerM) {
+        throw std::out_of_range("reduced beam model prediction is outside its validated training-load domain");
     }
     return complianceMPerNPerM * distributedLoadNPerM;
 }
@@ -144,6 +161,8 @@ CantileverReducedModel fitCantileverReducedModel(const CantileverBeamModel& mode
     }
     double numerator = 0.0;
     double denominator = 0.0;
+    double minimumTrainingLoad = std::numeric_limits<double>::infinity();
+    double maximumTrainingLoad = 0.0;
     for (const double sampleLoad : trainingLoadsNPerM) {
         if (!std::isfinite(sampleLoad) || sampleLoad <= 0.0) {
             throw std::invalid_argument("reduced beam training loads must be finite and positive");
@@ -153,14 +172,30 @@ CantileverReducedModel fitCantileverReducedModel(const CantileverBeamModel& mode
         const double response = solveCantileverBeam(sample, trainingElementCount).tipDisplacementM;
         numerator += sampleLoad * response;
         denominator += sampleLoad * sampleLoad;
+        minimumTrainingLoad = std::min(minimumTrainingLoad, sampleLoad);
+        maximumTrainingLoad = std::max(maximumTrainingLoad, sampleLoad);
     }
     CantileverReducedModel result;
     result.complianceMPerNPerM = numerator / denominator;
     result.trainingElementCount = trainingElementCount;
     result.validationElementCount = validationElementCount;
+    result.highFidelitySolverId = "datumloop.reference-timoshenko-fem";
+    result.highFidelitySolverVersion = "1.0";
+    result.sourceModelRevision = "cantilever-model-v1";
+    result.sourceLengthM = model.lengthM;
+    result.sourceYoungModulusPa = model.youngModulusPa;
+    result.sourceSecondMomentOfAreaM4 = model.secondMomentOfAreaM4;
+    result.sourceShearStiffnessN = model.shearStiffnessN;
+    result.minimumTrainingLoadNPerM = minimumTrainingLoad;
+    result.maximumTrainingLoadNPerM = maximumTrainingLoad;
+    result.trainingLoadsNPerM = trainingLoadsNPerM;
+    double squaredErrorSum = 0.0;
     for (const double validationLoad : validationLoadsNPerM) {
         if (!std::isfinite(validationLoad) || validationLoad <= 0.0) {
             throw std::invalid_argument("reduced beam validation loads must be finite and positive");
+        }
+        if (validationLoad < minimumTrainingLoad || validationLoad > maximumTrainingLoad) {
+            throw std::invalid_argument("reduced beam held-out loads must lie within the training-load domain");
         }
         CantileverBeamModel reference = model;
         reference.distributedLoadNPerM = validationLoad;
@@ -169,7 +204,10 @@ CantileverReducedModel fitCantileverReducedModel(const CantileverBeamModel& mode
         const double relativeError = std::abs(prediction - highFidelity) / std::abs(highFidelity);
         result.validationRelativeErrors.push_back(relativeError);
         result.maximumRelativeValidationError = std::max(result.maximumRelativeValidationError, relativeError);
+        squaredErrorSum += relativeError * relativeError;
+        result.heldOutSamples.push_back({validationLoad, prediction, highFidelity, relativeError});
     }
+    result.rmsRelativeValidationError = std::sqrt(squaredErrorSum / static_cast<double>(validationLoadsNPerM.size()));
     return result;
 }
 

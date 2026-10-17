@@ -3,6 +3,9 @@
 #include <QXmlStreamReader>
 
 #include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -111,10 +114,12 @@ datumloop::RLEnvironmentSpec makeEnvironment(const datumloop::RobotModel& robot)
     spec.timeStep = scalar(0.01, datumloop::UnitDimension::second(), "fixture.step", "Synthetic fixed timestep for the educational environment");
     spec.episodeStepLimit = 100;
     spec.movingMass = scalar(1.0, datumloop::UnitDimension::kilogram(), "fixture.mass", "Synthetic 1 kg point-mass benchmark; not a measured machine property");
-    spec.movingBodyDiagonalInertia = {{0.001, 0.002, 0.003}, {{{1, 2, 0, 0, 0, 0, 0}}, "kg*m^2"},
+    spec.movingBodyDiagonalInertia = {{0.001, 0.0015, 0.002}, {{{1, 2, 0, 0, 0, 0, 0}}, "kg*m^2"},
                                       fixture("fixture.inertia", "Synthetic principal inertias for MJCF; not inferred from CAD")};
     spec.initialPosition = scalar(0.0, length(), "fixture.x0", "Synthetic initial condition");
     spec.initialVelocity = scalar(0.0, {{{0, 1, -1, 0, 0, 0, 0}}, "m/s"}, "fixture.v0", "Synthetic initial condition");
+    spec.jointLowerPosition = scalar(-0.2, length(), "fixture.joint.lower", "Synthetic linear travel limit for the MJCF runtime check");
+    spec.jointUpperPosition = scalar(0.2, length(), "fixture.joint.upper", "Synthetic linear travel limit for the MJCF runtime check");
     spec.targetPosition = scalar(0.1, length(), "fixture.goal", "Synthetic RL task target");
     spec.targetTolerance = scalar(0.001, length(), "fixture.tolerance", "Synthetic RL termination tolerance");
     spec.randomSeed = 42;
@@ -214,9 +219,22 @@ int main()
                     mjcf.find("quat=\"0.70710678118654757 0 0 0.70710678118654757\"") != std::string::npos,
                 "MuJoCo export did not transform the DatumLoop base frame and joint origin");
         require(mjcf.find("type=\"slide\"") != std::string::npos && mjcf.find("<motor") != std::string::npos &&
-                    mjcf.find("ctrlrange=\"-5 5\"") != std::string::npos,
-                "MuJoCo export did not emit the linear actuator and action bounds");
+                    mjcf.find("ctrlrange=\"-5 5\"") != std::string::npos &&
+                    mjcf.find("limited=\"true\" range=\"-0.2") != std::string::npos,
+                "MuJoCo export did not emit the linear actuator, action bounds, and sourced joint limits");
+        require(mjcf.find("<jointpos") != std::string::npos && mjcf.find("<jointvel") != std::string::npos &&
+                    mjcf.find("sensor.camera.placeholder") == std::string::npos,
+                "MuJoCo export must expose encoder state and omit camera-placeholder data");
         require(!mjcfReader.hasError(), "MuJoCo export did not produce well-formed XML");
+
+        if (const char* outputPath = std::getenv("DATUMLOOP_MJCF_OUTPUT")) {
+            const std::filesystem::path path(outputPath);
+            std::filesystem::create_directories(path.parent_path());
+            std::ofstream output(path, std::ios::binary);
+            if (!output) throw std::runtime_error("could not write exported MJCF to the configured runtime-test path");
+            output << mjcf;
+            if (!output) throw std::runtime_error("could not finish writing the exported MJCF runtime-test fixture");
+        }
 
         std::cout << "DatumLoop robot model, evidence-gated sensors/randomization, RL I/O, MuJoCo export, and disabled hardware boundary passed.\n";
     } catch (const std::exception& error) {

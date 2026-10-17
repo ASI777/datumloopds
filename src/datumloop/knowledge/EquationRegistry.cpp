@@ -1,6 +1,7 @@
 #include "datumloop/knowledge/EquationRegistry.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -33,9 +34,11 @@ EquationVariable variable(std::string symbol,
                           std::string name,
                           UnitDimension dimension,
                           EquationQuantityType type = EquationQuantityType::Scalar,
-                          std::string frame = {})
+                          std::string frame = {},
+                          std::string coordinateSystem = {})
 {
-    return {std::move(symbol), std::move(name), std::move(dimension), type, std::move(frame)};
+    return {std::move(symbol), std::move(name), std::move(dimension), type,
+            std::move(frame), std::move(coordinateSystem)};
 }
 
 EquationTerm term(std::string expression, UnitDimension dimension)
@@ -90,12 +93,79 @@ bool UnitDimension::sameDimension(const UnitDimension& other) const noexcept
     return exponents == other.exponents;
 }
 
+UnitDimension UnitDimension::addCompatible(const UnitDimension& other) const
+{
+    validate();
+    other.validate();
+    if (!sameDimension(other)) {
+        throw std::invalid_argument("dimensionally incompatible quantities cannot be added");
+    }
+    return *this;
+}
+
+UnitDimension UnitDimension::multiply(const UnitDimension& other) const
+{
+    validate();
+    other.validate();
+    std::array<int, 7> result{};
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        const auto exponent = static_cast<long long>(exponents[index]) + other.exponents[index];
+        if (exponent < std::numeric_limits<int>::min() || exponent > std::numeric_limits<int>::max()) {
+            throw std::overflow_error("unit dimension exponent overflow during multiplication");
+        }
+        result[index] = static_cast<int>(exponent);
+    }
+    std::string symbol;
+    if (sameDimension(UnitDimension::dimensionless())) symbol = other.unitSymbol;
+    else if (other.sameDimension(UnitDimension::dimensionless())) symbol = unitSymbol;
+    else symbol = unitSymbol + "*" + other.unitSymbol;
+    return makeDimension(result, std::move(symbol));
+}
+
+UnitDimension UnitDimension::divide(const UnitDimension& other) const
+{
+    validate();
+    other.validate();
+    std::array<int, 7> result{};
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        const auto exponent = static_cast<long long>(exponents[index]) - other.exponents[index];
+        if (exponent < std::numeric_limits<int>::min() || exponent > std::numeric_limits<int>::max()) {
+            throw std::overflow_error("unit dimension exponent overflow during division");
+        }
+        result[index] = static_cast<int>(exponent);
+    }
+    const std::string symbol = other.sameDimension(UnitDimension::dimensionless())
+        ? unitSymbol : unitSymbol + "/" + other.unitSymbol;
+    return makeDimension(result, symbol);
+}
+
+UnitDimension UnitDimension::pow(int exponent) const
+{
+    validate();
+    std::array<int, 7> result{};
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        const auto power = static_cast<long long>(exponents[index]) * exponent;
+        if (power < std::numeric_limits<int>::min() || power > std::numeric_limits<int>::max()) {
+            throw std::overflow_error("unit dimension exponent overflow during power");
+        }
+        result[index] = static_cast<int>(power);
+    }
+    if (exponent == 0) return makeDimension(result, "1");
+    if (exponent == 1) return *this;
+    return makeDimension(result, unitSymbol + "^" + std::to_string(exponent));
+}
+
 UnitDimension UnitDimension::dimensionless() { return makeDimension({}, "1"); }
 UnitDimension UnitDimension::kilogram() { return makeDimension({1, 0, 0, 0, 0, 0, 0}, "kg"); }
 UnitDimension UnitDimension::meter() { return makeDimension({0, 1, 0, 0, 0, 0, 0}, "m"); }
 UnitDimension UnitDimension::second() { return makeDimension({0, 0, 1, 0, 0, 0, 0}, "s"); }
+UnitDimension UnitDimension::ampere() { return makeDimension({0, 0, 0, 1, 0, 0, 0}, "A"); }
+UnitDimension UnitDimension::mole() { return makeDimension({0, 0, 0, 0, 0, 1, 0}, "mol"); }
+UnitDimension UnitDimension::candela() { return makeDimension({0, 0, 0, 0, 0, 0, 1}, "cd"); }
 UnitDimension UnitDimension::newton() { return makeDimension({1, 1, -2, 0, 0, 0, 0}, "N"); }
 UnitDimension UnitDimension::pascal() { return makeDimension({1, -1, -2, 0, 0, 0, 0}, "Pa"); }
+UnitDimension UnitDimension::joule() { return makeDimension({1, 2, -2, 0, 0, 0, 0}, "J"); }
+UnitDimension UnitDimension::watt() { return makeDimension({1, 2, -3, 0, 0, 0, 0}, "W"); }
 UnitDimension UnitDimension::kelvin() { return makeDimension({0, 0, 0, 0, 1, 0, 0}, "K"); }
 UnitDimension UnitDimension::wattPerCubicMeter()
 {
@@ -107,8 +177,13 @@ void EquationVariable::validate() const
     requireText(symbol, "equation variable symbol");
     requireText(name, "equation variable name");
     dimension.validate();
-    if (quantityType != EquationQuantityType::Scalar) {
+    if (quantityType == EquationQuantityType::Vector || quantityType == EquationQuantityType::Tensor2) {
         requireText(referenceFrame, "vector/tensor reference frame");
+        requireText(coordinateSystem, "vector/tensor coordinate system");
+    } else if (quantityType != EquationQuantityType::Scalar) {
+        throw std::invalid_argument("unknown equation quantity type");
+    } else if (!referenceFrame.empty() || !coordinateSystem.empty()) {
+        throw std::invalid_argument("scalar equation variables cannot declare vector frame metadata");
     }
 }
 
@@ -135,6 +210,7 @@ void EquationDefinition::validate() const
     requireText(name, "equation name");
     requireText(domain, "equation domain");
     requireText(symbolicForm, "symbolic equation form");
+    requireText(strongForm, "equation strong form");
     requireText(validityRange, "equation validity range");
     if (variables.empty() || leftTerms.empty() || rightTerms.empty() || sources.empty()) {
         throw std::invalid_argument("equations require variables, dimensional terms, and sources");
@@ -226,10 +302,11 @@ EquationRegistry makeInitialEquationRegistry()
     newton.domain = "mechanics";
     newton.symbolicForm = "sum(F) = m a";
     newton.variables = {
-        variable("F", "net force", force, EquationQuantityType::Vector, "inertial-frame"),
+        variable("F", "net force", force, EquationQuantityType::Vector, "inertial-frame", "Cartesian"),
         variable("m", "mass", UnitDimension::kilogram()),
-        variable("a", "acceleration", acceleration, EquationQuantityType::Vector, "inertial-frame"),
+        variable("a", "acceleration", acceleration, EquationQuantityType::Vector, "inertial-frame", "Cartesian"),
     };
+    newton.strongForm = "sum(F) = m a";
     newton.leftTerms = {term("sum(F)", force)};
     newton.rightTerms = {term("m a", force)};
     newton.assumptions = {"Classical mechanics", "Constant mass", "Inertial reference frame"};
@@ -253,9 +330,11 @@ EquationRegistry makeInitialEquationRegistry()
         variable("cp", "specific heat capacity", heatCapacity),
         variable("dT/dt", "temperature rate", temperatureRate),
         variable("k", "isotropic thermal conductivity", conductivity),
-        variable("grad(T)", "temperature gradient", temperatureGradient, EquationQuantityType::Vector, "spatial-coordinate"),
+        variable("grad(T)", "temperature gradient", temperatureGradient, EquationQuantityType::Vector,
+                 "spatial-coordinate", "Cartesian"),
         variable("Q", "volumetric heat source", heatGeneration),
     };
+    heat.strongForm = "rho cp dT/dt = div(k grad(T)) + Q";
     heat.leftTerms = {term("rho cp dT/dt", heatGeneration)};
     heat.rightTerms = {term("div(k grad(T))", heatGeneration), term("Q", heatGeneration)};
     heat.assumptions = {"Continuum medium", "Local thermal equilibrium", "Scalar isotropic conductivity", "No bulk advection"};
@@ -279,6 +358,9 @@ EquationRegistry makeInitialEquationRegistry()
         variable("E", "Young's modulus", modulus),
         variable("epsilon", "uniaxial engineering strain", UnitDimension::dimensionless()),
     };
+    elasticity.strongForm = "d/dx(E A du/dx) + f = 0";
+    elasticity.weakForm = "integral_0^L(E A du/dx dv/dx) dx = integral_0^L(f v) dx + P v(L)";
+    elasticity.constitutiveRelationships = {"sigma = E epsilon", "epsilon = du/dx"};
     elasticity.leftTerms = {term("sigma", modulus)};
     elasticity.rightTerms = {term("E epsilon", modulus)};
     elasticity.assumptions = {"Small strain", "Uniaxial stress state", "Linear elastic response", "Material remains within its elastic range"};
@@ -292,10 +374,45 @@ EquationRegistry makeInitialEquationRegistry()
     };
     elasticity.maturity = ModelMaturity::E3;
 
+    EquationDefinition timoshenko;
+    timoshenko.id = "structural.timoshenko-beam.isotropic.v1";
+    timoshenko.name = "Static linear Timoshenko beam";
+    timoshenko.domain = "structural";
+    timoshenko.symbolicForm = "a((w, theta), (v, psi)) = integral(q v) dx";
+    timoshenko.strongForm = "-d/dx(EI dtheta/dx) - kGA(dw/dx-theta) = 0; -d/dx(kGA(dw/dx-theta)) = q";
+    timoshenko.weakForm = "integral(EI theta' psi' + kGA(w'-theta)(v'-psi)) dx = integral(q v) dx";
+    const UnitDimension energy = UnitDimension::joule();
+    const UnitDimension distributedLineLoad = UnitDimension::newton().divide(UnitDimension::meter());
+    timoshenko.variables = {
+        variable("w", "transverse displacement", UnitDimension::meter()),
+        variable("theta", "cross-section rotation", UnitDimension::dimensionless()),
+        variable("v", "virtual transverse displacement", UnitDimension::meter()),
+        variable("psi", "virtual cross-section rotation", UnitDimension::dimensionless()),
+        variable("EI", "bending rigidity", UnitDimension::newton().multiply(UnitDimension::meter().pow(2))),
+        variable("kGA", "effective shear rigidity", UnitDimension::newton()),
+        variable("q", "transverse distributed line load", distributedLineLoad),
+    };
+    timoshenko.leftTerms = {term("integral(EI theta' psi' + kGA(w'-theta)(v'-psi)) dx", energy)};
+    timoshenko.rightTerms = {term("integral(q v) dx", energy)};
+    timoshenko.assumptions = {"Prismatic beam", "Linear elastic material", "Small displacement and rotation", "Static transverse loading"};
+    timoshenko.validityRange = "Linear static Timoshenko beam response with supplied bending and effective shear rigidities; local 3D stress and geometric nonlinearity are excluded.";
+    timoshenko.boundaryConditions = {"Cantilever benchmark: zero displacement and rotation at the root; natural shear and moment conditions at the free tip."};
+    timoshenko.sources = {{EquationSourceKind::Textbook, "Timoshenko Beam", "TU Delft Open Textbook",
+                           "Computational Modelling", "Section 4.2",
+                           "https://teachbooks.tudelft.nl/computational-modelling/structural_linear/timoshenko.html"}};
+    timoshenko.verifications = {
+        verification("timoshenko-dimensions-v1", "dimensional-analysis", "Both sides of the weak form have units of energy (N m).", false, "SI dimension calculation"),
+        verification("timoshenko-symbols-v1", "symbolic-check", "The independent displacement and rotation fields are coupled by bending and effective shear rigidity.", false, timoshenko.sources.front().url),
+        verification("timoshenko-cantilever-v1", "analytical-benchmark", "Uniform-load cantilever deflection includes bending and shear contributions.", true, "tests/native/test_knowledge.cpp"),
+        verification("timoshenko-mfem-reference-v1", "independent-numerical", "MFEM H1 and the separate DatumLoop reference agree with each other and the analytical response under mesh refinement.", false, "reports/validation/mfem-cantilever-comparison.json"),
+    };
+    timoshenko.maturity = ModelMaturity::E4;
+
     EquationRegistry registry;
     registry.add(std::move(newton));
     registry.add(std::move(heat));
     registry.add(std::move(elasticity));
+    registry.add(std::move(timoshenko));
     return registry;
 }
 

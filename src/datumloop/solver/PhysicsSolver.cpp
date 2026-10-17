@@ -69,6 +69,42 @@ void PhysicsSolverResult::validateFor(const SolverRequest& request) const
     if (status != SolverResultStatus::Succeeded && !fields.empty()) {
         throw std::invalid_argument("unsuccessful solver result cannot publish field values");
     }
+    if (status == SolverResultStatus::Succeeded) {
+        if (!verificationProvenance) {
+            throw std::invalid_argument("successful solver results require structured verification provenance");
+        }
+        const SolverResultProvenance& evidence = *verificationProvenance;
+        requireText(evidence.equationDefinitionId, "result equation definition ID");
+        requireText(evidence.equationDefinitionRevision, "result equation revision");
+        requireText(evidence.backendId, "result backend ID");
+        requireText(evidence.backendVersion, "result backend version");
+        requireText(evidence.benchmarkId, "result benchmark ID");
+        requireText(evidence.benchmarkStatus, "result benchmark status");
+        requireText(evidence.inputRevision, "result input revision");
+        if (evidence.equationDefinitionId != request.equationDefinitionId ||
+            !meetsMaturity(evidence.equationMaturity, request.minimumMaturity)) {
+            throw std::invalid_argument("result equation provenance does not satisfy the requested maturity gate");
+        }
+        if (evidence.backendId != solverId || evidence.backendVersion != solverVersion) {
+            throw std::invalid_argument("result backend provenance does not match the solver identity");
+        }
+        if (evidence.inputRevision != request.designRevision) {
+            throw std::invalid_argument("result provenance does not identify the requested input revision");
+        }
+        if (!std::isfinite(evidence.absoluteTolerance) || evidence.absoluteTolerance <= 0.0 ||
+            !std::isfinite(evidence.relativeTolerance) || evidence.relativeTolerance <= 0.0 ||
+            evidence.absoluteTolerance != request.absoluteTolerance ||
+            evidence.relativeTolerance != request.relativeTolerance || !evidence.converged) {
+            throw std::invalid_argument("successful solver result provenance must record the requested tolerances and convergence");
+        }
+        if (!evidence.materialModelId.empty() && evidence.materialModelVersion.empty()) {
+            throw std::invalid_argument("material result provenance requires a material model version");
+        }
+        if (!evidence.elementFamily.empty() &&
+            (evidence.meshDescription.empty() || evidence.polynomialOrder <= 0)) {
+            throw std::invalid_argument("finite-element result provenance requires mesh and polynomial-order metadata");
+        }
+    }
     std::unordered_set<std::string> names;
     for (const SolverResultField& field : fields) {
         requireText(field.name, "solver result field name");

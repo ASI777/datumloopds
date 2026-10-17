@@ -44,6 +44,25 @@ struct SolverResultField {
     std::string datasetReference;
 };
 
+struct SolverResultProvenance {
+    std::string equationDefinitionId;
+    std::string equationDefinitionRevision;
+    ModelMaturity equationMaturity = ModelMaturity::E0;
+    std::string materialModelId;
+    std::string materialModelVersion;
+    std::string backendId;
+    std::string backendVersion;
+    std::string meshDescription;
+    std::string elementFamily;
+    int polynomialOrder = 0;
+    double absoluteTolerance = 0.0;
+    double relativeTolerance = 0.0;
+    bool converged = false;
+    std::string benchmarkId;
+    std::string benchmarkStatus;
+    std::string inputRevision;
+};
+
 struct PhysicsSolverResult {
     std::string requestId;
     std::string solverId;
@@ -51,6 +70,7 @@ struct PhysicsSolverResult {
     SolverResultStatus status = SolverResultStatus::Failed;
     std::vector<SolverResultField> fields;
     std::vector<std::string> provenance;
+    std::optional<SolverResultProvenance> verificationProvenance;
     std::string detail;
 
     void validateFor(const SolverRequest& request) const;

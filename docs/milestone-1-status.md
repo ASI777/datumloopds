@@ -1,6 +1,6 @@
 # DatumLoop DS Milestone Status
 
-**Milestone 1 remains in progress because a clean FreeCAD fork configure and build has not yet been repeated from an empty build tree.** The configured FreeCAD 1.1.3 build completed, and its command-line and GUI smoke checks passed. The product's long-term direction is now the standalone C++20 / Qt 6 / QML application; FreeCAD remains a migration and compatibility path until native workflows replace it. See [Native Application Migration](native-migration-dependencies.md).
+**The native application milestone proceeds independently of the FreeCAD compatibility gate.** DatumLoop's long-term direction is the standalone C++20 / Qt 6 / QML application; FreeCAD remains a migration and compatibility path until native workflows replace it. The clean FreeCAD 1.1.3 fork build is still incomplete: its earlier build was stopped at 65% when effort shifted to native solver work. That interruption was not a compiler failure, and FreeCAD compatibility does not block native progress. See [Native Application Migration](native-migration-dependencies.md).
 
 ## Milestone 1 delivery
 
@@ -18,21 +18,21 @@
 
 ## Checks run
 
-- `make native-check` — all six native CTest targets pass, including exact primitive/transform/Boolean graph recompute, schema-v1 through v4 migrations, materials/circuit/PCB import and persistence, ngspice DC, equation and unit gates, analytical examples, cantilever FEM mesh convergence, held-out reduced-model error, the one-axis RL environment, MJCF XML well-formedness, and a disabled hardware command boundary.
+- Native CMake build with MFEM 4.10 and the isolated MuJoCo 3.16.0 Python runtime configured — all ten CTest targets pass. Coverage includes the existing geometry/document/electronics/UI tests, Equation Registry and dimensional checks, model-evidence and agent-routing tests, the MFEM cantilever mesh comparison and held-out ROM validation, and a runtime load/step of the exact MJCF emitted by the C++ robotics exporter. The camera placeholder still returns no frame or pixels, and hardware actuator writes remain rejected.
 - `make native-qml-smoke` — workspace, common host, three editors, and OCCT-derived mesh data initialize. Qt Quick 3D cannot render in the offscreen plugin, as expected.
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
 - `make native-pointer-smoke` — real XTest interaction coverage is implemented. The current host cannot start its XCB window because `xcb-cursor0` is missing, so pointer selection, camera, and Move interactions remain a manual gate for this environment; see [the baseline report](native-baseline.md).
-- `make check` — 20 tests run: 19 pass and the optional smlibpy integration test is skipped because smlibpy is not installed in the default Python environment. The SMLib-enabled suite previously passed all 16 integration tests, including STEP and USD B-Rep round trips.
-- `make freecad-check` — the compatibility smoke passes geometry operations and project save/reopen with the locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
+- `make check` — 20 Python compatibility tests ran: 19 passed and the optional smlibpy integration test was skipped because smlibpy is not installed in the default Python environment.
+- `make freecad-check` — compatibility smoke passed geometry operations and project save/reopen with locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
 - `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, docks, project metadata, and a visible viewport solid pass under Xvfb with software OpenGL.
-- The Release build compiled all targets from the FreeCAD fork's existing configured build tree and installed into a temporary prefix. A fresh configure has not been confirmed: rerunning CMake with the current Python 3.14 interpreter stops in the Pivy compatibility check because that interpreter cannot import Pivy. No system package or user installation was changed.
+- The previous FreeCAD Release build used an existing configured build tree. A clean configure/build was not completed; work stopped at 65% to free resources for the native solver slice. No FreeCAD build failure is inferred from that interruption.
 - `make build` builds the Python wheel. With SMLib 0.3.4 installed, `make geometry-benchmark` previously completed the seven OCCT / SMLib comparisons within the documented measurement tolerances. In the current default Python environment, the OCCT cases pass but the comparison stops because the optional `smlibpy` package is absent; see [the baseline report](native-baseline.md).
 - CMake still warns that some Qt QML plugin link targets are unavailable in the current scope; the application builds, loads its QML, and presents frames. The offscreen platform still cannot verify 3D rendering.
 
 ## Remaining work
 
-- Repeat the FreeCAD 1.1.3 configure and build from an empty build directory with matching Pivy, yaml-cpp, and other development dependencies, so the pinned fork's build is reproducible from a clean checkout.
+- Repeat the FreeCAD 1.1.3 configure and build from an empty build directory with matching Pivy, yaml-cpp, and other development dependencies. This remains a compatibility milestone gate and does not block native engineering work.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.
