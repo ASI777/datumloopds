@@ -142,6 +142,45 @@ double relativeChange(double current, double previous)
     return std::abs(current - previous) / std::max(std::abs(current), 1e-30);
 }
 
+QJsonObject encodeTipResponseErrorMetrics(const datumloop::StructuralResponseErrorMetrics& metrics)
+{
+    return QJsonObject{
+        {QStringLiteral("sample_count"), static_cast<int>(metrics.sampleCount)},
+        {QStringLiteral("mean_absolute_relative_error"), metrics.meanAbsoluteRelativeError},
+        {QStringLiteral("rms_relative_error"), metrics.rmsRelativeError},
+        {QStringLiteral("maximum_relative_error"), metrics.maximumRelativeError},
+        {QStringLiteral("worst_operating_point"), QJsonObject{
+            {QStringLiteral("applied_force_n"), metrics.worstOperatingPoint.appliedForceMagnitudeN},
+            {QStringLiteral("youngs_modulus_pa"), metrics.worstOperatingPoint.youngsModulusPa},
+            {QStringLiteral("reference_tip_deflection_m"), metrics.worstOperatingPoint.referenceTipDeflectionM},
+            {QStringLiteral("predicted_tip_deflection_m"), metrics.worstOperatingPoint.predictedTipDeflectionM},
+            {QStringLiteral("relative_error"),
+             datumloop::relativeTipDeflectionError(metrics.worstOperatingPoint)},
+            {QStringLiteral("reference_run_id"), QString::fromStdString(metrics.worstOperatingPoint.referenceRunId)},
+        }},
+    };
+}
+
+bool preservesRigidObservation(const datumloop::RobotObservation& candidate,
+                               const datumloop::RobotObservation& reference)
+{
+    if (candidate.timeS != reference.timeS || candidate.sensors.size() != reference.sensors.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < reference.sensors.size(); ++index) {
+        const datumloop::RobotSensorObservation& left = candidate.sensors[index];
+        const datumloop::RobotSensorObservation& right = reference.sensors[index];
+        if (left.sensorId != right.sensorId || left.valid != right.valid || left.value != right.value ||
+            left.unit != right.unit || left.captureTimeS != right.captureTimeS ||
+            left.deliveryTimeS != right.deliveryTimeS || left.frameAvailable != right.frameAvailable ||
+            left.imageWidthPixels != right.imageWidthPixels ||
+            left.imageHeightPixels != right.imageHeightPixels || left.detail != right.detail) {
+            return false;
+        }
+    }
+    return true;
+}
+
 const datumloop::FieldDataset& field(const datumloop::StructuralAnalysisRun& run,
                                      datumloop::FieldType type)
 {
@@ -213,7 +252,8 @@ void writeReport(const std::filesystem::path& path,
                  double analyticalTipM,
                  double analyticalSectionStressPa,
                  const datumloop::StructuralElasticityRom& rom,
-                 const QJsonObject& mujocoRomBridge)
+                 const QJsonObject& mujocoRomBridge,
+                 const QJsonObject& fastVsHighFidelity)
 {
     QJsonArray refinement;
     for (std::size_t index = 0; index < runs.size(); ++index) {
@@ -371,6 +411,7 @@ void writeReport(const std::filesystem::path& path,
             {QStringLiteral("scope"), QStringLiteral("Bounded static response model for this CAD solid; not a modal or general-purpose ROM.")},
         }},
         {QStringLiteral("mujoco_rom_bridge"), mujocoRomBridge},
+        {QStringLiteral("fast_vs_high_fidelity"), fastVsHighFidelity},
         {QStringLiteral("convergence"), QJsonObject{
             {QStringLiteral("compared_runs"), QJsonArray{
                 QString::fromStdString(convergence.solverRunIds[convergence.solverRunIds.size() - 2]),
@@ -648,6 +689,93 @@ int main(int argc, char* argv[])
         jointVelocity.deliveryTimeS = rigidObservation.timeS;
         rigidObservation.sensors = {jointPosition, jointVelocity};
 
+        std::vector<datumloop::StructuralResponseComparisonSample> romVsMfemComparisons;
+        std::vector<datumloop::StructuralResponseComparisonSample> mujocoPlusRomVsMfemComparisons;
+        std::vector<datumloop::StructuralResponseComparisonSample> mujocoPlusRomVsRomComparisons;
+        QJsonArray heldOutOperatingPoints;
+        for (const datumloop::StructuralRomSampleRecord& sample : rom.validationSamples) {
+            datumloop::RobotObservation combinedObservation = rigidObservation;
+            datumloop::Vector3 appliedForceN{
+                rom.appliedForceDirectionUnit[0] * sample.appliedForceMagnitudeN,
+                rom.appliedForceDirectionUnit[1] * sample.appliedForceMagnitudeN,
+                rom.appliedForceDirectionUnit[2] * sample.appliedForceMagnitudeN,
+            };
+            datumloop::addStructuralResponseObservation(combinedObservation, rom, appliedForceN,
+                                                        sample.youngsModulusPa);
+            require(preservesRigidObservation(combinedObservation, rigidObservation) &&
+                        combinedObservation.structuralResponse.has_value() &&
+                        combinedObservation.structuralResponse->romId == rom.id,
+                    "held-out MuJoCo+ROM observation changed rigid sensors or omitted its structural response");
+
+            const double romDeflectionM = rom.predictTipDisplacement(
+                sample.appliedForceMagnitudeN, sample.youngsModulusPa);
+            const double integratedDeflectionM =
+                combinedObservation.structuralResponse->tipDeflectionMagnitudeM;
+            require(std::abs(romDeflectionM - sample.romTipDisplacementM) <= 1e-15 &&
+                        std::abs(integratedDeflectionM - romDeflectionM) <= 1e-15,
+                    "MuJoCo+ROM held-out response diverged from the bounded ROM prediction");
+
+            romVsMfemComparisons.push_back({sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                                           sample.highFidelityTipDisplacementM, romDeflectionM,
+                                           sample.solverRunId});
+            mujocoPlusRomVsMfemComparisons.push_back({sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                                                     sample.highFidelityTipDisplacementM, integratedDeflectionM,
+                                                     sample.solverRunId});
+            mujocoPlusRomVsRomComparisons.push_back({sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                                                    romDeflectionM, integratedDeflectionM,
+                                                    sample.solverRunId});
+            const datumloop::StructuralResponseComparisonSample romPrediction{
+                sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                sample.highFidelityTipDisplacementM, romDeflectionM,
+                sample.solverRunId};
+            const datumloop::StructuralResponseComparisonSample integratedPrediction{
+                sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                sample.highFidelityTipDisplacementM, integratedDeflectionM,
+                sample.solverRunId};
+            heldOutOperatingPoints.append(QJsonObject{
+                {QStringLiteral("applied_force_n"), sample.appliedForceMagnitudeN},
+                {QStringLiteral("youngs_modulus_pa"), sample.youngsModulusPa},
+                {QStringLiteral("mfem_solver_run_id"), QString::fromStdString(sample.solverRunId)},
+                {QStringLiteral("material_revision"), QString::fromStdString(sample.materialRevision)},
+                {QStringLiteral("mfem_tip_displacement_m"), sample.highFidelityTipDisplacementM},
+                {QStringLiteral("rom_tip_displacement_m"), romDeflectionM},
+                {QStringLiteral("mujoco_plus_rom_tip_deflection_m"), integratedDeflectionM},
+                {QStringLiteral("rom_relative_error_vs_mfem"),
+                 datumloop::relativeTipDeflectionError(romPrediction)},
+                {QStringLiteral("mujoco_plus_rom_relative_error_vs_mfem"),
+                 datumloop::relativeTipDeflectionError(integratedPrediction)},
+                {QStringLiteral("mujoco_plus_rom_relative_error_vs_rom"),
+                 datumloop::relativeTipDeflectionError({sample.appliedForceMagnitudeN, sample.youngsModulusPa,
+                                                        romDeflectionM, integratedDeflectionM, sample.solverRunId})},
+            });
+        }
+        const datumloop::StructuralResponseErrorMetrics romVsMfemMetrics =
+            datumloop::compareStructuralTipDeflections(romVsMfemComparisons);
+        const datumloop::StructuralResponseErrorMetrics mujocoPlusRomVsMfemMetrics =
+            datumloop::compareStructuralTipDeflections(mujocoPlusRomVsMfemComparisons);
+        const datumloop::StructuralResponseErrorMetrics mujocoPlusRomVsRomMetrics =
+            datumloop::compareStructuralTipDeflections(mujocoPlusRomVsRomComparisons);
+        require(romVsMfemMetrics.sampleCount == rom.validationSamples.size() &&
+                    mujocoPlusRomVsMfemMetrics.maximumRelativeError <= rom.validationToleranceRelative &&
+                    mujocoPlusRomVsRomMetrics.maximumRelativeError <= 1e-12,
+                "held-out MFEM, ROM, and MuJoCo+ROM comparison exceeded its declared response tolerance");
+        const QJsonObject fastVsHighFidelity{
+            {QStringLiteral("comparison_quantity"), QStringLiteral("static tip deflection magnitude")},
+            {QStringLiteral("reference_backend"), QString::fromStdString(rom.solverId)},
+            {QStringLiteral("reference_solver_version"), QString::fromStdString(rom.solverVersion)},
+            {QStringLiteral("fast_backend"), QStringLiteral("MuJoCo rigid runtime plus DatumLoop bounded structural ROM")},
+            {QStringLiteral("relative_error_definition"),
+             QStringLiteral("absolute(predicted - MFEM) / abs(MFEM); mean is arithmetic and RMS is root-mean-square")},
+            {QStringLiteral("validation_tolerance_relative"), rom.validationToleranceRelative},
+            {QStringLiteral("rigid_observation_preserved"), true},
+            {QStringLiteral("held_out_operating_points"), heldOutOperatingPoints},
+            {QStringLiteral("rom_vs_mfem"), encodeTipResponseErrorMetrics(romVsMfemMetrics)},
+            {QStringLiteral("mujoco_plus_rom_vs_mfem"),
+             encodeTipResponseErrorMetrics(mujocoPlusRomVsMfemMetrics)},
+            {QStringLiteral("mujoco_plus_rom_vs_rom"),
+             encodeTipResponseErrorMetrics(mujocoPlusRomVsRomMetrics)},
+        };
+
         datumloop::RobotObservation lightLoadObservation = rigidObservation;
         datumloop::addStructuralResponseObservation(lightLoadObservation, rom, {0.0, -5.0, 0.0}, youngsModulusPa);
         datumloop::RobotObservation heavyLoadObservation = rigidObservation;
@@ -760,7 +888,8 @@ int main(int argc, char* argv[])
 
         if (argc == 3 && std::string(argv[1]) == "--report") {
             writeReport(argv[2], study, runs, *sourcedMaterial, youngsModulusPa,
-                        analyticalTipM, analyticalSectionStressPa, rom, mujocoRomBridge);
+                        analyticalTipM, analyticalSectionStressPa, rom, mujocoRomBridge,
+                        fastVsHighFidelity);
         } else if (argc != 1) {
             throw std::invalid_argument("usage: datumloop-mfem-elasticity-tests [--report path]");
         }

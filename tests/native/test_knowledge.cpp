@@ -1,10 +1,12 @@
 #include "datumloop/knowledge/EquationRegistry.hpp"
 #include "datumloop/numerics/CantileverBeamFEM.hpp"
+#include "datumloop/numerics/StructuralReducedModel.hpp"
 #include "datumloop/solver/PhysicsSolver.hpp"
 
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -215,7 +217,33 @@ int main()
                   << ",validation_elements=" << rom.validationElementCount
                   << ",max_heldout_relative_error=" << rom.maximumRelativeValidationError << '\n';
 
-        std::cout << "Equation registry, units, analytical checks, generic solver contracts, cantilever FEM mesh convergence, and ROM validation passed.\n";
+        const std::vector<datumloop::StructuralResponseComparisonSample> responseComparisons{
+            {7.5, 69.0e9, 1.0e-3, 1.01e-3, "reference-run-a"},
+            {12.5, 70.0e9, 2.0e-3, 2.2e-3, "reference-run-b"},
+        };
+        const datumloop::StructuralResponseErrorMetrics responseMetrics =
+            datumloop::compareStructuralTipDeflections(responseComparisons);
+        require(responseMetrics.sampleCount == 2 &&
+                    close(responseMetrics.meanAbsoluteRelativeError, 0.055, 1e-12) &&
+                    close(responseMetrics.rmsRelativeError, std::sqrt(0.00505), 1e-12) &&
+                    close(responseMetrics.maximumRelativeError, 0.1, 1e-12) &&
+                    responseMetrics.worstOperatingPoint.referenceRunId == "reference-run-b" &&
+                    datumloop::relativeTipDeflectionError(responseComparisons[1]) ==
+                        responseMetrics.maximumRelativeError,
+                "structural response comparison did not report mean, RMS, maximum, and worst-case provenance");
+        requireThrows([&]() {
+            (void)datumloop::compareStructuralTipDeflections({});
+        }, "structural response comparison accepted an empty validation set");
+        auto invalidComparison = responseComparisons.front();
+        invalidComparison.referenceTipDeflectionM = 0.0;
+        requireThrows([&]() { (void)datumloop::relativeTipDeflectionError(invalidComparison); },
+                      "structural response comparison accepted a zero reference response");
+        invalidComparison.referenceTipDeflectionM = std::numeric_limits<double>::denorm_min();
+        invalidComparison.predictedTipDeflectionM = std::numeric_limits<double>::max();
+        requireThrows([&]() { (void)datumloop::relativeTipDeflectionError(invalidComparison); },
+                      "structural response comparison emitted an infinite relative error");
+
+        std::cout << "Equation registry, units, analytical checks, generic solver contracts, cantilever FEM mesh convergence, ROM validation, and structural response error metrics passed.\n";
     } catch (const std::exception& error) {
         std::cerr << "Knowledge and verification test failed: " << error.what() << '\n';
         return 1;

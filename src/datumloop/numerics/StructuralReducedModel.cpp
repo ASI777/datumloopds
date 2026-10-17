@@ -99,6 +99,53 @@ StructuralRomSampleRecord makeRecord(const StructuralRomHighFidelitySample& samp
 
 }  // namespace
 
+double relativeTipDeflectionError(const StructuralResponseComparisonSample& comparison)
+{
+    if (!finite(comparison.appliedForceMagnitudeN) || comparison.appliedForceMagnitudeN <= 0.0 ||
+        !finite(comparison.youngsModulusPa) || comparison.youngsModulusPa <= 0.0 ||
+        !finite(comparison.referenceTipDeflectionM) || comparison.referenceTipDeflectionM <= 0.0 ||
+        !finite(comparison.predictedTipDeflectionM) || comparison.predictedTipDeflectionM <= 0.0 ||
+        comparison.referenceRunId.empty()) {
+        throw std::invalid_argument("structural response comparison requires finite positive values and reference provenance");
+    }
+    const double error = std::abs(comparison.predictedTipDeflectionM - comparison.referenceTipDeflectionM) /
+                         comparison.referenceTipDeflectionM;
+    if (!finite(error)) {
+        throw std::overflow_error("structural response relative error exceeds the supported numeric range");
+    }
+    return error;
+}
+
+StructuralResponseErrorMetrics compareStructuralTipDeflections(
+    const std::vector<StructuralResponseComparisonSample>& comparisons)
+{
+    if (comparisons.empty()) {
+        throw std::invalid_argument("structural response comparison requires at least one sample");
+    }
+    StructuralResponseErrorMetrics metrics;
+    metrics.sampleCount = comparisons.size();
+    metrics.worstOperatingPoint = comparisons.front();
+    long double absoluteErrorSum = 0.0L;
+    long double squaredErrorSum = 0.0L;
+    for (const StructuralResponseComparisonSample& comparison : comparisons) {
+        const double error = relativeTipDeflectionError(comparison);
+        const long double extendedError = static_cast<long double>(error);
+        absoluteErrorSum += extendedError;
+        squaredErrorSum += extendedError * extendedError;
+        if (error > metrics.maximumRelativeError) {
+            metrics.maximumRelativeError = error;
+            metrics.worstOperatingPoint = comparison;
+        }
+    }
+    const long double sampleCount = static_cast<long double>(metrics.sampleCount);
+    metrics.meanAbsoluteRelativeError = static_cast<double>(absoluteErrorSum / sampleCount);
+    metrics.rmsRelativeError = static_cast<double>(std::sqrt(squaredErrorSum / sampleCount));
+    if (!finite(metrics.meanAbsoluteRelativeError) || !finite(metrics.rmsRelativeError)) {
+        throw std::overflow_error("structural response error metrics exceed the supported numeric range");
+    }
+    return metrics;
+}
+
 bool StructuralRomInputDomain::contains(double appliedForceN, double youngsModulusPa) const noexcept
 {
     return finite(appliedForceN) && finite(youngsModulusPa) &&

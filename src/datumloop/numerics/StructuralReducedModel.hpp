@@ -2,6 +2,7 @@
 
 #include "datumloop/engineering/StructuralAnalysis.hpp"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,30 @@ struct StructuralRomSampleRecord {
     std::string solverRunId;
     std::string materialRevision;
 };
+
+struct StructuralResponseComparisonSample {
+    double appliedForceMagnitudeN = 0.0;
+    double youngsModulusPa = 0.0;
+    double referenceTipDeflectionM = 0.0;
+    double predictedTipDeflectionM = 0.0;
+    std::string referenceRunId;
+};
+
+// The error fields are absolute relative errors normalized by the reference
+// tip-deflection magnitude. Ties for the maximum retain the first sample.
+struct StructuralResponseErrorMetrics {
+    std::size_t sampleCount = 0;
+    double meanAbsoluteRelativeError = 0.0;
+    double rmsRelativeError = 0.0;
+    double maximumRelativeError = 0.0;
+    StructuralResponseComparisonSample worstOperatingPoint;
+};
+
+// Requires positive finite inputs/responses and a nonempty reference run ID.
+[[nodiscard]] double relativeTipDeflectionError(
+    const StructuralResponseComparisonSample& comparison);
+[[nodiscard]] StructuralResponseErrorMetrics compareStructuralTipDeflections(
+    const std::vector<StructuralResponseComparisonSample>& comparisons);
 
 // A bounded response surface fitted from MFEM static linear-elastic runs.
 // Its normalized compliance has units 1/m and follows

@@ -40,8 +40,20 @@ error therefore measures parameter-response fit, not mesh transfer,
 experimental validation, or model discrepancy. The ROM is not yet stored in
 `.dld`. The native robotics observation contract can append this static tip
 deflection to a rigid-body observation while preserving MuJoCo joint position
-and velocity. A check uses the verified MuJoCo runtime state and compares 5 N
-and 15 N loads; the rigid state stays unchanged as the flexible observation
-changes. This is observation-level coupling only: deflection does not feed
-back into MuJoCo forces or dynamics. Dynamic modes, flexible-body feedback,
-and time-varying load profiles remain future work.
+and velocity. The held-out check now starts from the joint position and
+velocity returned by a verified MuJoCo 3.16.0 runtime step, then passes all
+four MFEM-held-out force/modulus pairs through the observation adapter. Both
+ROM versus MFEM and the integrated observation versus MFEM report mean absolute
+relative error `6.69e-10`, RMS relative error `7.89e-10`, and maximum relative
+error `1.09e-9`; the worst point is 7.5 N at 68.6604 GPa. The integrated
+observation's deflection matches the direct ROM output at all four points, and
+the MuJoCo position and velocity remain unchanged.
+
+The pointwise values, MFEM run IDs, material revisions, and worst-case records
+are in
+[`mfem-3d-elasticity.json`](../reports/validation/mfem-3d-elasticity.json).
+This comparison tests static ROM transfer into an observation containing an
+actual MuJoCo runtime state. MuJoCo does not calculate structural deflection,
+and this is not flexible-body feedback, dynamic load transfer, experimental
+validation, or a complete digital twin. Dynamic modes and time-varying load
+profiles remain future work.

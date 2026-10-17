@@ -51,9 +51,13 @@
   [the ROM record](native-structural-rom.md) and the [numerical report](numerical-verification.md).
 - A first observation-level bridge now adds ROM tip deflection to a verified
   MuJoCo rigid-state observation, while leaving MuJoCo dynamics unchanged.
-  Extend this to a runtime environment adapter with dynamic load transfer,
-  then compare held-out fast responses with MFEM. The 3D result is a
-  numerically verified model, not an experimentally validated digital twin.
+  A four-point held-out comparison now reports mean, RMS, and maximum relative
+  error plus its worst operating point for MFEM versus ROM and MuJoCo-plus-ROM
+  observations. The integrated static output matches the direct ROM on this
+  grid; MuJoCo supplies the rigid state and does not calculate flex or receive
+  feedback. Next, extend the observation bridge to a runtime environment
+  adapter with time-varying load transfer. The 3D result is a numerically
+  verified model, not an experimentally validated digital twin.
 - Verify result-overlay rendering, selection, and camera movement on a
   hardware GPU; hardware rendering remains unverified.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
