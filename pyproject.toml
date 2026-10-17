@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools==78.1.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "datumloopds"
+version = "0.1.0"
+description = "An open-source desktop platform for industrial mechanism engineering."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "DatumLoop DS contributors" }]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
