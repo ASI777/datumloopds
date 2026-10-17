@@ -137,7 +137,7 @@ struct PartRequirements {
     [[nodiscard]] const DesignVariable& variable(const std::string& key) const;
     [[nodiscard]] std::vector<std::string> unresolvedCriticalRequirements() const;
     [[nodiscard]] double parameterIn(const std::string& key, const std::string& targetUnit) const;
-    // Returns a reviewed change record. Fixed and standard interfaces cannot move.
+    // Records the change reason. Fixed and standard interfaces cannot move.
     void changeParameter(const std::string& key, double value, const std::string& engineeringReason);
     [[nodiscard]] DesignEvaluation evaluate(const std::string& candidateId,
                                              const std::string& geometryRevision,

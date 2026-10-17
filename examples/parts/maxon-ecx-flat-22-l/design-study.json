@@ -1,0 +1,1392 @@
+{
+  "schemaVersion": 1,
+  "id": "b318233e-cbec-4c7b-bd80-57f536cdcb67",
+  "name": "ECX FLAT 22 L standard-flange mounting bracket requirements",
+  "revision": "z-spindle-carrier-study-1",
+  "sources": [
+    {
+      "id": "maxon.catalog.2025.p259",
+      "type": "DIMENSIONED_DRAWING",
+      "title": "ECX FLAT 22 L catalog, page 259",
+      "manufacturer": "maxon",
+      "partConfiguration": "2025 catalog standard flange; 18 V motor data column; actual configured order code unknown",
+      "revision": "2025 February edition; provisional data, subject to change",
+      "reference": "https://www.maxongroup.com/medias/sys_master/root/9399287709726/Cataloge-Page-EN-259.pdf",
+      "sha256": "9aa3139520c7f4c6cdd5c74c1dafe24df351556142f77a1e26500e9c2b405d17"
+    },
+    {
+      "id": "datumloop.machine-part.request",
+      "type": "ENGINEERING_SPECIFICATION",
+      "title": "DatumLoop machine-part milestone user requirements",
+      "manufacturer": "",
+      "partConfiguration": "10-head precision placement system; first motor bracket",
+      "revision": "2026-10-17 request",
+      "reference": "DatumLoop machine-part milestone request, Parts 1, 2, 5, 9 and 10",
+      "sha256": null
+    },
+    {
+      "id": "datumloop.z-spindle-carrier.selection",
+      "type": "ENGINEERING_SPECIFICATION",
+      "title": "Z-spindle motor carrier reference application selections",
+      "manufacturer": "",
+      "partConfiguration": "Single 18 V ECX FLAT 22 L standard-flange motor carrier, 10-head placement concept",
+      "revision": "2026-10-17 design study 1",
+      "reference": "User delegated application selection and optimization; values are design targets and assumptions, not measurements of an existing machine.",
+      "sha256": null
+    }
+  ],
+  "requirements": [
+    {
+      "id": "motor.mount.pcd",
+      "description": "Motor mounting pitch circle",
+      "status": "REQUIRED",
+      "value": 16,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Diameter callout on the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.count",
+      "description": "Motor fixing hole count",
+      "status": "REQUIRED",
+      "value": 3,
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Three mounting locations are shown at equal angular spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.spacing",
+      "description": "Motor fixing angular spacing",
+      "status": "REQUIRED",
+      "value": 120,
+      "unit": "deg",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Angular callout between the three fixing locations.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.nominal",
+      "description": "Motor internal thread nominal diameter",
+      "status": "REQUIRED",
+      "value": 2,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "M2 callout describes the motor internal thread, not the bracket clearance-hole diameter.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.depth",
+      "description": "Motor internal thread depth",
+      "status": "REQUIRED",
+      "value": 2.9,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Thread depth callout; this is not a bracket drill depth or an approved screw length.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.diameter",
+      "description": "Motor locating pilot outside diameter",
+      "status": "REQUIRED",
+      "value": 6,
+      "unit": "mm",
+      "lowerDeviation": -0.05,
+      "upperDeviation": 0,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Pilot dimension in side view; tolerance offsets belong to the motor pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.height",
+      "description": "Motor locating pilot projection",
+      "status": "REQUIRED",
+      "value": 1.7,
+      "unit": "mm",
+      "lowerDeviation": -0.2,
+      "upperDeviation": 0,
+      "critical": true,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Axial pilot projection from the mounting face.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.body.diameter",
+      "description": "Motor flange envelope diameter",
+      "status": "REQUIRED",
+      "value": 22,
+      "unit": "mm",
+      "lowerDeviation": -0.1,
+      "upperDeviation": 0.1,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Outside diameter from the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.body.length.max",
+      "description": "Motor body length envelope",
+      "status": "REQUIRED",
+      "value": 17,
+      "unit": "mm",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Maximum axial body length, independent of front shaft and pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mass",
+      "description": "Catalog motor mass",
+      "status": "REQUIRED",
+      "value": 32,
+      "unit": "g",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Motor data, row 31",
+        "kind": "PRINTED",
+        "interpretation": "Family catalog mass; configuration changes need review.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.nominal.torque",
+      "description": "18 V catalog continuous torque",
+      "status": "REQUIRED",
+      "value": 28.3,
+      "unit": "mN*m",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": false,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Motor data, row 5, 18 V column",
+        "kind": "PRINTED",
+        "interpretation": "18 V column; continuous nominal torque is not a peak design torque.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.motor.configuration",
+      "description": "Selected motor mechanical configuration",
+      "status": "REQUIRED",
+      "value": "ECX FLAT 22 L, 18 V, standard flange per catalog 2025 page 259",
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "The selected component must match the cited flange drawing. Verify the configured procurement drawing before fabrication.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.gantry.pattern",
+      "description": "Gantry mating mounting pattern",
+      "status": "REQUIRED",
+      "value": "Two M4 clearance fasteners at x=\u00b111 mm, y=-15 mm, plus two 3 mm locating holes at x=\u00b16 mm, y=-10 mm",
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Define a new mating gantry carrier interface for this application. Coordinates are selected requirements; they are not dimensions recovered from an existing gantry.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.acceleration",
+      "description": "Machine acceleration envelope",
+      "status": "REQUIRED",
+      "value": 60,
+      "unit": "m/s^2",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected peak acceleration envelope for the reference head; use a quasi-static equivalent load. Dynamics and vibration remain unverified.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.interface.displacement",
+      "description": "Allowed relative motor-to-gantry interface displacement",
+      "status": "REQUIRED",
+      "value": 5,
+      "unit": "um",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected maximum elastic motor-to-gantry interface displacement under the study load cases. This is not a measured placement accuracy or an assembly tolerance.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.interface.angle",
+      "description": "Allowed motor interface angular deflection",
+      "status": "REQUIRED",
+      "value": 0.0002,
+      "unit": "rad",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected maximum elastic motor mounting angle change, 0.2 mrad. Full machine alignment and vibration are outside this static test.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "machine.design.torque",
+      "description": "Peak bracket reaction torque including duty and faults",
+      "status": "DERIVED",
+      "value": 0.1935,
+      "unit": "N*m",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DERIVED",
+        "interpretation": "Selected equivalent reaction torque about the motor shaft.",
+        "reviewed": true,
+        "derivedFrom": [
+          "motor.stall.torque",
+          "load.torque.factor"
+        ],
+        "derivation": "129 mN*m * 1.5 = 0.1935 N*m"
+      }
+    },
+    {
+      "id": "bracket.pilot.fit",
+      "description": "Bracket precision bore fit and tolerance",
+      "status": "REQUIRED",
+      "value": 6.02,
+      "unit": "mm",
+      "lowerDeviation": 0,
+      "upperDeviation": 0.02,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected through bore with +0.02/-0 mm size limits. Pilot radial clearance is not a sub-5 \u00b5m locating accuracy guarantee.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.stall.torque",
+      "description": "18 V catalog stall torque",
+      "status": "REQUIRED",
+      "value": 129,
+      "unit": "mN*m",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Motor data, row 6, 18 V column",
+        "kind": "PRINTED",
+        "interpretation": "Catalog 18 V stall torque; saturation-effect caveat remains applicable.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "load.torque.factor",
+      "description": "Selected torque screening factor",
+      "status": "REQUIRED",
+      "value": 1.5,
+      "unit": "1",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Conservative study selection relative to catalog stall torque; not a certified safety factor.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "payload.mass",
+      "description": "Selected pulley/coupler allowance",
+      "status": "REQUIRED",
+      "value": 8,
+      "unit": "g",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Unmeasured accessory mass allocation for design screening; replace with actual BOM mass before release.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "load.moving.mass",
+      "description": "Motor plus accessory mass allocation",
+      "status": "DERIVED",
+      "value": 40,
+      "unit": "g",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DERIVED",
+        "interpretation": "Sourced motor mass plus selected accessory allowance.",
+        "reviewed": true,
+        "derivedFrom": [
+          "motor.mass",
+          "payload.mass"
+        ],
+        "derivation": "32 g + 8 g = 40 g"
+      }
+    },
+    {
+      "id": "load.gravity",
+      "description": "Conventional gravity for study",
+      "status": "REQUIRED",
+      "value": 9.80665,
+      "unit": "m/s^2",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected standard gravity convention; local measured gravity is unnecessary for this screening.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "load.normal.force",
+      "description": "Worst-aligned equivalent normal force",
+      "status": "DERIVED",
+      "value": 2.792266,
+      "unit": "N",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DERIVED",
+        "interpretation": "Conservatively align gravity with the selected normal acceleration.",
+        "reviewed": true,
+        "derivedFrom": [
+          "load.moving.mass",
+          "machine.acceleration",
+          "load.gravity"
+        ],
+        "derivation": "0.040 kg * (60 + 9.80665) m/s^2 = 2.792266 N"
+      }
+    },
+    {
+      "id": "plate.width",
+      "description": "Carrier stock width",
+      "status": "REQUIRED",
+      "value": 34,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected stock width; fixed envelope for this controlled thickness study.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "plate.height",
+      "description": "Carrier stock height",
+      "status": "REQUIRED",
+      "value": 44,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected stock height centered about y=0.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "plate.thickness",
+      "description": "Carrier plate thickness",
+      "status": "REQUIRED",
+      "value": 1.5,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": -0.05,
+      "upperDeviation": 0.05,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Initial thickness; redesign may vary 1.5 to 5.5 mm with all hole axes and diameters fixed. Selected thickness size limits are \u00b10.05 mm; shop capability remains to be qualified.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.center.x",
+      "description": "Motor shaft x coordinate",
+      "status": "REQUIRED",
+      "value": 0,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected application coordinate system.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.center.y",
+      "description": "Motor shaft y coordinate",
+      "status": "REQUIRED",
+      "value": 8,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected application layout relative to plate center.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.clock.angle",
+      "description": "First motor bolt clocking",
+      "status": "REQUIRED",
+      "value": 90,
+      "unit": "deg",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected +Y bolt orientation; repeat using the sourced count and spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.bolt.clearance",
+      "description": "M2 bracket clearance diameter",
+      "status": "REQUIRED",
+      "value": 2.2,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Explicit clearance-hole selection, distinct from the M2 thread diameter in the motor.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.spacing",
+      "description": "Gantry fastener horizontal spacing",
+      "status": "REQUIRED",
+      "value": 22,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected mating gantry pattern; optimizer must preserve it.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.y",
+      "description": "Gantry fastener row y coordinate",
+      "status": "REQUIRED",
+      "value": -15,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected mating coordinate, in the plate plane.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.clearance",
+      "description": "M4 bracket clearance diameter",
+      "status": "REQUIRED",
+      "value": 4.5,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected clearance for M4 fasteners; no standards compliance inferred.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.spacing",
+      "description": "Locating hole horizontal spacing",
+      "status": "REQUIRED",
+      "value": 12,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected round/diamond-pin mating fixture layout.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.y",
+      "description": "Locating hole row y coordinate",
+      "status": "REQUIRED",
+      "value": -10,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected locating row; precision interfaces are fixed during optimization.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.bore",
+      "description": "Precision locating hole diameter",
+      "status": "REQUIRED",
+      "value": 3,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": 0,
+      "upperDeviation": 0.01,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected reamed bore, +0.01/-0 mm. Mating pin fit must be inspected before fabrication.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "screw.penetration",
+      "description": "Motor screw penetration",
+      "status": "REQUIRED",
+      "value": 2.5,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected penetration below the 2.9 mm motor thread-depth limit. Screw length changes with plate thickness; washers are not included.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "manufacturing.wall.min",
+      "description": "Minimum retained wall",
+      "status": "REQUIRED",
+      "value": 1,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected minimum wall for this simple 3-axis plate process.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "manufacturing.hole.aspect.max",
+      "description": "Maximum drilled/reamed depth ratio",
+      "status": "REQUIRED",
+      "value": 5,
+      "unit": "1",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected process capability limit, to be confirmed with the actual tool and shop.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "manufacturing.tool.reach",
+      "description": "Available axial tool reach",
+      "status": "REQUIRED",
+      "value": 10,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected capability envelope; no toolholder collision model exists yet.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "manufacturing.thread.engagement.min",
+      "description": "Minimum selected motor thread engagement",
+      "status": "REQUIRED",
+      "value": 2,
+      "unit": "mm",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Screening requirement for chosen screw arrangement; joint capacity and preload are not solved.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "manufacturing.stress.allowable",
+      "description": "Selected elastic stress screening cap",
+      "status": "REQUIRED",
+      "value": 100,
+      "unit": "MPa",
+      "critical": false,
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Conservative screening cap; not a sourced yield stress, fatigue limit, or certified safety factor.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "material.designation",
+      "description": "Selected carrier material",
+      "status": "REQUIRED",
+      "value": "Aluminum alloy 6061-T6",
+      "unit": "1",
+      "lowerDeviation": null,
+      "upperDeviation": null,
+      "critical": true,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application material selection",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Use the existing DatumLoop NIST-compiled 6061-T6 material record, including reported property uncertainty; no yield strength is invented.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    }
+  ],
+  "variables": [
+    {
+      "id": "motor.mount.pcd",
+      "requirementId": "motor.mount.pcd",
+      "role": "FIXED_INTERFACE",
+      "value": 16,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Diameter callout on the mounting end view.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.count",
+      "requirementId": "motor.mount.count",
+      "role": "FIXED_INTERFACE",
+      "value": 3,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Three mounting locations are shown at equal angular spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.spacing",
+      "requirementId": "motor.mount.spacing",
+      "role": "FIXED_INTERFACE",
+      "value": 120,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Angular callout between the three fixing locations.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.nominal",
+      "requirementId": "motor.mount.thread.nominal",
+      "role": "FIXED_INTERFACE",
+      "value": 2,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "M2 callout describes the motor internal thread, not the bracket clearance-hole diameter.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.mount.thread.depth",
+      "requirementId": "motor.mount.thread.depth",
+      "role": "FIXED_INTERFACE",
+      "value": 2.9,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Thread depth callout; this is not a bracket drill depth or an approved screw length.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.diameter",
+      "requirementId": "motor.pilot.diameter",
+      "role": "FIXED_INTERFACE",
+      "value": 6,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Pilot dimension in side view; tolerance offsets belong to the motor pilot.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.pilot.height",
+      "requirementId": "motor.pilot.height",
+      "role": "FIXED_INTERFACE",
+      "value": 1.7,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "maxon.catalog.2025.p259",
+        "pdfPage": 1,
+        "section": "Dimensional drawing, front and side views",
+        "kind": "PRINTED",
+        "interpretation": "Axial pilot projection from the mounting face.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "bracket.pilot.fit",
+      "requirementId": "bracket.pilot.fit",
+      "role": "FIXED_INTERFACE",
+      "value": 6.02,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected through bore with +0.02/-0 mm size limits. Pilot radial clearance is not a sub-5 \u00b5m locating accuracy guarantee.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "plate.width",
+      "requirementId": "plate.width",
+      "role": "FIXED_INTERFACE",
+      "value": 34,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected stock width; fixed envelope for this controlled thickness study.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "plate.height",
+      "requirementId": "plate.height",
+      "role": "FIXED_INTERFACE",
+      "value": 44,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected stock height centered about y=0.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "plate.thickness",
+      "requirementId": "plate.thickness",
+      "role": "BOUNDED_VARIABLE",
+      "value": 1.5,
+      "minimum": 1.5,
+      "maximum": 5.5,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Initial thickness; redesign may vary 1.5 to 5.5 mm with all hole axes and diameters fixed.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.center.x",
+      "requirementId": "motor.center.x",
+      "role": "FIXED_INTERFACE",
+      "value": 0,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected application coordinate system.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.center.y",
+      "requirementId": "motor.center.y",
+      "role": "FIXED_INTERFACE",
+      "value": 8,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected application layout relative to plate center.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.clock.angle",
+      "requirementId": "motor.clock.angle",
+      "role": "FIXED_INTERFACE",
+      "value": 90,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected +Y bolt orientation; repeat using the sourced count and spacing.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "motor.bolt.clearance",
+      "requirementId": "motor.bolt.clearance",
+      "role": "FIXED_INTERFACE",
+      "value": 2.2,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Explicit clearance-hole selection, distinct from the M2 thread diameter in the motor.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.spacing",
+      "requirementId": "gantry.bolt.spacing",
+      "role": "FIXED_INTERFACE",
+      "value": 22,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected mating gantry pattern; optimizer must preserve it.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.y",
+      "requirementId": "gantry.bolt.y",
+      "role": "FIXED_INTERFACE",
+      "value": -15,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected mating coordinate, in the plate plane.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.bolt.clearance",
+      "requirementId": "gantry.bolt.clearance",
+      "role": "FIXED_INTERFACE",
+      "value": 4.5,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected clearance for M4 fasteners; no standards compliance inferred.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.spacing",
+      "requirementId": "gantry.dowel.spacing",
+      "role": "FIXED_INTERFACE",
+      "value": 12,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected round/diamond-pin mating fixture layout.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.y",
+      "requirementId": "gantry.dowel.y",
+      "role": "FIXED_INTERFACE",
+      "value": -10,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected locating row; precision interfaces are fixed during optimization.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "gantry.dowel.bore",
+      "requirementId": "gantry.dowel.bore",
+      "role": "FIXED_INTERFACE",
+      "value": 3,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected reamed bore, +0.01/-0 mm. Mating pin fit must be inspected before fabrication.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    },
+    {
+      "id": "screw.penetration",
+      "requirementId": "screw.penetration",
+      "role": "FIXED_INTERFACE",
+      "value": 2.5,
+      "minimum": null,
+      "maximum": null,
+      "evidence": {
+        "sourceId": "datumloop.z-spindle-carrier.selection",
+        "pdfPage": null,
+        "section": "Reference application design selections",
+        "kind": "DESIGN_SELECTION",
+        "interpretation": "Selected penetration below the 2.9 mm motor thread-depth limit. Screw length changes with plate thickness; washers are not included.",
+        "reviewed": true,
+        "derivedFrom": [],
+        "derivation": null
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "motor.mounting",
+      "name": "Motor mounting face, bolt pattern and pilot",
+      "matingPart": "Maxon ECX FLAT 22 L, catalog standard flange",
+      "parameterIds": [
+        "motor.mount.pcd",
+        "motor.mount.count",
+        "motor.mount.spacing",
+        "motor.mount.thread.nominal",
+        "motor.mount.thread.depth",
+        "motor.pilot.diameter",
+        "motor.pilot.height",
+        "bracket.pilot.fit",
+        "motor.center.x",
+        "motor.center.y",
+        "motor.clock.angle",
+        "motor.bolt.clearance"
+      ],
+      "requirementIds": [
+        "machine.motor.configuration",
+        "bracket.pilot.fit"
+      ],
+      "topologyReferenceIds": []
+    },
+    {
+      "id": "gantry.mounting",
+      "name": "Gantry attachment interface",
+      "matingPart": "Placement gantry, definition pending",
+      "parameterIds": [
+        "gantry.bolt.spacing",
+        "gantry.bolt.y",
+        "gantry.bolt.clearance",
+        "gantry.dowel.spacing",
+        "gantry.dowel.y",
+        "gantry.dowel.bore"
+      ],
+      "requirementIds": [
+        "machine.gantry.pattern"
+      ],
+      "topologyReferenceIds": []
+    }
+  ],
+  "constraints": [
+    {
+      "id": "precision.displacement",
+      "requirementId": "machine.interface.displacement",
+      "metric": "relative_interface_displacement",
+      "relation": "MAXIMUM"
+    },
+    {
+      "id": "precision.angle",
+      "requirementId": "machine.interface.angle",
+      "metric": "interface_angular_deflection",
+      "relation": "MAXIMUM"
+    },
+    {
+      "id": "stress.screening",
+      "requirementId": "manufacturing.stress.allowable",
+      "metric": "maximum_von_mises_stress",
+      "relation": "MAXIMUM"
+    }
+  ],
+  "changes": []
+}

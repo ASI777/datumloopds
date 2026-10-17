@@ -26,6 +26,8 @@ add_library(datumloop_core STATIC
     src/datumloop/engineering/DatumEngineeringModel.cpp
     src/datumloop/engineering/StructuralAnalysis.cpp
     src/datumloop/engineering/PartDesign.cpp
+    src/datumloop/engineering/MotorCarrierDesign.cpp
+    src/datumloop/engineering/Manufacturing.cpp
     src/datumloop/knowledge/EquationRegistry.cpp
     src/datumloop/materials/MaterialModel.cpp
     src/datumloop/electronics/ElectronicsModel.cpp
@@ -61,6 +63,8 @@ target_link_libraries(datumloop_solver PUBLIC datumloop_core Qt6::Core)
 target_compile_options(datumloop_solver PRIVATE -Wall -Wextra -Wpedantic)
 
 add_executable(datumloop-ngspice-worker apps/ngspice-worker/main.cpp)
+add_executable(datumloop-part-design apps/part-design/main.cpp)
+target_link_libraries(datumloop-part-design PRIVATE datumloop_io Qt6::Core)
 target_link_libraries(datumloop-ngspice-worker PRIVATE Qt6::Core ${CMAKE_DL_LIBS})
 target_compile_options(datumloop-ngspice-worker PRIVATE -Wall -Wextra -Wpedantic)
 find_library(DATUMLOOP_NGSPICE_LIBRARY NAMES ngspice libngspice.so.0)
@@ -179,6 +183,12 @@ if(BUILD_TESTING)
     target_compile_definitions(datumloop-part-design-tests PRIVATE
         DATUMLOOP_PART_SOURCE="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/requirements.json")
     add_test(NAME datumloop-part-design-tests COMMAND datumloop-part-design-tests)
+
+    add_executable(datumloop-motor-carrier-tests tests/native/test_motor_carrier.cpp)
+    target_link_libraries(datumloop-motor-carrier-tests PRIVATE datumloop_io Qt6::Core)
+    target_compile_definitions(datumloop-motor-carrier-tests PRIVATE
+        DATUMLOOP_CARRIER_STUDY="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/design-study.json")
+    add_test(NAME datumloop-motor-carrier-tests COMMAND datumloop-motor-carrier-tests)
 
     add_executable(datumloop-electronics-tests tests/native/test_electronics.cpp)
     target_link_libraries(datumloop-electronics-tests PRIVATE datumloop_io datumloop_solver Qt6::Core)

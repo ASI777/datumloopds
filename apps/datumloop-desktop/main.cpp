@@ -4,6 +4,7 @@
 #include "datumloop/geometry/OcctKernel.hpp"
 #include "datumloop/geometry/PcbShapeBuilder.hpp"
 #include "datumloop/io/ElectronicsAdapter.hpp"
+#include "datumloop/io/DldProjectStore.hpp"
 #include "datumloop/materials/MaterialModel.hpp"
 #include "datumloop/numerics/AnalysisMesh.hpp"
 #include "datumloop/ui/DocumentViewModel.hpp"
@@ -239,8 +240,19 @@ int main(int argc, char* argv[])
     datumloop::TriangleMesh displayMesh;
     const QStringList arguments = app.arguments();
     const int pcbArgumentIndex = arguments.indexOf(QStringLiteral("--pcb"));
+    const int projectArgumentIndex = arguments.indexOf(QStringLiteral("--project"));
     try {
-        if (pcbArgumentIndex >= 0) {
+        if (projectArgumentIndex >= 0) {
+            if (pcbArgumentIndex >= 0 || projectArgumentIndex + 1 >= arguments.size() ||
+                arguments[projectArgumentIndex + 1].startsWith(QStringLiteral("--"))) {
+                throw std::invalid_argument("--project requires one .dld path and cannot be combined with --pcb");
+            }
+            document = datumloop::DldProjectStore::load(arguments[projectArgumentIndex + 1]);
+            if (document.objects().empty()) throw std::invalid_argument("project has no geometry to display");
+            initialObject = &document.objects().front();
+            qInfo() << "Opened native project:" << QString::fromStdString(document.name())
+                    << "objects =" << document.objects().size();
+        } else if (pcbArgumentIndex >= 0) {
             if (pcbArgumentIndex + 1 >= arguments.size() ||
                 arguments[pcbArgumentIndex + 1].startsWith(QStringLiteral("--"))) {
                 qCritical() << "--pcb requires a .kicad_pcb or Circuit JSON file path.";

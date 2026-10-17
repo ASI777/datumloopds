@@ -92,6 +92,19 @@ QJsonObject encodeProperty(const DatumPropertyValue& value)
 
 QJsonObject encodeFeature(const DatumFeature& feature)
 {
+    QJsonObject definitions;
+    for (const auto& [key, definition] : feature.parameterDefinitions) {
+        QJsonArray variables;
+        for (const auto& id : definition.designVariableIds) variables.append(fromUtf8(id));
+        QJsonObject sourceValues;
+        for (const auto& [id, value] : definition.sourceValues) sourceValues.insert(fromUtf8(id), value);
+        definitions.insert(fromUtf8(key), QJsonObject{
+            {QStringLiteral("unit"), fromUtf8(definition.unit)},
+            {QStringLiteral("partRequirementsId"), fromUtf8(definition.partRequirementsId)},
+            {QStringLiteral("designVariableIds"), variables},
+            {QStringLiteral("sourceValues"), sourceValues},
+            {QStringLiteral("relationship"), fromUtf8(definition.relationship)}});
+    }
     QJsonArray inputs;
     for (const std::string& inputId : feature.inputFeatureIds) {
         inputs.append(fromUtf8(inputId));
@@ -107,10 +120,13 @@ QJsonObject encodeFeature(const DatumFeature& feature)
         {QStringLiteral("inputFeatureIds"), inputs},
         {QStringLiteral("parameters"), parameters},
         {QStringLiteral("kernelBackend"), fromUtf8(feature.kernelBackend)},
+        {QStringLiteral("name"), fromUtf8(feature.name)},
+        {QStringLiteral("semanticRole"), fromUtf8(feature.semanticRole)},
+        {QStringLiteral("parameterDefinitions"), definitions},
     };
 }
 
-DatumFeature decodeFeature(const QJsonObject& object, const std::string& expectedOwnerId)
+DatumFeature decodeFeature(const QJsonObject& object, const std::string& expectedOwnerId, int schemaVersion)
 {
     DatumFeature feature;
     feature.id = toUtf8(requiredString(object, QStringLiteral("id")));
@@ -144,6 +160,41 @@ DatumFeature decodeFeature(const QJsonObject& object, const std::string& expecte
                                                         QStringLiteral("feature.parameters.%1").arg(iterator.key())));
     }
     feature.kernelBackend = toUtf8(requiredString(object, QStringLiteral("kernelBackend")));
+    const auto definitions = object.value(QStringLiteral("parameterDefinitions"));
+    if (!definitions.isUndefined() && !definitions.isObject()) fail(QStringLiteral("Feature parameter definitions must be an object."));
+    const auto name = object.value(QStringLiteral("name"));
+    const auto role = object.value(QStringLiteral("semanticRole"));
+    if ((!name.isUndefined() && !name.isString()) || (!role.isUndefined() && !role.isString())) {
+        fail(QStringLiteral("Feature name and role must be strings."));
+    }
+    feature.name = toUtf8(name.toString());
+    feature.semanticRole = toUtf8(role.toString());
+    const auto definitionObject = definitions.toObject();
+    if (schemaVersion < 9 && (!definitionObject.isEmpty() || !feature.name.empty() || !feature.semanticRole.empty() ||
+        feature.type == DatumFeatureType::ExtrudeRectangle || feature.type == DatumFeatureType::ThroughHole)) {
+        fail(QStringLiteral("Engineering feature semantics require schema nine."));
+    }
+    for (auto it = definitionObject.begin(); it != definitionObject.end(); ++it) {
+        if (!it.value().isObject()) fail(QStringLiteral("Invalid feature parameter definition."));
+        const auto item = it.value().toObject();
+        FeatureParameter definition;
+        definition.unit = toUtf8(requiredString(item, QStringLiteral("unit")));
+        definition.partRequirementsId = toUtf8(requiredString(item, QStringLiteral("partRequirementsId")));
+        definition.relationship = toUtf8(requiredString(item, QStringLiteral("relationship")));
+        const auto sourceValues = item.value(QStringLiteral("sourceValues"));
+        if (!sourceValues.isObject()) fail(QStringLiteral("Feature sourceValues must be an object."));
+        const auto snapshots = sourceValues.toObject();
+        for (auto snapshot = snapshots.begin(); snapshot != snapshots.end(); ++snapshot) {
+            definition.sourceValues.emplace(toUtf8(snapshot.key()), requiredFiniteNumber(snapshot.value(), snapshot.key()));
+        }
+        const auto variables = item.value(QStringLiteral("designVariableIds"));
+        if (!variables.isArray()) fail(QStringLiteral("Feature source parameters must be an array."));
+        for (const auto& id : variables.toArray()) {
+            if (!id.isString()) fail(QStringLiteral("Feature source parameter key must be a string."));
+            definition.designVariableIds.push_back(toUtf8(id.toString()));
+        }
+        feature.parameterDefinitions.emplace(toUtf8(it.key()), std::move(definition));
+    }
     return feature;
 }
 
@@ -1703,7 +1754,7 @@ DatumDocument decodeProject(const QJsonObject& root)
                 if (!featureValue.isObject()) {
                     fail(QStringLiteral("Object '%1' contains an invalid feature definition.").arg(name));
                 }
-                features.push_back(decodeFeature(featureValue.toObject(), toUtf8(id)));
+                features.push_back(decodeFeature(featureValue.toObject(), toUtf8(id), static_cast<int>(schemaNumber)));
             }
             const QJsonValue outputValue = objectJson.value(QStringLiteral("outputFeatureId"));
             std::optional<std::string> outputFeatureId;

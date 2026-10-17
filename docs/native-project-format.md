@@ -30,7 +30,7 @@ Example structure (the geometry payload is abbreviated):
 ```json
 {
   "format": "datumloop-project",
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "project": { "id": "…", "name": "Assembly" },
   "objects": [{
     "id": "…",
@@ -167,7 +167,9 @@ Example structure (the geometry payload is abbreviated):
       "encoder": null,
       "mountingReferences": [],
       "supplierData": null
-    }]
+    }],
+    "structuralStudies": [],
+    "partRequirements": []
   }
 }
 ```
@@ -279,3 +281,11 @@ part requirements in an older schema are rejected to prevent silent data loss.
 Ingestion accepts reviewed JSON source records through `PartRequirementsCodec`;
 it does not claim OCR or automatic PDF dimension recognition. See the
 [Maxon source ledger](../examples/parts/maxon-ecx-flat-22-l/README.md).
+
+Schema-nine feature definitions additionally preserve names, engineering roles,
+and `FeatureParameter` records with requirement-set UUID, source-variable keys,
+source-value snapshots, unit and generation relationship. The initial semantic
+features are centered rectangular-profile extrusion and complete constant-depth
+Z through bores. A changed source snapshot must be regenerated before it can be
+attached to a document. Older generic primitives/Booleans remain supported with
+empty semantic metadata. Semantic feature data in schemas below nine is rejected.

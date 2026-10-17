@@ -410,6 +410,23 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
 void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
 {
     model.validate();
+    for (const auto& object : objects_) {
+        for (const auto& feature : object.featureGraph.features()) {
+            for (const auto& [key, definition] : feature.parameterDefinitions) {
+                (void)key;
+                const auto part = std::find_if(model.partRequirements.begin(), model.partRequirements.end(),
+                    [&](const auto& candidate) { return candidate.id == definition.partRequirementsId; });
+                if (part == model.partRequirements.end()) {
+                    throw std::invalid_argument("feature parameter references an unknown part requirements set");
+                }
+                for (const auto& id : definition.designVariableIds) {
+                    if (part->variable(id).value != definition.sourceValues.at(id)) {
+                        throw std::invalid_argument("feature source parameter changed; regenerate geometry before attaching new requirements");
+                    }
+                }
+            }
+        }
+    }
     std::unordered_set<std::string> reservedIds;
     reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
     reservedIds.insert(projectId_);

@@ -199,3 +199,9 @@ metadata. The project's intended license and contributor ownership need a
 product-owner decision before any license change. No files were relicensed for
 the native migration. See [`docs/licensing-strategy.md`](docs/licensing-strategy.md)
 and preserve upstream licenses and notices for FreeCAD and optional dependencies.
+
+The first requirements-driven part source and editable native motor-carrier
+candidate are in [the Maxon bracket study](examples/parts/maxon-ecx-flat-22-l/README.md).
+The preserved `.dld` contains eight bores, parameter provenance, fixed mating
+interfaces and a sourced material. Its geometric manufacturing screen has run;
+machine-part FEA and automatic redesign remain pending.

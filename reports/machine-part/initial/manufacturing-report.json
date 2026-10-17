@@ -1,0 +1,155 @@
+{
+    "cad_object_id": "1427b023-7192-4f4c-81cb-c21d2b3cd8a1",
+    "checks": [
+        {
+            "id": "precision_bore_0",
+            "limit": null,
+            "method": "size-limit and finishing-process specification",
+            "observed": null,
+            "reason": "Ream and inspect the recorded bore limits; accuracy has not been measured",
+            "source_requirement_ids": [
+                "bracket.pilot.fit"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "precision_bore_5",
+            "limit": null,
+            "method": "size-limit and finishing-process specification",
+            "observed": null,
+            "reason": "Ream and inspect the recorded bore limits; accuracy has not been measured",
+            "source_requirement_ids": [
+                "gantry.dowel.bore"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "precision_bore_7",
+            "limit": null,
+            "method": "size-limit and finishing-process specification",
+            "observed": null,
+            "reason": "Ream and inspect the recorded bore limits; accuracy has not been measured",
+            "source_requirement_ids": [
+                "gantry.dowel.bore"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "minimum_wall",
+            "limit": 1,
+            "method": "stock thickness, edge ligaments and bore-to-bore ligaments using upper bore size limits",
+            "observed": 1.45,
+            "reason": "Nominal stock with specified dimensional offsets; no cutter-force model",
+            "source_requirement_ids": [
+                "manufacturing.wall.min"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "hole_depth_diameter",
+            "limit": 5,
+            "method": "maximum normal-through-bore depth / diameter",
+            "observed": 0.7045454545454545,
+            "reason": "Compare with selected shop capability; not a drill-life prediction",
+            "source_requirement_ids": [
+                "manufacturing.hole.aspect.max"
+            ],
+            "status": "PASSED",
+            "unit": "1"
+        },
+        {
+            "id": "tool_reach",
+            "limit": 10,
+            "method": "plate through-depth versus selected axial reach",
+            "observed": 1.55,
+            "reason": "Toolholder interference remains outside this depth check",
+            "source_requirement_ids": [
+                "manufacturing.tool.reach"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "thread_engagement_min",
+            "limit": 2,
+            "method": "selected motor screw penetration",
+            "observed": 2.5,
+            "reason": "Bracket holes are clearance bores; the motor contains the thread",
+            "source_requirement_ids": [
+                "screw.penetration",
+                "manufacturing.thread.engagement.min"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "motor_thread_depth",
+            "limit": 2.9,
+            "method": "selected screw penetration versus manufacturer thread depth",
+            "observed": 2.5,
+            "reason": "Check screw length for each plate thickness; washer and blind-hole bottom clearances need assembly review",
+            "source_requirement_ids": [
+                "screw.penetration",
+                "motor.mount.thread.depth"
+            ],
+            "status": "PASSED",
+            "unit": "mm"
+        },
+        {
+            "id": "tool_access",
+            "limit": 8,
+            "method": "normal-through-hole feature axes",
+            "observed": 8,
+            "reason": "Every bore has a straight +Z approach in this supported recipe; fixture/toolholder collisions are not evaluated",
+            "source_requirement_ids": [
+            ],
+            "status": "PASSED",
+            "unit": "1"
+        },
+        {
+            "id": "undercut_detection",
+            "limit": 0,
+            "method": "restricted feature-family check",
+            "observed": 0,
+            "reason": "No undercut features in a planar extrusion with complete normal through-bores; arbitrary shapes are not covered",
+            "source_requirement_ids": [
+            ],
+            "status": "PASSED",
+            "unit": "1"
+        },
+        {
+            "id": "setup_feasibility",
+            "limit": 2,
+            "method": "geometric approach-direction plan",
+            "observed": 2,
+            "reason": "Top drilling/reaming plus reverse-side finishing are geometrically accessible; workholding must still be qualified",
+            "source_requirement_ids": [
+            ],
+            "status": "PASSED",
+            "unit": "1"
+        },
+        {
+            "id": "internal_corner_radius",
+            "limit": null,
+            "method": "feature inventory",
+            "observed": null,
+            "reason": "No internal pocket corners in this recipe; circular bores are drilled or reamed",
+            "source_requirement_ids": [
+            ],
+            "status": "NOT_APPLICABLE",
+            "unit": "mm"
+        }
+    ],
+    "document_revision": 9,
+    "geometric_screening_passed": true,
+    "limitations": [
+        "Geometric screening of the supported plate and normal-through-hole recipe; not CAM verification or process qualification.",
+        "Toolholders, fixturing forces, cutting forces, burrs, flatness, residual stress and achieved tolerances are not simulated.",
+        "Precision-bore checks establish a specified reaming/inspection requirement, not an achieved fit or sub-5-micrometre assembly accuracy."
+    ],
+    "process_qualified": false
+}
