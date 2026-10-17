@@ -28,6 +28,8 @@ suite with MFEM disabled, then launches `DatumLoopDS --smoke-load` on Qt's
 offscreen platform. This verifies the project QML shell initializes; it does
 not verify rendered frames or hardware-GPU behavior. MFEM and MuJoCo remain
 optional integrations and are intentionally excluded from this baseline lock.
+When either backend is unavailable, CTest reports its integration checks as
+skipped so the baseline does not imply those integrations were exercised.
 The same commands run in
 [`reproducible-native-build.yml`](../.github/workflows/reproducible-native-build.yml)
 on pushes and pull requests.

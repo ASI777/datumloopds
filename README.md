@@ -17,6 +17,8 @@ public [FreeCAD fork](https://github.com/ASI777/FreeCAD) and
 fork's `codex/datumloop-ds-1.1.3` branch contains the branding and isolated
 application identity changes. The standalone application migration is tracked in
 [`docs/native-migration-dependencies.md`](docs/native-migration-dependencies.md).
+The canonical repository and branch rules are recorded in
+[`docs/development-workflow.md`](docs/development-workflow.md).
 
 ## Development
 
@@ -47,13 +49,16 @@ configured package and Python environment to `make native-check`, for example:
 make native-check NATIVE_CMAKE_ARGS="-DMFEM_DIR=/path/to/mfem-config-dir -DDATUMLOOP_MUJOCO_PYTHON=/path/to/python-with-mujoco"
 ```
 
-The native shell can open and save schema-six `.dld` projects. The provisional
+The native shell can open and save schema-seven `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
 face/edge/vertex references, a recomputable primitive/transform/Boolean feature
 graph, mechanism bodies, joints, actuators, contact pairs and requirements,
-motors, and native material/circuit/PCB models. Engineering quantities use SI
-units and missing optional data remains unknown. The circuit solver returns a
+motors, sourced materials, circuit/PCB models, CAD-linked structural studies,
+MFEM fields, mesh convergence and solver provenance. Engineering quantities use
+SI units and missing optional data remains unknown. The initial structural
+path is bounded to one axis-aligned rectangular solid and numerical verification;
+it does not establish experimental validation. The circuit solver returns a
 resistor DC operating point and power placeholder only; it does not solve
 thermal fields. See
 [`docs/native-project-format.md`](docs/native-project-format.md).

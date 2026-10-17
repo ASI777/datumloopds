@@ -2,8 +2,9 @@
 
 Numerical verification checks whether an implementation solves its stated
 mathematical problem. It does not establish that the problem represents a real
-machine. Material and load values in the fixtures below are synthetic and are
-labelled in the test code.
+machine. The scalar and 1D fixtures use synthetic inputs; the CAD-driven 3D
+case uses sourced material-property means with a synthetic beam geometry and
+load.
 
 ## Registry and units
 
@@ -101,6 +102,48 @@ The registry marks only this restricted Timoshenko model E4 because the
 analytical check and independent cross-backend comparison pass; no experiment
 or machine-level validation is implied.
 
+## CAD-derived 3D linear elasticity
+
+The first native 3D structural case starts from a DatumLoop `DatumDocument`
+box whose exact OCCT B-Rep remains authoritative. Six persistent CAD face
+references identify the clamp and load. The explicit meshing stage currently
+accepts only one axis-aligned rectangular solid with six unsplit planar faces
+and emits a structured eight-node hexahedral mesh. The MFEM 4.10 adapter solves
+static, isotropic, homogeneous, small-strain linear elasticity with serial H1/Q1
+elements. It checks that each mesh still matches the current exact CAD body,
+stores nodal displacement and element-center strain/stress/von-Mises fields,
+and records CAD, material, topology, equation, boundary-condition, mesh, and
+solver provenance in the native `.dld` project.
+
+The beam is `200 x 10 x 10 mm` with a fixed minimum-X face and a `10 N`
+downward force on the maximum-X face. Material means come from H. M. Ledbetter,
+NBS NSRDS 61 Part V, Table 2(SI): density `2710 kg/m^3` (reported source
+uncertainty `0.2%`), Young's modulus `69.6 GPa` (`2.7%`), and Poisson ratio
+`0.331` (`1.5%`). The solver uses these central values without propagating the
+published uncertainty. The selected `293.15 K` material-state temperature is a
+fixture reference assumption; this source does not provide verified
+temperature-applicability bounds for the properties. The density is stored and
+provenanced but does not enter this static stiffness solve; no gravity or body
+force is applied. See the primary [NIST publication record](https://doi.org/10.6028/NBS.NSRDS.61p5),
+the [NIST report PDF](https://srd.nist.gov/NSRDS/NSRDS-NBS-61-V.pdf), and the
+generated [3D verification report](../reports/validation/mfem-3d-elasticity.json).
+
+| Maximum element size | Hexes | Tip displacement | Error vs Euler-Bernoulli | Fixed-section axial stress | Error vs beam estimate |
+|---:|---:|---:|---:|---:|---:|
+| 10 mm | 80 | 319.07 um | 44.09% | 3.376 MPa | 33.28% |
+| 5 mm | 160 | 399.08 um | 15.21% | 4.208 MPa | 6.95% |
+| 2.5 mm | 1,280 | 441.72 um | 4.09% | 4.332 MPa | 3.88% |
+| 1.25 mm | 10,240 | 454.21 um | 1.22% | 4.457 MPa | 0.97% |
+
+The analytical cantilever tip estimate is `459.77 um`; the fixed-section beam
+stress estimate is `4.50 MPa`. From the 2.5 mm to 1.25 mm meshes, tip
+displacement and strain energy change by `2.75%`, and fixed-section stress
+changes by `2.79%`, within the recorded `5%` convergence tolerance. The
+maximum reaction-force balance error across the four runs is below
+`3.6e-9`. The result is numerical verification, not experimental validation.
+The maximum element-center von Mises value can reflect idealized clamp or load
+edge concentrations; it is not used as a yield criterion.
+
 ## External numerical libraries
 
 The adapter boundary remains solver-neutral. MFEM is the finite-element
@@ -128,5 +171,7 @@ cmake --build build/native --parallel 2
 ctest --test-dir build/native --output-on-failure
 ```
 
-MFEM is optional. When found, CTest adds `datumloop-mfem-tests`; the native
-suite also retains the reference FEM, equation, and held-out ROM checks.
+MFEM is optional. When found, CTest adds `datumloop-mfem-tests` and
+`datumloop-mfem-elasticity-tests`; the native suite retains the reference FEM,
+equation, and held-out ROM checks. When MFEM or MuJoCo is unavailable, CTest
+marks the related integration checks as skipped.

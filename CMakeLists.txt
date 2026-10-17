@@ -203,6 +203,16 @@ if(BUILD_TESTING)
         add_executable(datumloop-mfem-tests tests/native/test_mfem_solver.cpp)
         target_link_libraries(datumloop-mfem-tests PRIVATE datumloop_mfem_backend)
         add_test(NAME datumloop-mfem-tests COMMAND datumloop-mfem-tests)
+
+        add_executable(datumloop-mfem-elasticity-tests tests/native/test_mfem_3d_elasticity.cpp)
+        target_link_libraries(datumloop-mfem-elasticity-tests PRIVATE datumloop_mfem_backend datumloop_io Qt6::Core)
+        add_test(NAME datumloop-mfem-elasticity-tests COMMAND datumloop-mfem-elasticity-tests)
+    else()
+        foreach(test_name IN ITEMS datumloop-mfem-tests datumloop-mfem-elasticity-tests)
+            add_test(NAME ${test_name}
+                COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: MFEM 4.10 is unavailable or disabled")
+            set_tests_properties(${test_name} PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
+        endforeach()
     endif()
 
     if(DATUMLOOP_MUJOCO_PYTHON)
@@ -218,7 +228,14 @@ if(BUILD_TESTING)
             set_tests_properties(datumloop-mujoco-runtime PROPERTIES DEPENDS datumloop-robotics-tests)
         else()
             message(WARNING "DATUMLOOP_MUJOCO_PYTHON cannot import mujoco; runtime test is disabled")
+            add_test(NAME datumloop-mujoco-runtime
+                COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: configured Python cannot import MuJoCo")
+            set_tests_properties(datumloop-mujoco-runtime PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
         endif()
+    else()
+        add_test(NAME datumloop-mujoco-runtime
+            COMMAND ${CMAKE_COMMAND} -E echo "SKIPPED: no Python interpreter configured with MuJoCo")
+        set_tests_properties(datumloop-mujoco-runtime PROPERTIES SKIP_REGULAR_EXPRESSION "^SKIPPED:")
     endif()
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)

@@ -1,0 +1,319 @@
+{
+    "analysis_temperature_k": 293.15,
+    "analytical_euler_bernoulli_tip_m": 0.00045977011494252877,
+    "analytical_midspan_section_stress_pa": 4499999.999999999,
+    "benchmark_id": "datumloop-cad-mfem-3d-linear-elasticity-v1",
+    "convergence": {
+        "compared_runs": [
+            "5a1bd99a-839a-4cd4-8931-c784033981fc",
+            "43dcb774-50e4-4002-9d44-219bd4a00b65"
+        ],
+        "converged": true,
+        "relative_section_stress_change": 0.02793383261919365,
+        "relative_strain_energy_change": 0.027503240164178922,
+        "relative_tip_displacement_change": 0.027503367798946528,
+        "tolerance": 0.05
+    },
+    "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+    "equation_maturity": "E3",
+    "material_definition_id": "9560d3f2-d428-4abf-91cd-2bc07d0ede9b",
+    "material_properties": [
+        {
+            "absolute_uncertainty": 5.42,
+            "name": "mass.density",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 0.200000%",
+            "source_percent_uncertainty": 0.2,
+            "unit": "kg/m^3",
+            "value": 2710
+        },
+        {
+            "absolute_uncertainty": 1879200000,
+            "name": "elastic.youngs_modulus",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 2.700000%",
+            "source_percent_uncertainty": 2.7,
+            "unit": "Pa",
+            "value": 69600000000
+        },
+        {
+            "absolute_uncertainty": 0.004965000000000001,
+            "name": "elastic.poisson_ratio",
+            "source": "NBS NSRDS 61 Part V, Table 2(SI), mean value; percent uncertainty 1.500000%",
+            "source_percent_uncertainty": 1.5,
+            "unit": "1",
+            "value": 0.331
+        }
+    ],
+    "material_property_statistic": "source table mean values; solver uses central values and does not propagate uncertainty",
+    "material_revision": "sha256:d229fc4ed8561240dc3361cac37c4998604f5156bb48376f8d7b6a2294e7468b",
+    "material_source": "H. M. Ledbetter (1982), NBS NSRDS 61 Part V, Table 2(SI); https://doi.org/10.6028/NBS.NSRDS.61p5",
+    "mesh_refinement": [
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "e514703a-5c76-4b37-a8d4-805211880826",
+                "eb87142d-1a9e-437d-a1d8-577aee4b9fb1"
+            ],
+            "cad_object_id": "b3963c5e-6686-4081-a5b3-ffd5e9bdbf5d",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "1d13b368-c13a-4f2b-ab4f-13c033df37b8",
+            "hexahedra": 80,
+            "iterations": 246,
+            "material_state_id": "bd502476-e6c7-407e-8187-4c873eaa399e",
+            "maximum_aspect_ratio": 2,
+            "maximum_displacement_m": 0.0003193019018042638,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 4046234.352133072,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "95fc9bb2-d040-43d4-b6a2-8c659721797a",
+            "nodes": 189,
+            "reaction_force_n": [
+                -2.4739748027968744e-09,
+                9.999999999054701,
+                7.254762124375702e-09
+            ],
+            "relative_force_balance_error": 7.723063829300649e-10,
+            "relative_residual": 1.964690612831887e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.01,
+            "section_axial_stress_pa": 3376406.8829389485,
+            "section_stress_relative_error_vs_beam_estimate": 0.33277775932118525,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "3fbc0801-d3d9-4d3a-bbb8-8b287afb25db",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "333f3462-b88f-46c7-88ee-ba49dd7ccc11",
+            "strain_energy_j": 0.0015953734699974188,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T13:26:17.821Z",
+            "tip_displacement_m": 0.0003190745925519853,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.44094868621549865,
+            "topology_reference_ids": [
+                "d2a1083f-a5c2-473e-a1e1-0c67d5a9a793",
+                "4415d90d-2f12-496c-b009-768674f438f3",
+                "d40af7e5-7648-4f95-95d6-c732639ac0da",
+                "f79cd390-3776-42a3-9a5a-5e1a55bf5a76",
+                "5ec2ee21-ffab-4e70-a1e5-6af83c86cf7a",
+                "6e375740-09a9-4914-846f-43e8827bc943"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "e514703a-5c76-4b37-a8d4-805211880826",
+                "eb87142d-1a9e-437d-a1d8-577aee4b9fb1"
+            ],
+            "cad_object_id": "b3963c5e-6686-4081-a5b3-ffd5e9bdbf5d",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "1d13b368-c13a-4f2b-ab4f-13c033df37b8",
+            "hexahedra": 160,
+            "iterations": 272,
+            "material_state_id": "bd502476-e6c7-407e-8187-4c873eaa399e",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.00039935936634596714,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 5178137.439793499,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "f8926f07-c716-4c5d-9921-adfa9692cab8",
+            "nodes": 369,
+            "reaction_force_n": [
+                -3.5774263551502372e-09,
+                9.99999999091586,
+                -1.1624337048488087e-09
+            ],
+            "relative_force_balance_error": 9.832132263983488e-10,
+            "relative_residual": 2.3010291094235774e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.005,
+            "section_axial_stress_pa": 4207758.613337699,
+            "section_stress_relative_error_vs_beam_estimate": 0.06945298281511604,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "9b355ff6-6f6d-4bbc-9ec2-b83b620573f3",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "333f3462-b88f-46c7-88ee-ba49dd7ccc11",
+            "strain_energy_j": 0.001995383435069421,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T13:26:17.857Z",
+            "tip_displacement_m": 0.0003990765168168059,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.15208511543059297,
+            "topology_reference_ids": [
+                "d2a1083f-a5c2-473e-a1e1-0c67d5a9a793",
+                "4415d90d-2f12-496c-b009-768674f438f3",
+                "d40af7e5-7648-4f95-95d6-c732639ac0da",
+                "f79cd390-3776-42a3-9a5a-5e1a55bf5a76",
+                "5ec2ee21-ffab-4e70-a1e5-6af83c86cf7a",
+                "6e375740-09a9-4914-846f-43e8827bc943"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "e514703a-5c76-4b37-a8d4-805211880826",
+                "eb87142d-1a9e-437d-a1d8-577aee4b9fb1"
+            ],
+            "cad_object_id": "b3963c5e-6686-4081-a5b3-ffd5e9bdbf5d",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "1d13b368-c13a-4f2b-ab4f-13c033df37b8",
+            "hexahedra": 1280,
+            "iterations": 456,
+            "material_state_id": "bd502476-e6c7-407e-8187-4c873eaa399e",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.00044203298376652676,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 8480561.387327734,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "646f7d10-5ab8-4c35-b81b-62d05c94c0a9",
+            "nodes": 2025,
+            "reaction_force_n": [
+                3.845975982130767e-09,
+                9.999999977959432,
+                -5.910081313231785e-10
+            ],
+            "relative_force_balance_error": 2.238140926865425e-09,
+            "relative_residual": 2.3378688585967466e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.0025,
+            "section_axial_stress_pa": 4332127.308165244,
+            "section_stress_relative_error_vs_beam_estimate": 0.0387506367872308,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "5a1bd99a-839a-4cd4-8931-c784033981fc",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "333f3462-b88f-46c7-88ee-ba49dd7ccc11",
+            "strain_energy_j": 0.0022085986982953183,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T13:26:18.187Z",
+            "tip_displacement_m": 0.00044171987748861284,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.04086353902962236,
+            "topology_reference_ids": [
+                "d2a1083f-a5c2-473e-a1e1-0c67d5a9a793",
+                "4415d90d-2f12-496c-b009-768674f438f3",
+                "d40af7e5-7648-4f95-95d6-c732639ac0da",
+                "f79cd390-3776-42a3-9a5a-5e1a55bf5a76",
+                "5ec2ee21-ffab-4e70-a1e5-6af83c86cf7a",
+                "6e375740-09a9-4914-846f-43e8827bc943"
+            ]
+        },
+        {
+            "absolute_tolerance": 1e-12,
+            "applied_force_n": [
+                0,
+                -10,
+                0
+            ],
+            "boundary_condition_ids": [
+                "e514703a-5c76-4b37-a8d4-805211880826",
+                "eb87142d-1a9e-437d-a1d8-577aee4b9fb1"
+            ],
+            "cad_object_id": "b3963c5e-6686-4081-a5b3-ffd5e9bdbf5d",
+            "equation_definition_id": "structural.linear-elasticity.3d.isotropic-small-strain.v1",
+            "field_dataset_count": 4,
+            "geometry_feature_id": "1d13b368-c13a-4f2b-ab4f-13c033df37b8",
+            "hexahedra": 10240,
+            "iterations": 833,
+            "material_state_id": "bd502476-e6c7-407e-8187-4c873eaa399e",
+            "maximum_aspect_ratio": 1,
+            "maximum_displacement_m": 0.0004545348508082544,
+            "maximum_iterations": 20000,
+            "maximum_von_mises_stress_pa": 10132758.45000241,
+            "mesh_element_type": "hexahedron8",
+            "mesh_generator": "datumloop.occt-rectangular-solid-structured-hex",
+            "mesh_generator_version": "1.0.0",
+            "mesh_minimum_scaled_jacobian": 1,
+            "mesh_revision": "8594137c-59bb-4177-9478-33621e960ba4",
+            "nodes": 13041,
+            "reaction_force_n": [
+                -8.024416686680524e-10,
+                9.99999997446039,
+                -2.402210608209998e-08
+            ],
+            "relative_force_balance_error": 3.507103004791151e-09,
+            "relative_residual": 4.800151096672179e-09,
+            "relative_tolerance": 1e-10,
+            "requested_max_element_size_m": 0.00125,
+            "section_axial_stress_pa": 4456617.721649534,
+            "section_stress_relative_error_vs_beam_estimate": 0.009734350366135477,
+            "section_stress_sample_position_m": [
+                0,
+                0.00375,
+                0
+            ],
+            "solver_id": "mfem.serial-h1-q1-3d-linear-elasticity",
+            "solver_run_id": "43dcb774-50e4-4002-9d44-219bd4a00b65",
+            "solver_version": "4.10.0",
+            "source_document_revision": 4,
+            "source_project_id": "333f3462-b88f-46c7-88ee-ba49dd7ccc11",
+            "strain_energy_j": 0.002271060212754003,
+            "temperature_range_verified": false,
+            "timestamp_utc": "2026-10-17T13:26:23.806Z",
+            "tip_displacement_m": 0.00045421224389113554,
+            "tip_displacement_relative_error_vs_euler_bernoulli": 0.01223628628717752,
+            "topology_reference_ids": [
+                "d2a1083f-a5c2-473e-a1e1-0c67d5a9a793",
+                "4415d90d-2f12-496c-b009-768674f438f3",
+                "d40af7e5-7648-4f95-95d6-c732639ac0da",
+                "f79cd390-3776-42a3-9a5a-5e1a55bf5a76",
+                "5ec2ee21-ffab-4e70-a1e5-6af83c86cf7a",
+                "6e375740-09a9-4914-846f-43e8827bc943"
+            ]
+        }
+    ],
+    "metric_definitions": {
+        "maximum_displacement": "maximum nodal displacement magnitude",
+        "maximum_von_mises_stress": "maximum element-center von Mises stress; not a yield metric and may reflect ideal clamp/load-edge concentrations",
+        "mesh_convergence": "relative change from the medium mesh to the fine mesh for tip displacement, strain energy, and fixed-point section stress",
+        "section_axial_stress": "absolute axial stress sampled at the reported fixed midspan point; adjacent element values are averaged"
+    },
+    "scope_limitations": [
+        "Structured hexahedral meshing currently supports one axis-aligned rectangular OCCT solid with six unsplit planar faces.",
+        "The solve is serial MFEM H1/Q1, static, homogeneous, isotropic, small-strain linear elasticity.",
+        "The cited material compilation reports property percent uncertainties, recorded above, but no verified temperature applicability range; 293.15 K is a fixture reference assumption.",
+        "No experiment or physical machine was used; this report is numerical verification only."
+    ],
+    "solver": "mfem.serial-h1-q1-3d-linear-elasticity",
+    "solver_version": "4.10.0",
+    "validation_classification": "numerical verification; no experimental validation claimed",
+    "youngs_modulus_pa": 69600000000
+}
