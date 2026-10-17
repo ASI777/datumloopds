@@ -66,8 +66,10 @@ find_library(DATUMLOOP_NGSPICE_LIBRARY NAMES ngspice libngspice.so.0)
 add_library(datumloop_numerics STATIC
     src/datumloop/numerics/CantileverBeamFEM.cpp
     src/datumloop/numerics/FemSolver.cpp
+    src/datumloop/numerics/AnalysisMesh.cpp
 )
 target_include_directories(datumloop_numerics PUBLIC src)
+target_link_libraries(datumloop_numerics PUBLIC datumloop_core)
 target_compile_options(datumloop_numerics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_digitaltwin STATIC
@@ -90,6 +92,7 @@ endif()
 if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
     add_library(datumloop_mfem_backend STATIC
         src/datumloop/numerics/MfemFemSolver.cpp
+        src/datumloop/numerics/MfemLinearElasticitySolver.cpp
     )
     target_include_directories(datumloop_mfem_backend PUBLIC src)
     target_link_libraries(datumloop_mfem_backend PUBLIC datumloop_numerics datumloop_solver mfem)
