@@ -39,3 +39,32 @@ OCCT version, and graphics backend before running the checks.
 Record headless logic tests, software-rendered frame tests, and hardware-GPU
 interactive checks separately. A passing software-rendered smoke does not
 establish hardware performance, driver stability, or large-assembly capacity.
+
+## NVIDIA hardware viewport smoke
+
+The checked-in GPU path is separate from normal CI because this host has no
+NVIDIA device. Configure a Linux x86-64 runner with an NVIDIA driver, an
+NVIDIA-backed X11 display, native CMake/Qt 6/OCCT build dependencies, XTest,
+`nvidia-smi`, and `xrandr`. Register it with the labels `self-hosted`, `linux`,
+`x64`, `nvidia`, and `x11`. The manual
+[`DatumLoop NVIDIA GPU viewport smoke`](../.github/workflows/native-nvidia-gpu-smoke.yml)
+workflow builds the desktop application and runs the same local command:
+
+```sh
+python3 scripts/native_gpu_smoke.py --report artifacts/native-gpu/report.json
+```
+
+The harness requests Qt Quick's OpenGL RHI backend and does not force Mesa
+software rendering. It records the GPU and driver, Qt RHI API, OpenGL vendor,
+renderer and version, display and window resolution, presented frame count,
+warnings and errors. It drives the existing XTest face-selection and camera
+workflow, then switches the viewport to a synthetic, explicitly labeled von
+Mises field fixture and checks that the rendered viewport pixels change. The
+captured CAD and field-overlay frames are uploaded with the report.
+
+The field values in this smoke fixture exercise visualization only; they are
+not solver output and must not be cited as engineering results. The workflow
+only runs when explicitly dispatched on a configured NVIDIA runner, so missing
+GPU infrastructure does not block normal native builds. On a machine without a
+driver, use `--allow-missing-gpu` to record `status: skipped`. GPU rendering
+remains unverified until a report records `status: passed` on NVIDIA hardware.

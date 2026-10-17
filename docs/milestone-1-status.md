@@ -25,6 +25,7 @@
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The reproducible native CI container now runs this check too.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
 - Native XTest pointer smoke — passes under Xvfb with software OpenGL, including object/face selection, camera controls, and Move cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified; see [the baseline report](native-baseline.md).
+- Added a manual NVIDIA viewport workflow that records the Qt RHI/OpenGL renderer, driver, resolution, presented frames, warnings, errors, CAD pixels, selection/camera behavior, and a synthetic stress-overlay frame. This environment has no working NVIDIA driver/device or `/dev/dri`; the hardware path has not passed and the synthetic fields are only a display fixture.
 - `make check` — 20 Python compatibility tests ran: 19 passed and the optional smlibpy integration test was skipped because smlibpy is not installed in the default Python environment.
 - `make freecad-check` — compatibility smoke passed geometry operations and project save/reopen with locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
 - `scripts/check-freecad-core.sh` against the clean FreeCAD 1.1.3 install — OCCT operations and measures pass; workbench panels, central viewport slot, and `.FCStd` project save/reopen pass.
@@ -58,8 +59,9 @@
   feedback. Next, extend the observation bridge to a runtime environment
   adapter with time-varying load transfer. The 3D result is a numerically
   verified model, not an experimentally validated digital twin.
-- Verify result-overlay rendering, selection, and camera movement on a
-  hardware GPU; hardware rendering remains unverified.
+- Run [the manual NVIDIA viewport workflow](../.github/workflows/native-nvidia-gpu-smoke.yml)
+  on a configured Linux runner; result-overlay rendering, selection, and camera
+  movement on hardware remain unverified until that run passes.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - FreeCAD is limited to `.FCStd` migration, regression/reference checks, import/export assistance, and concrete compatibility defects. Return to its build only when one of those use cases requires it.
 - Resolve the license and contributor-ownership questions recorded in [`licensing-strategy.md`](licensing-strategy.md) before relicensing or selecting a proprietary distribution strategy. This decision does not block technical development.

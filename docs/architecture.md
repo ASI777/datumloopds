@@ -241,7 +241,10 @@ pointer smoke covers the visible viewport and Move workflow when the Qt XCB
 runtime is available. The 2026-10-17 Xvfb recheck passes selection, camera, and
 Move cancel/confirm/undo/redo with software OpenGL; offscreen checks still only
 verify QML and viewport-data initialization. Hardware-GPU behavior remains
-unverified. See
+unverified. A manual Linux/NVIDIA X11 workflow now records the GPU, driver,
+Qt RHI/OpenGL renderer, frame count, warnings, errors, CAD rendering, pointer
+selection/camera behavior, and a synthetic structural-field overlay. It has not
+run on hardware: this host has no working NVIDIA driver or `/dev/dri`. See
 [`native-baseline.md`](native-baseline.md) for this run's results.
 
 The first electronics slice imports supported Circuit JSON and KiCad PCB
