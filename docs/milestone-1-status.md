@@ -1,6 +1,6 @@
 # DatumLoop DS Milestone Status
 
-**The native application milestone proceeds independently of the FreeCAD compatibility gate.** DatumLoop's long-term direction is the standalone C++20 / Qt 6 / QML application; FreeCAD remains a migration and compatibility path until native workflows replace it. The clean FreeCAD 1.1.3 fork build is still incomplete: its earlier build was stopped at 65% when effort shifted to native solver work. That interruption was not a compiler failure, and FreeCAD compatibility does not block native progress. See [Native Application Migration](native-migration-dependencies.md).
+**The native application milestone proceeds independently of the FreeCAD compatibility gate.** DatumLoop's long-term direction is the standalone C++20 / Qt 6 / QML application; FreeCAD remains a migration and compatibility path until native workflows replace it. The FreeCAD 1.1.3 fork has now completed a clean Release build and isolated install; command-line geometry/project and software-rendered GUI smokes pass. See [Native Application Migration](native-migration-dependencies.md) and the [FreeCAD build profile](freecad-1.1.3-build-profile.md).
 
 ## Milestone 1 delivery
 
@@ -22,17 +22,17 @@
 - `make native-qml-smoke` — workspace, common host, three editors, and OCCT-derived mesh data initialize. Qt Quick 3D cannot render in the offscreen plugin, as expected.
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
-- `make native-pointer-smoke` — real XTest interaction coverage is implemented. The current host cannot start its XCB window because `xcb-cursor0` is missing, so pointer selection, camera, and Move interactions remain a manual gate for this environment; see [the baseline report](native-baseline.md).
+- Native XTest pointer smoke — passes under Xvfb with software OpenGL, including object/face selection, camera controls, and Move cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified; see [the baseline report](native-baseline.md).
 - `make check` — 20 Python compatibility tests ran: 19 passed and the optional smlibpy integration test was skipped because smlibpy is not installed in the default Python environment.
 - `make freecad-check` — compatibility smoke passed geometry operations and project save/reopen with locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
+- `scripts/check-freecad-core.sh` against the clean FreeCAD 1.1.3 install — OCCT operations and measures pass; workbench panels, central viewport slot, and `.FCStd` project save/reopen pass.
 - `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, docks, project metadata, and a visible viewport solid pass under Xvfb with software OpenGL.
-- The previous FreeCAD Release build used an existing configured build tree. A clean configure/build was not completed; work stopped at 65% to free resources for the native solver slice. No FreeCAD build failure is inferred from that interruption.
+- A clean FreeCAD 1.1.3 Release configure/build reached 100%, and `cmake --install` completed into an isolated prefix. The tested versions, options, and evidence are recorded in the [FreeCAD build profile](freecad-1.1.3-build-profile.md).
 - `make build` builds the Python wheel. With SMLib 0.3.4 installed, `make geometry-benchmark` previously completed the seven OCCT / SMLib comparisons within the documented measurement tolerances. In the current default Python environment, the OCCT cases pass but the comparison stops because the optional `smlibpy` package is absent; see [the baseline report](native-baseline.md).
 - CMake still warns that some Qt QML plugin link targets are unavailable in the current scope; the application builds, loads its QML, and presents frames. The offscreen platform still cannot verify 3D rendering.
 
 ## Remaining work
 
-- Repeat the FreeCAD 1.1.3 configure and build from an empty build directory with matching Pivy, yaml-cpp, and other development dependencies. This remains a compatibility milestone gate and does not block native engineering work.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.

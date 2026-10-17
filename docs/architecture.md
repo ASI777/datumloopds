@@ -217,9 +217,10 @@ Renderer/display-mesh separation,
 workspace/editor composition, picking-service
 boundary, and native independence are guarded by architecture checks. An XTest
 pointer smoke covers the visible viewport and Move workflow when the Qt XCB
-runtime is available. The 2026-10-17 recheck could not start the XCB window
-because `xcb-cursor0` is missing; the offscreen check only verifies QML and
-viewport-data initialization. Hardware-GPU behavior remains unverified. See
+runtime is available. The 2026-10-17 Xvfb recheck passes selection, camera, and
+Move cancel/confirm/undo/redo with software OpenGL; offscreen checks still only
+verify QML and viewport-data initialization. Hardware-GPU behavior remains
+unverified. See
 [`native-baseline.md`](native-baseline.md) for this run's results.
 
 The first electronics slice imports supported Circuit JSON and KiCad PCB
@@ -256,9 +257,8 @@ scientific-agent routing, robotics timing/action contracts, actual MJCF loading
 and stepping in MuJoCo, and disabled hardware writes. The headless QML smoke checks
 the common host and all three editor components. `make native-independence-check` finds no
 FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The
-offscreen platform cannot render Qt Quick 3D; this environment also lacks the
-`xcb-cursor0` runtime needed for the Xvfb window and XTest pointer workflow.
-Hardware-GPU behavior remains unverified.
+offscreen platform cannot render Qt Quick 3D; the Xvfb frame and XTest pointer
+workflow pass with software OpenGL. Hardware-GPU behavior remains unverified.
 The manual native viewport and `.dld` verification procedure is in
 [`native-verification-checklist.md`](native-verification-checklist.md).
 
@@ -271,11 +271,10 @@ engineering context. The lower panel reserves space for jobs, playback, plots,
 and evidence. Project creation, open, and save currently use native FreeCAD
 documents.
 
-The project targets FreeCAD 1.1.3 for its compatibility shell. The fork's
-configured Release build, command-line smoke, and GUI viewport smoke now pass
-in the isolated development environment. Repeating the configure and build
-from an empty build directory still needs a matching Pivy and yaml-cpp
-development environment; see the milestone status report.
+The project targets FreeCAD 1.1.3 for its compatibility shell. A clean Release
+build and isolated install pass, as do the FreeCADCmd geometry/project smoke
+and GUI viewport smoke. See the [FreeCAD build profile](freecad-1.1.3-build-profile.md)
+for the tested toolchain and scope.
 
 ## Application identity
 
@@ -304,9 +303,8 @@ The public DatumLoop DS repository and the FreeCAD and smlibpy forks are
 available. The FreeCAD 1.1.3 branding integration is on
 ASI777/FreeCAD:codex/datumloop-ds-1.1.3; it retains the upstream CAD engine and
 uses a DatumLoopDS executable identity for separate settings. The configured
-fork build, command-line smoke, and software-rendered GUI viewport smoke pass.
-This verifies the transitional compatibility shell, not completion of the
-standalone native application. A clean configure remains open because the
-current Python 3.14 interpreter cannot import Pivy during CMake's compatibility
-check. Current native migration status is tracked in
+fork build, clean install, command-line smoke, and software-rendered GUI
+viewport smoke pass. This verifies the transitional compatibility shell, not
+completion of the standalone native application. Current native migration
+status is tracked in
 [native-migration-dependencies.md](native-migration-dependencies.md).

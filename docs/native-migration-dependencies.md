@@ -29,17 +29,19 @@ Viewport, and Properties components. `IViewportRenderer` isolates the
 display-mesh handoff; `PickingService` resolves render hits against exact
 geometry and persistent topology references. An offscreen run creates and
 tessellates the exact OCCT box, but Qt Quick 3D does not render through Qt's
-offscreen plugin. Earlier frame and XTest pointer smokes passed under Xvfb with
-software rendering. In the 2026-10-17 recheck, the XCB smoke could not start
-because `xcb-cursor0` was unavailable; see [`native-baseline.md`](native-baseline.md).
-Hardware-GPU behavior remains unverified.
+offscreen plugin. The native frame and XTest pointer smokes pass under Xvfb
+with software rendering, including selection, camera controls, and Move
+cancel/confirm/undo/redo. Hardware-GPU behavior remains unverified; see
+[`native-baseline.md`](native-baseline.md).
 
-The transitional FreeCAD 1.1.3 fork build completed from its configured build
-tree. Its FreeCADCmd geometry/project smoke and the GUI smoke for workbench,
-docks, project metadata, and a visible viewport solid pass under Xvfb with
-software OpenGL. A clean FreeCAD configure remains unverified because CMake's
-Pivy compatibility check cannot import Pivy with the current Python 3.14
-interpreter; see the milestone status report.
+The transitional FreeCAD 1.1.3 fork now completes a clean Release build from an
+empty build directory and installs into an isolated prefix. `FreeCADCmd`
+passes OCCT geometry and project save/reopen checks; the GUI smoke passes
+workbench registration, docks, project metadata, and a visible viewport solid
+under Xvfb with software OpenGL. The tested source revision, toolchain, build
+options, runtime notes, and limits are recorded in the
+[`FreeCAD 1.1.3 build profile`](freecad-1.1.3-build-profile.md). This is
+compatibility-path evidence; it does not replace native application checks.
 
 ## Dependency inventory
 
@@ -89,10 +91,10 @@ model does not yet define joints or drive a solver, and it has no editor UI.
 
 This is a foundation, not a replacement for Part Design, assemblies, native
 engineering semantics, or production simulation. The equation/FEM/RL examples
-are verification fixtures, not general solver capabilities. The FreeCAD 1.1.3 compatibility shell's
-configured build and GUI smoke pass, but a clean configure remains open. Keep
-FreeCAD integration until native equivalents for the workflows in scope are
-implemented and tested. The XTest pointer smoke covers viewport selection,
-camera orbit and zoom, and the Move cancel/confirm/undo/redo path when the Qt
-XCB runtime is available; this recheck could not launch it. Hardware-GPU
-behavior remains unverified.
+are verification fixtures, not general solver capabilities. The FreeCAD 1.1.3
+compatibility shell has a clean build/install and passing command-line and GUI
+smokes. Keep FreeCAD integration until native equivalents for the workflows in
+scope are implemented and tested. The native XTest pointer smoke covers
+viewport selection, camera orbit and zoom, and the Move cancel/confirm/undo/redo
+path under Xvfb with software OpenGL. Hardware-GPU behavior remains
+unverified.
