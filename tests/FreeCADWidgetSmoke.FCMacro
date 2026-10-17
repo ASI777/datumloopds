@@ -1,0 +1,77 @@
+"""FreeCADCmd smoke for workbench Qt panels and native project persistence."""
+
+import os
+import shutil
+import sys
+import tempfile
+import types
+
+import FreeCAD as App
+from PySide import QtWidgets
+
+
+application = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+main_window = QtWidgets.QMainWindow()
+viewport_placeholder = QtWidgets.QWidget(main_window)
+main_window.setCentralWidget(viewport_placeholder)
+
+selection = types.SimpleNamespace(getSelection=lambda: [])
+registered_workbenches = []
+registered_commands = {}
+
+
+class Workbench:
+    def appendToolbar(self, name, command_names):
+        self.toolbar = (name, command_names)
+
+    def appendMenu(self, name, command_names):
+        self.menu = (name, command_names)
+
+
+gui_stub = types.ModuleType("FreeCADGui")
+gui_stub.Workbench = Workbench
+gui_stub.Selection = selection
+gui_stub.getMainWindow = lambda: main_window
+gui_stub.addCommand = lambda name, command: registered_commands.setdefault(name, command)
+gui_stub.addWorkbench = lambda workbench: registered_workbenches.append(workbench)
+sys.modules["FreeCADGui"] = gui_stub
+
+from datumloopds.freecad import project_actions
+from datumloopds.freecad.workbench import register
+
+
+register()
+assert len(registered_workbenches) == 1
+workbench = registered_workbenches[0]
+workbench.Initialize()
+workbench.Activated()
+assert set(registered_commands) == {
+    "DatumLoopDS_NewProject",
+    "DatumLoopDS_OpenProject",
+    "DatumLoopDS_SaveProject",
+}
+from datumloopds.freecad import shell
+
+for dock_name in shell.DOCK_OBJECT_NAMES:
+    assert main_window.findChild(QtWidgets.QDockWidget, dock_name) is not None, dock_name
+assert main_window.centralWidget() is viewport_placeholder
+
+temp_root = tempfile.mkdtemp(prefix="datumloopds-freecad-smoke-")
+project_path = os.path.join(temp_root, "smoke.FCStd")
+try:
+    doc = project_actions.create_project("DatumLoop FreeCAD smoke")
+    expected_id = doc.getObject(project_actions.PROJECT_OBJECT_NAME).ProjectId
+    doc.saveAs(project_path)
+    App.closeDocument(doc.Name)
+    reopened = App.openDocument(project_path)
+    assert reopened.Label == "smoke"
+    assert reopened.getObject(project_actions.PROJECT_OBJECT_NAME).ProjectId == expected_id
+    App.closeDocument(reopened.Name)
+finally:
+    shutil.rmtree(temp_root, ignore_errors=True)
+
+App.Console.PrintMessage(
+    "DATUMLOOP_FREECAD_CORE_SMOKE_PASS: workbench, panels, central viewport slot, project round-trip\n"
+)
+main_window.close()
+application.quit()
