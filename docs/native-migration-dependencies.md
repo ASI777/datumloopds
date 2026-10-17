@@ -14,12 +14,12 @@ evidence; they do not verify a standalone application.
 The native target is a C++20/Qt 6 Quick/QML executable. OCCT is its primary
 exact kernel, and SMLib remains optional. `DatumDocument` owns stable object and
 feature UUIDs, hierarchy, typed properties, exact B-Rep shapes, topology
-references, an initial object-scoped parametric feature graph, and a separate
-mechanism/axis/motor model. The native `.dld` format is at schema 4, writes
-exact B-Rep, feature definitions, and engineering metadata, and migrates schema
-1, 2, and 3 projects with an empty engineering model. FreeCAD `.FCStd` support
-remains isolated in the compatibility workbench; native persistence does not replace that import
-and migration path.
+references, an initial object-scoped parametric feature graph, and separate
+engineering/electronics models. The native `.dld` format is at schema 5,
+writes exact B-Rep, feature definitions, engineering metadata, materials,
+circuits, and PCB data, and migrates schema 1 through 4 projects. FreeCAD
+`.FCStd` support remains isolated in the compatibility workbench; native
+persistence does not replace that import and migration path.
 
 The native executable currently configures and builds against Qt 6.10.2 and
 OCCT 7.9.2. Its OCCT core and UI-model checks cover exact geometry,
@@ -55,7 +55,7 @@ interpreter; see the milestone status report.
 | Undo and document mutation | FreeCAD document transactions and GUI-thread document edits | FreeCAD host today; not yet a standalone feature API | DatumLoop commands and document transactions | Native command execute/undo/redo and preview/cancel tests pass without host calls |
 | Project metadata | Standard-library Python; metadata currently stored on FreeCAD document objects | `src/datumloopds/project.py`, `freecad/project_actions.py` | Native document metadata and migrations | `.dld` metadata validates, migrates, and round trips in a headless core test |
 | Geometry benchmark and reporting | FreeCADCmd for OCCT; separate optional SMLib runtime | `scripts/`, `reports/geometry-benchmark/` | Native C++ OCCT regression and performance checks, retaining the Python cross-kernel benchmark | Direct OCCT results are measured; compatibility comparison remains available where both backends are installed |
-| Solver/job isolation | No native solver implementation in the current shell | architecture decisions in `docs/architecture.md` | DatumLoop job manager and external solver processes | Versioned requests/results are validated and applied as undoable document commands |
+| Solver/job isolation | Equation and generic steady/transient solver contracts; isolated ngspice DC worker; educational FEM and robotics fixtures | `src/datumloop/solver/`, `knowledge/`, `numerics/`, and `robotics/` | DatumLoop job manager and replaceable external solver processes | Versioned requests/results, cancellation, immutable inputs, validated outputs, and revision-aware application as commands |
 
 ## Migration boundaries
 
@@ -88,7 +88,8 @@ or topology references. The current axes are descriptive references only; the
 model does not yet define joints or drive a solver, and it has no editor UI.
 
 This is a foundation, not a replacement for Part Design, assemblies, native
-engineering semantics, or simulation. The FreeCAD 1.1.3 compatibility shell's
+engineering semantics, or production simulation. The equation/FEM/RL examples
+are verification fixtures, not general solver capabilities. The FreeCAD 1.1.3 compatibility shell's
 configured build and GUI smoke pass, but a clean configure remains open. Keep
 FreeCAD integration until native equivalents for the workflows in scope are
 implemented and tested. The XTest pointer smoke covers viewport selection,

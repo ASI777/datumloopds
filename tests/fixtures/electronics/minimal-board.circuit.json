@@ -1,0 +1,20 @@
+[
+  {"type":"pcb_board","pcb_board_id":"board-1","center":{"x":0,"y":0},"width":20,"height":10,"thickness":1.6,"num_layers":2,"material":"fr4"},
+  {"type":"source_component","source_component_id":"src-r1","name":"R1","display_name":"Resistor"},
+  {"type":"source_component","source_component_id":"src-r2","name":"R2","display_name":"Resistor"},
+  {"type":"pcb_component","pcb_component_id":"cmp-r1","source_component_id":"src-r1","center":{"x":5,"y":5},"layer":"F.Cu","rotation":0,"width":2,"height":1.2},
+  {"type":"pcb_component","pcb_component_id":"cmp-r2","source_component_id":"src-r2","center":{"x":15,"y":5},"layer":"B.Cu","rotation":90,"width":2,"height":1.2},
+  {"type":"source_net","source_net_id":"net-signal","name":"SIGNAL","member_source_group_ids":["grp-1","grp-2"]},
+  {"type":"pcb_net","pcb_net_id":"pcbnet-1","source_net_id":"net-signal"},
+  {"type":"source_port","source_port_id":"src-port-1","source_component_id":"src-r1","source_group_id":"grp-1","name":"1","pin_number":1},
+  {"type":"source_port","source_port_id":"src-port-2","source_component_id":"src-r2","source_group_id":"grp-2","name":"1","pin_number":1},
+  {"type":"pcb_port","pcb_port_id":"port-1","source_port_id":"src-port-1","pcb_component_id":"cmp-r1","x":4,"y":5,"layers":["F.Cu"]},
+  {"type":"pcb_port","pcb_port_id":"port-2","source_port_id":"src-port-2","pcb_component_id":"cmp-r2","x":14,"y":5,"layers":["B.Cu"]},
+  {"type":"pcb_smtpad","pcb_smtpad_id":"pad-1","pcb_component_id":"cmp-r1","pcb_port_id":"port-1","shape":"rect","x":4,"y":5,"width":1,"height":1,"layer":"F.Cu"},
+  {"type":"pcb_smtpad","pcb_smtpad_id":"pad-2","pcb_component_id":"cmp-r2","pcb_port_id":"port-2","shape":"circle","x":14,"y":5,"radius":0.5,"layer":"B.Cu"},
+  {"type":"pcb_trace","pcb_trace_id":"trace-1","route":[
+    {"route_type":"wire","x":4,"y":5,"width":0.25,"layer":"F.Cu","start_pcb_port_id":"port-1"},
+    {"route_type":"wire","x":9,"y":5,"width":0.25,"layer":"F.Cu"},
+    {"route_type":"wire","x":14,"y":5,"width":0.25,"layer":"F.Cu","end_pcb_port_id":"port-2"}]},
+  {"type":"pcb_via","pcb_via_id":"via-1","x":9,"y":5,"outer_diameter":0.7,"hole_diameter":0.3,"layers":["F.Cu","B.Cu"],"source_net_id":"net-signal"}
+]

@@ -1,5 +1,8 @@
 #include "datumloop/core/DatumDocument.hpp"
+#include "datumloop/core/DatumUuid.hpp"
 #include "datumloop/geometry/OcctKernel.hpp"
+#include "datumloop/geometry/PcbShapeBuilder.hpp"
+#include "datumloop/io/ElectronicsAdapter.hpp"
 #include "datumloop/ui/DocumentViewModel.hpp"
 #include "datumloop/ui/ExactShapeGeometry.hpp"
 #include "datumloop/ui/PickingService.hpp"
@@ -7,6 +10,8 @@
 #include "datumloop/ui/workspace/DatumEditorType.hpp"
 
 #include <QGuiApplication>
+#include <QFile>
+#include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -17,6 +22,7 @@
 #include <QTimer>
 #include <QDebug>
 #include <cmath>
+#include <exception>
 
 int main(int argc, char* argv[])
 {
@@ -29,9 +35,57 @@ int main(int argc, char* argv[])
     const bool loadSmokeMode = app.arguments().contains(QStringLiteral("--smoke-load"));
     const bool interactionSmokeMode = app.arguments().contains(QStringLiteral("--interaction-smoke"));
     datumloop::DatumDocument document;
-    const datumloop::DatumObject& demoPart = document.createBox(
-        "DatumLoop Reference Block", {48.0, 34.0, 24.0});
-    const datumloop::TriangleMesh displayMesh = datumloop::OcctKernel::tessellate(demoPart.shape);
+    const datumloop::DatumObject* initialObject = nullptr;
+    datumloop::TriangleMesh displayMesh;
+    const QStringList arguments = app.arguments();
+    const int pcbArgumentIndex = arguments.indexOf(QStringLiteral("--pcb"));
+    try {
+        if (pcbArgumentIndex >= 0) {
+            if (pcbArgumentIndex + 1 >= arguments.size() ||
+                arguments[pcbArgumentIndex + 1].startsWith(QStringLiteral("--"))) {
+                qCritical() << "--pcb requires a .kicad_pcb or Circuit JSON file path.";
+                return 1;
+            }
+            const QString pcbPath = arguments[pcbArgumentIndex + 1];
+            QFile file(pcbPath);
+            if (!file.open(QIODevice::ReadOnly)) {
+                qCritical() << "Could not open PCB input:" << pcbPath << file.errorString();
+                return 1;
+            }
+            const QByteArray bytes = file.readAll();
+            const datumloop::ElectronicsImportResult imported =
+                QFileInfo(pcbPath).suffix().compare(QStringLiteral("kicad_pcb"), Qt::CaseInsensitive) == 0
+                    ? datumloop::KiCadPcbAdapter::importBytes(
+                          bytes, QFileInfo(pcbPath).completeBaseName().toStdString())
+                    : datumloop::CircuitJsonAdapter::importBytes(bytes);
+            if (imported.model.pcbs.empty()) {
+                qCritical() << "PCB input did not contain a supported board.";
+                return 1;
+            }
+            document.setElectronicsModel(imported.model);
+            const datumloop::PcbDocument& pcb = document.electronicsModel().pcbs.front();
+            const datumloop::PcbViewportGeometry preview = datumloop::PcbShapeBuilder::build(pcb);
+            initialObject = &document.addObject(
+                datumloop::createDatumUuidV4(), pcb.name, preview.shape);
+            for (const std::string& warning : imported.warnings) {
+                qWarning().noquote() << QString::fromStdString(warning);
+            }
+            for (const std::string& notice : preview.notices) {
+                qInfo().noquote() << QString::fromStdString(notice);
+            }
+            qInfo() << "Imported PCB into the native electronics model:" << pcb.name
+                    << "components =" << pcb.components.size()
+                    << ", pads =" << pcb.pads.size()
+                    << ", traces =" << pcb.traces.size()
+                    << ", vias =" << pcb.vias.size();
+        } else {
+            initialObject = &document.createBox("DatumLoop Reference Block", {48.0, 34.0, 24.0});
+        }
+        displayMesh = datumloop::OcctKernel::tessellate(initialObject->shape);
+    } catch (const std::exception& error) {
+        qCritical() << "Could not initialize native geometry:" << error.what();
+        return 1;
+    }
     datumloop::DocumentViewModel documentModel(&document);
     if (interactionSmokeMode) {
         documentModel.selectRow(-1);
@@ -117,7 +171,7 @@ int main(int argc, char* argv[])
     bool windowVisibleDuringSmoke = false;
     bool windowExposedDuringSmoke = false;
     qInfo() << "DatumLoop native core ready: OCCT shape valid ="
-            << demoPart.metrics.valid << ", display triangles =" << displayMesh.triangleCount()
+            << initialObject->metrics.valid << ", display triangles =" << displayMesh.triangleCount()
             << ". FreeCAD is not loaded.";
 
     if (smokeMode) {
@@ -152,7 +206,7 @@ int main(int argc, char* argv[])
             !hasItem(QStringLiteral("viewportEditor")) ||
             !hasItem(QStringLiteral("selectionModeToolbar")) ||
             !hasItem(QStringLiteral("propertiesEditor")) ||
-            !demoPart.metrics.valid || displayMesh.triangleCount() == 0) {
+            initialObject == nullptr || !initialObject->metrics.valid || displayMesh.triangleCount() == 0) {
             qCritical() << "DatumLoop workspace, editor components, or OCCT-derived viewport data did not initialize.";
             return 5;
         }
@@ -163,7 +217,7 @@ int main(int argc, char* argv[])
             qCritical() << "Pointer-smoke targets were not available after QML layout.";
             return 6;
         }
-        const datumloop::DatumObject* movedObject = document.object(demoPart.id);
+        const datumloop::DatumObject* movedObject = document.object(initialObject->id);
         QObject* camera = root->findChild<QObject*>(QStringLiteral("datumLoopCamera"));
         const bool cameraInputPassed = camera != nullptr &&
             (std::abs(camera->property("orbitYaw").toReal() - 35.0) > 0.1 ||

@@ -21,8 +21,12 @@ add_library(datumloop_core STATIC
     src/datumloop/core/DatumUuid.cpp
     src/datumloop/core/DatumTopologyReference.cpp
     src/datumloop/engineering/DatumEngineeringModel.cpp
+    src/datumloop/knowledge/EquationRegistry.cpp
+    src/datumloop/materials/MaterialModel.cpp
+    src/datumloop/electronics/ElectronicsModel.cpp
     src/datumloop/topology/DatumTopologyResolver.cpp
     src/datumloop/geometry/OcctKernel.cpp
+    src/datumloop/geometry/PcbShapeBuilder.cpp
 )
 target_include_directories(datumloop_core PUBLIC src)
 target_link_libraries(datumloop_core PUBLIC
@@ -34,10 +38,39 @@ target_compile_options(datumloop_core PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_io STATIC
     src/datumloop/io/DldProjectStore.cpp
+    src/datumloop/io/ElectronicsProjectCodec.cpp
+    src/datumloop/io/CircuitJsonAdapter.cpp
+    src/datumloop/io/KiCadPcbAdapter.cpp
 )
 target_include_directories(datumloop_io PUBLIC src)
 target_link_libraries(datumloop_io PUBLIC datumloop_core Qt6::Core)
 target_compile_options(datumloop_io PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(datumloop_solver STATIC
+    src/datumloop/solver/PhysicsSolver.cpp
+    src/datumloop/solver/NgspiceProcessCircuitSolver.cpp
+)
+target_include_directories(datumloop_solver PUBLIC src)
+target_link_libraries(datumloop_solver PUBLIC datumloop_core Qt6::Core)
+target_compile_options(datumloop_solver PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(datumloop-ngspice-worker apps/ngspice-worker/main.cpp)
+target_link_libraries(datumloop-ngspice-worker PRIVATE Qt6::Core ${CMAKE_DL_LIBS})
+target_compile_options(datumloop-ngspice-worker PRIVATE -Wall -Wextra -Wpedantic)
+find_library(DATUMLOOP_NGSPICE_LIBRARY NAMES ngspice libngspice.so.0)
+
+add_library(datumloop_numerics STATIC
+    src/datumloop/numerics/CantileverBeamFEM.cpp
+)
+target_include_directories(datumloop_numerics PUBLIC src)
+target_compile_options(datumloop_numerics PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(datumloop_robotics STATIC
+    src/datumloop/robotics/RobotLearning.cpp
+)
+target_include_directories(datumloop_robotics PUBLIC src)
+target_link_libraries(datumloop_robotics PUBLIC datumloop_core)
+target_compile_options(datumloop_robotics PRIVATE -Wall -Wextra -Wpedantic)
 
 add_library(datumloop_ui STATIC
     src/datumloop/ui/DocumentViewModel.cpp
@@ -99,6 +132,24 @@ if(BUILD_TESTING)
     add_executable(datumloop-io-tests tests/native/test_io.cpp)
     target_link_libraries(datumloop-io-tests PRIVATE datumloop_io Qt6::Core)
     add_test(NAME datumloop-io-tests COMMAND datumloop-io-tests)
+
+    add_executable(datumloop-electronics-tests tests/native/test_electronics.cpp)
+    target_link_libraries(datumloop-electronics-tests PRIVATE datumloop_io datumloop_solver Qt6::Core)
+    add_dependencies(datumloop-electronics-tests datumloop-ngspice-worker)
+    if(DATUMLOOP_NGSPICE_LIBRARY)
+        target_compile_definitions(datumloop-electronics-tests PRIVATE DATUMLOOP_HAS_NGSPICE=1)
+    endif()
+    target_compile_definitions(datumloop-electronics-tests PRIVATE
+        DATUMLOOP_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/electronics")
+    add_test(NAME datumloop-electronics-tests COMMAND datumloop-electronics-tests)
+
+    add_executable(datumloop-knowledge-tests tests/native/test_knowledge.cpp)
+    target_link_libraries(datumloop-knowledge-tests PRIVATE datumloop_core datumloop_solver datumloop_numerics)
+    add_test(NAME datumloop-knowledge-tests COMMAND datumloop-knowledge-tests)
+
+    add_executable(datumloop-robotics-tests tests/native/test_robotics.cpp)
+    target_link_libraries(datumloop-robotics-tests PRIVATE datumloop_robotics Qt6::Core)
+    add_test(NAME datumloop-robotics-tests COMMAND datumloop-robotics-tests)
 
     add_executable(datumloop-ui-tests tests/native/test_ui_model.cpp)
     target_link_libraries(datumloop-ui-tests PRIVATE datumloop_ui)

@@ -1,7 +1,7 @@
 # Native DatumLoop project format (`.dld`)
 
 The native application saves projects as UTF-8 JSON in a `.dld` file. Schema
-version 4 is provisional and stores the document state supported by the current
+version 5 is provisional and stores the document state supported by the current
 native core:
 
 - project UUID and name;
@@ -13,14 +13,21 @@ native core:
   feature identity, geometric/topological signatures, and parent references;
 - engineering mechanisms and datum axes linked to CAD body object IDs;
 - motors with optional CAD representation, physical properties, actuator data,
-  mounting references, encoder, and supplier data.
+  mounting references, encoder, and supplier data;
+- common material definitions and states with optional composition, phase,
+  microstructure, process-history, property-model, provenance, and dataset
+  reference data;
+- circuit documents with UUID-backed components, pins, nets, optional values,
+  and explicit units;
+- PCB documents with stack-up/layer material references, placed components,
+  pads, traces, vias, and common-material regions.
 
 Example structure (the geometry payload is abbreviated):
 
 ```json
 {
   "format": "datumloop-project",
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "project": { "id": "…", "name": "Assembly" },
   "objects": [{
     "id": "…",
@@ -111,7 +118,7 @@ Example structure (the geometry payload is abbreviated):
 }
 ```
 
-Property types in version 4 are `bool`, signed `int64`, finite `double`, and
+The property types remain `bool`, signed `int64`, finite `double`, and
 UTF-8 `string`. Signed 64-bit values are decimal strings in JSON so integers
 above JavaScript's exact-number range remain lossless. Parent objects must
 precede children in the object array; this both validates parent identity and
@@ -137,11 +144,16 @@ replaces its document and clears the old command history. A failed load leaves
 the open document untouched. Saving uses `QSaveFile`; the document becomes
 clean only after the atomic file commit succeeds.
 
-Schema version 4 reads versions 1, 2, and 3. Version 1 files receive initial
-face, edge, and vertex references; version 2 and 3 references and object
-identities are preserved. Older schemas load with an empty engineering model;
-engineering data in a schema 1, 2, or 3 file is rejected. Unknown schema
-versions are rejected. The object feature graph is an append-ordered DAG with
+Schema version 5 reads versions 1 through 4. Version 1 files receive initial
+face, edge, and vertex references; version 2 through 4 references, object
+identities, and supported engineering data are preserved. Versions 1 through 3
+load with an empty engineering model; versions 1 through 4 load with an empty
+electronics model. Engineering data in a schema 1, 2, or 3 file and electronics
+data in a schema 1 through 4 file are rejected rather than discarded. Schema 5
+requires its electronics model. Unknown schema versions are rejected. Equation
+definitions, physics solver requests/results, robot/sensor/action specs, and
+simulation state are not yet persisted in schema 5. The object feature graph
+is an append-ordered DAG with
 explicit feature UUIDs, owner, type, input feature UUIDs,
 parameters in millimetres, and a geometry backend identifier. The first native
 OCCT backend supports box, cylinder, sphere, and cone primitives, translation,
@@ -177,7 +189,7 @@ geometry payloads into assets.
 
 The tests cover exact-shape and feature-graph round-trip, primitive and Boolean
 recompute, UUID identity, hierarchy, translation, all four property types, dirty
-tracking, schema-v1/v2/v3 migration, engineering-model round-trip and reference
-validation, face/edge/vertex reference resolution and point picking, ambiguity
+tracking, schema-v1/v2/v3/v4 migration, engineering and electronics/material
+round-trip and reference validation, face/edge/vertex reference resolution and point picking, ambiguity
 rejection, parent relationships, display tessellation regeneration, and
 rejection of unsupported or malformed data.

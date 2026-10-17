@@ -133,6 +133,65 @@ int main(int argc, char* argv[])
         engineeringModel.motors.push_back(unspecifiedMotor);
         document.setEngineeringModel(engineeringModel);
 
+        datumloop::DatumElectronicsModel electronicsModel;
+        datumloop::MaterialDefinition fr4;
+        fr4.id = uuid().toStdString();
+        fr4.name = "FR-4 (composition and properties unspecified)";
+        fr4.provenance = {"Named from imported board metadata; no physical values inferred."};
+        datumloop::MaterialDefinition copper;
+        copper.id = uuid().toStdString();
+        copper.name = "Copper (grade unspecified)";
+        copper.provenance = {"Material label only; conductivity and temper are unknown."};
+        electronicsModel.materials = {fr4, copper};
+
+        datumloop::CircuitDocument circuit;
+        circuit.id = uuid().toStdString();
+        circuit.name = "Board netlist";
+        datumloop::CircuitComponent resistor;
+        resistor.id = uuid().toStdString();
+        resistor.sourceId = "cmp-r1";
+        resistor.reference = "R1";
+        resistor.displayName = "Resistor";
+        resistor.kind = datumloop::CircuitComponentKind::Resistor;
+        resistor.electricalValue = 1000.0;
+        resistor.electricalValueUnit = "ohm";
+        datumloop::CircuitPin pinA{uuid().toStdString(), resistor.id, "1", "A"};
+        datumloop::CircuitPin pinB{uuid().toStdString(), resistor.id, "2", "B"};
+        resistor.pinIds = {pinA.id, pinB.id};
+        datumloop::CircuitNet signalNet{uuid().toStdString(), "net-signal", "SIG", false, {pinA.id}};
+        datumloop::CircuitNet groundNet{uuid().toStdString(), "net-ground", "GND", true, {pinB.id}};
+        circuit.components.push_back(resistor);
+        circuit.pins = {pinA, pinB};
+        circuit.nets = {signalNet, groundNet};
+        electronicsModel.circuits.push_back(circuit);
+
+        datumloop::PcbDocument pcb;
+        pcb.id = uuid().toStdString();
+        pcb.name = "Reference PCB";
+        pcb.circuitDocumentId = circuit.id;
+        pcb.boardMaterialDefinitionId = fr4.id;
+        pcb.widthM = 0.04;
+        pcb.heightM = 0.03;
+        pcb.thicknessM = 0.0016;
+        pcb.stackup.id = uuid().toStdString();
+        const std::string frontLayerId = uuid().toStdString();
+        const std::string backLayerId = uuid().toStdString();
+        pcb.stackup.layers = {
+            {frontLayerId, "F.Cu", datumloop::PcbLayerRole::Copper, copper.id, 35e-6, {}, {}, {}},
+            {backLayerId, "B.Cu", datumloop::PcbLayerRole::Copper, copper.id, 35e-6, {}, {}, {}},
+        };
+        pcb.components.push_back({uuid().toStdString(), "pcb-cmp-r1", "R1", "R_0805",
+                                  resistor.id, {0.01, 0.015}, 0.0, 0.002, 0.00125, {}, "F.Cu"});
+        pcb.pads.push_back({uuid().toStdString(), "pad-1", pcb.components.front().id, pinA.id,
+                            signalNet.id, datumloop::PcbPadShape::Rectangle, {0.009, 0.015},
+                            0.001, 0.001, 0.0, {frontLayerId}});
+        pcb.traces.push_back({uuid().toStdString(), "trace-1", signalNet.id, frontLayerId,
+                              0.00025, {{0.009, 0.015}, {0.02, 0.015}}});
+        pcb.vias.push_back({uuid().toStdString(), "via-1", groundNet.id, {0.03, 0.02},
+                            0.0007, 0.0003, {frontLayerId, backLayerId}});
+        electronicsModel.pcbs.push_back(pcb);
+        document.setElectronicsModel(electronicsModel);
+
         const TopoDS_Shape regeneratedBox = datumloop::OcctKernel::box({40.0, 30.0, 20.0});
         for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
             const auto resolution = datumloop::DatumTopologyResolver::resolve(
@@ -197,8 +256,8 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 4,
-                "saved project did not include the version-four schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 5,
+                "saved project did not include the version-five schema");
         require(root.value(QStringLiteral("engineeringModel")).toObject()
                     .value(QStringLiteral("mechanisms")).toArray().size() == 1 &&
                     root.value(QStringLiteral("engineeringModel")).toObject()
@@ -224,6 +283,8 @@ int main(int argc, char* argv[])
         require(!loaded.isDirty(), "loaded project should start clean");
         require(loaded.engineeringModel() == engineeringModel,
                 "engineering entities, SI values, optional unknowns, or CAD references changed during round-trip");
+        require(loaded.electronicsModel() == electronicsModel,
+                "materials, circuits, stackup, pads, traces, or vias changed during round-trip");
         require(loaded.projectId() == projectId, "project UUID did not survive round-trip");
         require(loaded.name() == "Round-trip assembly", "project name did not survive round-trip");
         require(loaded.objects().size() == 2, "project object count did not survive round-trip");
@@ -284,6 +345,7 @@ int main(int argc, char* argv[])
         versionOne.insert(QStringLiteral("schemaVersion"), 1);
         versionOne.remove(QStringLiteral("topologyReferences"));
         versionOne.remove(QStringLiteral("engineeringModel"));
+        versionOne.remove(QStringLiteral("electronicsModel"));
         QJsonArray legacyObjects = versionOne.value(QStringLiteral("objects")).toArray();
         for (qsizetype index = 0; index < legacyObjects.size(); ++index) {
             QJsonObject legacyObject = legacyObjects.at(index).toObject();
@@ -334,12 +396,14 @@ int main(int argc, char* argv[])
         QJsonObject versionThree = root;
         versionThree.insert(QStringLiteral("schemaVersion"), 3);
         versionThree.remove(QStringLiteral("engineeringModel"));
+        versionThree.remove(QStringLiteral("electronicsModel"));
         const QString versionThreePath = temporaryDirectory.filePath(QStringLiteral("schema-v3.dld"));
         writeObject(versionThreePath, versionThree);
         datumloop::DatumDocument migratedVersionThree = datumloop::DldProjectStore::load(versionThreePath);
         require(migratedVersionThree.engineeringModel() == datumloop::DatumEngineeringModel{} &&
+                    migratedVersionThree.electronicsModel() == datumloop::DatumElectronicsModel{} &&
                     migratedVersionThree.objects().size() == 2 && !migratedVersionThree.isDirty(),
-                "schema-v3 project did not migrate with an empty engineering model");
+                "schema-v3 project did not migrate with empty engineering and electronics models");
         datumloop::DldProjectStore::save(migratedVersionThree, versionThreePath);
         QFile migratedV3Manifest(versionThreePath);
         require(migratedV3Manifest.open(QIODevice::ReadOnly), "migrated schema-v3 project could not be reopened");
@@ -349,6 +413,25 @@ int main(int argc, char* argv[])
                     migratedV3Root.value(QStringLiteral("engineeringModel")).toObject()
                     .value(QStringLiteral("motors")).toArray().isEmpty(),
                 "saving a schema-v3 project did not write the current schema and empty engineering model");
+
+        QJsonObject versionFour = root;
+        versionFour.insert(QStringLiteral("schemaVersion"), 4);
+        versionFour.remove(QStringLiteral("electronicsModel"));
+        const QString versionFourPath = temporaryDirectory.filePath(QStringLiteral("schema-v4.dld"));
+        writeObject(versionFourPath, versionFour);
+        datumloop::DatumDocument migratedVersionFour = datumloop::DldProjectStore::load(versionFourPath);
+        require(migratedVersionFour.engineeringModel() == engineeringModel &&
+                    migratedVersionFour.electronicsModel() == datumloop::DatumElectronicsModel{},
+                "schema-v4 project did not preserve engineering data and default electronics data");
+        datumloop::DldProjectStore::save(migratedVersionFour, versionFourPath);
+        QFile migratedV4Manifest(versionFourPath);
+        require(migratedV4Manifest.open(QIODevice::ReadOnly), "migrated schema-v4 project could not be reopened");
+        const QJsonObject migratedV4Root = QJsonDocument::fromJson(migratedV4Manifest.readAll()).object();
+        require(migratedV4Root.value(QStringLiteral("schemaVersion")).toInt() ==
+                    datumloop::DldProjectStore::SchemaVersion &&
+                    migratedV4Root.value(QStringLiteral("electronicsModel")).toObject()
+                        .value(QStringLiteral("materials")).toArray().isEmpty(),
+                "saving a schema-v4 project did not write the current electronics-aware schema");
 
         QJsonObject invalidSchemaThree = versionThree;
         invalidSchemaThree.insert(QStringLiteral("engineeringModel"), root.value(QStringLiteral("engineeringModel")));
@@ -370,7 +453,7 @@ int main(int argc, char* argv[])
             temporaryDirectory.filePath(QStringLiteral("invalid-engineering-model.dld"));
         writeObject(invalidEngineeringPath, invalidEngineering);
         require(loadFails(invalidEngineeringPath),
-                "schema-v4 load accepted a motor with a missing mechanism reference");
+                "schema-v5 load accepted a motor with a missing mechanism reference");
 
         QJsonObject missingNullableField = root;
         QJsonObject missingFieldModel = missingNullableField.value(QStringLiteral("engineeringModel")).toObject();
@@ -388,7 +471,7 @@ int main(int argc, char* argv[])
             temporaryDirectory.filePath(QStringLiteral("missing-engineering-nullable-field.dld"));
         writeObject(missingNullablePath, missingNullableField);
         require(loadFails(missingNullablePath),
-                "schema-v4 load accepted an omitted nullable engineering field");
+                "schema-v5 load accepted an omitted nullable engineering field");
 
         datumloop::DatumDocument booleanDocument("Boolean feature round-trip");
         const std::string booleanObjectId = booleanDocument.createBox("Boolean result", {8.0, 8.0, 8.0}).id;
@@ -428,7 +511,7 @@ int main(int argc, char* argv[])
                                 loadedBooleanObject->featureGraph.features().end(), [](const auto& feature) {
                                     return feature.status == datumloop::DatumFeatureStatus::Succeeded;
                                 }),
-                "Boolean feature DAG did not recompute and round-trip through schema 4");
+                "Boolean feature DAG did not recompute and round-trip through schema 5");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");

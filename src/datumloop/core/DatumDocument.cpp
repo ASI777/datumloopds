@@ -49,6 +49,34 @@ void reserveEngineeringIdentities(const DatumEngineeringModel& model,
     }
 }
 
+void reserveElectronicsIdentities(const DatumElectronicsModel& model,
+                                  std::unordered_set<std::string>& reservedIds)
+{
+    const auto reserve = [&reservedIds](const std::string& id) {
+        if (!reservedIds.insert(id).second) {
+            throw std::invalid_argument("electronics entity UUID collides with an existing document identity");
+        }
+    };
+    for (const MaterialDefinition& material : model.materials) reserve(material.id);
+    for (const MaterialState& state : model.materialStates) reserve(state.id);
+    for (const CircuitDocument& circuit : model.circuits) {
+        reserve(circuit.id);
+        for (const CircuitComponent& component : circuit.components) reserve(component.id);
+        for (const CircuitPin& pin : circuit.pins) reserve(pin.id);
+        for (const CircuitNet& net : circuit.nets) reserve(net.id);
+    }
+    for (const PcbDocument& pcb : model.pcbs) {
+        reserve(pcb.id);
+        reserve(pcb.stackup.id);
+        for (const PcbLayer& layer : pcb.stackup.layers) reserve(layer.id);
+        for (const PcbComponent& component : pcb.components) reserve(component.id);
+        for (const PcbTrace& trace : pcb.traces) reserve(trace.id);
+        for (const PcbVia& via : pcb.vias) reserve(via.id);
+        for (const PcbPad& pad : pcb.pads) reserve(pad.id);
+        for (const ElectronicMaterialRegion& region : pcb.materialRegions) reserve(region.id);
+    }
+}
+
 }  // namespace
 
 DatumDocument::DatumDocument(std::string name, std::string projectId)
@@ -84,6 +112,7 @@ void DatumDocument::clear(std::string name)
     objects_.clear();
     topologyReferences_.clear();
     engineeringModel_ = {};
+    electronicsModel_ = {};
     ++revision_;
     dirty_ = true;
 }
@@ -95,6 +124,7 @@ void DatumDocument::replaceWith(DatumDocument replacement)
     objects_ = std::move(replacement.objects_);
     topologyReferences_ = std::move(replacement.topologyReferences_);
     engineeringModel_ = std::move(replacement.engineeringModel_);
+    electronicsModel_ = std::move(replacement.electronicsModel_);
     ++revision_;
     dirty_ = replacement.dirty_;
 }
@@ -138,7 +168,7 @@ const DatumObject& DatumDocument::addObject(std::string id,
         }) ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&id](const auto& reference) {
             return reference.id == id;
-        }) || hasEngineeringIdentity(engineeringModel_, id)) {
+        }) || hasEngineeringIdentity(engineeringModel_, id) || electronicsModel_.containsIdentity(id)) {
         throw std::invalid_argument("object id must be unique within a project");
     }
     if (id == projectId_) {
@@ -256,7 +286,7 @@ const DatumTopologyReference& DatumDocument::addTopologyReference(DatumTopologyR
                            [&reference](const DatumFeature& feature) { return feature.id == reference.id; });
     });
     if (reference.id == projectId_ || object(reference.id) != nullptr || featureIdCollision ||
-        hasEngineeringIdentity(engineeringModel_, reference.id) ||
+        hasEngineeringIdentity(engineeringModel_, reference.id) || electronicsModel_.containsIdentity(reference.id) ||
         std::any_of(topologyReferences_.begin(), topologyReferences_.end(), [&](const auto& existing) {
             return existing.id == reference.id;
         })) {
@@ -335,6 +365,7 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
     for (const DatumTopologyReference& reference : topologyReferences_) {
         reservedIds.insert(reference.id);
     }
+    reserveElectronicsIdentities(electronicsModel_, reservedIds);
     for (const DatumMechanism& mechanism : model.mechanisms) {
         if (!reservedIds.insert(mechanism.id).second) {
             throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
@@ -397,6 +428,31 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
     }
 }
 
+void DatumDocument::setElectronicsModel(DatumElectronicsModel model)
+{
+    model.validate();
+    std::unordered_set<std::string> reservedIds;
+    reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
+    reservedIds.insert(projectId_);
+    for (const DatumObject& item : objects_) {
+        reservedIds.insert(item.id);
+        for (const DatumFeature& feature : item.featureGraph.features()) {
+            reservedIds.insert(feature.id);
+        }
+    }
+    for (const DatumTopologyReference& reference : topologyReferences_) {
+        reservedIds.insert(reference.id);
+    }
+    reserveEngineeringIdentities(engineeringModel_, reservedIds);
+    reserveElectronicsIdentities(model, reservedIds);
+
+    if (electronicsModel_ != model) {
+        electronicsModel_ = std::move(model);
+        ++revision_;
+        dirty_ = true;
+    }
+}
+
 void DatumDocument::setFeatureGraph(const std::string& objectId,
                                     DatumFeatureGraph graph,
                                     bool captureTopologyReferences)
@@ -424,6 +480,7 @@ void DatumDocument::setFeatureGraph(const std::string& objectId,
     reservedIds.reserve(1 + objects_.size() + topologyReferences_.size());
     reservedIds.insert(projectId_);
     reserveEngineeringIdentities(engineeringModel_, reservedIds);
+    reserveElectronicsIdentities(electronicsModel_, reservedIds);
     reservedIds.insert(objectId);
     for (const DatumObject& existing : objects_) {
         if (existing.id != objectId) {
@@ -515,6 +572,7 @@ void DatumDocument::restoreObjectSnapshot(DatumObjectSnapshot snapshot)
     reservedIds.insert(projectId_);
     reservedIds.insert(snapshot.object.id);
     reserveEngineeringIdentities(engineeringModel_, reservedIds);
+    reserveElectronicsIdentities(electronicsModel_, reservedIds);
     for (const DatumObject& existing : objects_) {
         if (existing.id != snapshot.object.id) {
             reservedIds.insert(existing.id);

@@ -103,10 +103,14 @@ The standalone application uses C++20, Qt 6 Quick/QML, and direct OCCT APIs.
 `DatumDocument` owns each exact `TopoDS_Shape`, project, object and feature
 UUIDs, object hierarchy, typed scalar properties, shape metrics, translation,
 dirty and revision state, topology reference signatures, an object-scoped
-feature graph, and a separate engineering model. `DldProjectStore` reads and
-writes the version-four `.dld` manifest using Qt Core and OCCT; it persists exact
-B-Rep geometry and regenerates display tessellation after load. Schema v1, v2,
-and v3 projects migrate to v4 with an empty engineering model. Feature-backed
+feature graph, and separate engineering and electronics models.
+`DatumElectronicsModel` owns shared material definitions/states, circuits, and
+PCB boards; PCB layers and material regions reference that same material
+collection. `DldProjectStore` reads and writes the version-five `.dld` manifest
+using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates display
+tessellation after load. Schema v1 through v4 projects migrate with an empty
+electronics model, preserving supported engineering data where the older
+schema allowed it. Feature-backed
 objects persist their feature inputs and recompute exact shapes on load; direct
 imported geometry remains stored as B-Rep data.
 `DocumentViewModel` provides Save/Open,
@@ -131,6 +135,15 @@ that presentation component while keeping the document model and hit-resolution
 service intact. This is an incremental renderer boundary, not a backend-neutral
 scene graph yet.
 
+PCB documents use a separate `PcbShapeBuilder` to produce a disposable OCCT
+preview from native board, copper, pad, trace, via, and optional package
+envelope data. This display compound is not the canonical PCB definition or a
+manufacturing/analysis solid. The desktop accepts `--pcb FILE` to import one
+Circuit JSON board or the documented subset of a KiCad `.kicad_pcb` file into
+the native electronics model before constructing the viewport. Adapter limits
+and preview assumptions are listed in
+[`electronics-materials-multiphysics.md`](electronics-materials-multiphysics.md).
+
 `PickingService` maps backend hits to persistent DatumLoop identities before
 selection changes. It resolves object IDs directly and resolves face, edge,
 and vertex hits against the exact OCCT shape, matching a stored topology UUID
@@ -140,7 +153,9 @@ modes. Large-model acceleration and distinct subshape highlight geometry
 remain future work.
 
 `DatumEngineeringModel` currently stores mechanisms, linear and rotary datum
-axes, and motors separately from CAD objects. Mechanisms reference CAD body
+axes, and motors separately from CAD objects. `DatumElectronicsModel` stores
+materials, circuit connectivity, and PCB stack-up/geometry using common
+material references. Mechanisms reference CAD body
 object IDs; axes record their base and moving objects, metre-valued origin, and
 unit direction. Motors may reference their CAD representation and mounting
 topology, plus mass, inertia, center of mass, torque/speed data, electrical and
@@ -158,7 +173,7 @@ and cone primitives, translation, and union/cut/intersection Booleans within
 one object. Feature graph replacement creates a new initial topology reference
 set for that object's output; provenance-aware topology migration,
 object-to-object references, sketch and manufacturing features, rotations,
-joints, and solver integration remain future work.
+joints, and topology migration remain future work.
 
 ```text
 Qt Quick / QML workspace and editor components
@@ -173,14 +188,29 @@ OCCT primary geometry                  optional SMLib adapter
     |
 TriangleMesh -> IViewportRenderer -> Qt Quick 3D display adapter
 
+DatumElectronicsModel -> Circuit JSON / KiCad format adapters
+                     -> PcbShapeBuilder -> OCCT preview geometry
+                     -> ICircuitSolver -> isolated ngspice worker
+
+EquationRegistry -> generic physics solver requests/results
+                 -> analytical checks and one educational cantilever FEM
+RobotModel -> backend-neutral observation/action contracts
+           -> deterministic fixture environment -> MJCF text export
+           -> simulated StateInterface / hardware writes disabled
+
 FreeCAD Python workbench -> separate compatibility path
 ```
 
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
-version-four `.dld` save/open with an initial recomputable feature graph and
-mechanism/axis/motor metadata. Renderer/display-mesh separation,
+version-five `.dld` save/open with an initial recomputable feature graph,
+mechanism/motor metadata, and native material/circuit/PCB models. Separate
+engineering prototypes add an E0-E6 equation registry, generic solver
+contracts, a verified 1D cantilever FEM example, a reduced beam response, and a
+simulated-only one-axis robot/RL environment with MJCF text export. Those
+prototypes are not persisted in `.dld` or exposed in the Qt workspace.
+Renderer/display-mesh separation,
 workspace/editor composition, picking-service
 boundary, and native independence are guarded by architecture checks. An XTest
 pointer smoke covers the visible viewport and Move workflow when the Qt XCB
@@ -188,21 +218,37 @@ runtime is available. The 2026-10-17 recheck could not start the XCB window
 because `xcb-cursor0` is missing; the offscreen check only verifies QML and
 viewport-data initialization. Hardware-GPU behavior remains unverified. See
 [`native-baseline.md`](native-baseline.md) for this run's results.
-Joint definitions, solver integration, and further engineering workflows are
-later work.
+
+The first electronics slice imports supported Circuit JSON and KiCad PCB
+profiles, builds a display-only OCCT preview, and runs a small ngspice DC
+resistor/source example in a worker process. Result power is only a thermal
+source placeholder. The worker cannot mutate the document, and no thermal,
+structural, CFD, EM, chemistry, metallurgy, or coupled solve is implemented.
+See [`electronics-materials-multiphysics.md`](electronics-materials-multiphysics.md)
+for the material, physics, coupling, digital-twin, format, and license plan.
+
+Equation governance, analytical/FEM verification, a limited reduced beam
+response, and the simulated-only robot/RL/control interfaces are documented in
+[`engineering-equation-governance.md`](engineering-equation-governance.md),
+[`numerical-verification.md`](numerical-verification.md),
+[`multifidelity-simulation.md`](multifidelity-simulation.md),
+[`robot-learning-architecture.md`](robot-learning-architecture.md), and
+[`sim-to-real.md`](sim-to-real.md). These provide verified examples and
+interfaces; they are not production machine solvers or deployment readiness.
 
 ### Current native implementation status
 
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
-workspace without loading FreeCAD. Core, persistence, and UI-model checks cover
-geometry measures, `.dld` round-trip and v1/v2/v3 migration, typed properties,
-hierarchy, dirty state, exact primitive/transform/Boolean recompute, feature
-status and error reporting, engineering-model validation and persistence,
-stable-ID object and subshape picking,
-preview/cancel/commit behavior, input validation, and move/feature-graph
-undo/redo. The headless QML smoke checks the common host
-and all three editor components. `make native-independence-check` finds no
+workspace without loading FreeCAD. Six CTest targets cover geometry measures,
+`.dld` round-trip and v1-v4 migration, typed properties, hierarchy, dirty state,
+exact primitive/transform/Boolean recompute, feature status and error
+reporting, engineering/electronics model validation and persistence, stable-ID
+object and subshape picking, move/feature-graph undo/redo, Circuit JSON/KiCad
+imports and ngspice, equation/unit gates, analytical checks, cantilever mesh
+convergence, reduced-response error, robotics timing/action contracts, MJCF
+well-formedness, and disabled hardware writes. The headless QML smoke checks
+the common host and all three editor components. `make native-independence-check` finds no
 FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings. The
 offscreen platform cannot render Qt Quick 3D; this environment also lacks the
 `xcb-cursor0` runtime needed for the Xvfb window and XTest pointer workflow.
@@ -238,12 +284,13 @@ but those do not complete the branded application gate by themselves.
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
   FreeCAD, Coin, SoQt, or PySide.
-- The native document owns its stable IDs, geometry, commands, and version-four
+- The native document owns its stable IDs, geometry, commands, and version-five
   `.dld` persistence, including initial face, edge, and vertex reference
   signatures. The previous FreeCAD document model remains the compatibility
   path until native import/export and project workflows are verified.
-- Keep all solver work out of the GUI process. No simulation code is introduced
-  in this shell slice.
+- Keep solver processes out of the GUI process. The current engineering slice
+  adds equation/solver contracts and small analytical, FEM, and robotics
+  fixtures; it does not add production multiphysics solvers to the application.
 
 ## Compatibility release status
 

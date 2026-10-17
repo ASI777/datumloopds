@@ -4,6 +4,7 @@
 #include "datumloop/core/DatumTopologyReference.hpp"
 #include "datumloop/core/DatumFeatureGraph.hpp"
 #include "datumloop/engineering/DatumEngineeringModel.hpp"
+#include "datumloop/electronics/ElectronicsModel.hpp"
 
 #include <TopoDS_Shape.hxx>
 
@@ -63,11 +64,16 @@ public:
     {
         return engineeringModel_;
     }
+    [[nodiscard]] const DatumElectronicsModel& electronicsModel() const noexcept
+    {
+        return electronicsModel_;
+    }
     [[nodiscard]] const DatumObject* object(const std::string& id) const noexcept;
     [[nodiscard]] bool setPosition(const std::string& id, const Vector3& position) noexcept;
     void setProperty(const std::string& id, std::string key, DatumPropertyValue value);
     [[nodiscard]] const DatumTopologyReference& addTopologyReference(DatumTopologyReference reference);
     void setEngineeringModel(DatumEngineeringModel model);
+    void setElectronicsModel(DatumElectronicsModel model);
     void setFeatureGraph(const std::string& objectId,
                          DatumFeatureGraph graph,
                          bool captureTopologyReferences = true);
@@ -81,6 +87,7 @@ private:
     std::vector<DatumObject> objects_;
     std::vector<DatumTopologyReference> topologyReferences_;
     DatumEngineeringModel engineeringModel_;
+    DatumElectronicsModel electronicsModel_;
     std::uint64_t revision_ = 0;
     bool dirty_ = true;
 };

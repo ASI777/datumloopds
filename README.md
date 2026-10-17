@@ -32,7 +32,7 @@ make freecad-check
 make build
 ```
 
-Build and run the native application and its C++ core and UI-model checks with:
+Build and run the native application and all C++ checks with:
 
 ```sh
 make native-check
@@ -40,14 +40,37 @@ make native-independence-check
 ./build/native/apps/datumloop-desktop/DatumLoopDS
 ```
 
-The native shell can open and save version-four `.dld` projects. The provisional
+The native shell can open and save version-five `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
 face/edge/vertex references, a recomputable primitive/transform/Boolean feature
-graph, and a separate mechanism/axis/motor engineering model. Engineering
-quantities use SI units and absent optional motor data remains unknown. Joints,
-solver state, and analysis results remain unsupported; see
+graph, engineering mechanisms and motors, and native material/circuit/PCB
+models. Engineering quantities use SI units and missing optional data remains
+unknown. The circuit solver returns a resistor DC operating point and power
+placeholder only; it does not solve thermal fields. See
 [`docs/native-project-format.md`](docs/native-project-format.md).
+
+The first electronics slice imports one PCB from Circuit JSON or a supported
+subset of KiCad `.kicad_pcb` and displays a derived OCCT preview. Try a sample
+board with:
+
+```sh
+./build/native/apps/datumloop-desktop/DatumLoopDS --pcb path/to/board.kicad_pcb
+```
+
+Format limits, material/physics/coupling architecture, solver boundaries, and
+the tscircuit repository license/version review are recorded in
+[`docs/electronics-materials-multiphysics.md`](docs/electronics-materials-multiphysics.md).
+
+Equation governance, analytical/FEM verification, a limited reduced beam
+response, and the simulated-only robot/RL/control interfaces are documented in
+[`docs/engineering-equation-governance.md`](docs/engineering-equation-governance.md),
+[`docs/numerical-verification.md`](docs/numerical-verification.md),
+[`docs/multifidelity-simulation.md`](docs/multifidelity-simulation.md),
+[`docs/robot-learning-architecture.md`](docs/robot-learning-architecture.md),
+and [`docs/sim-to-real.md`](docs/sim-to-real.md). These are small engineering
+foundations; they do not claim a general-purpose multiphysics solver, trained
+policy, or hardware-ready control path.
 
 `make native-smoke` starts the native window and verifies that Qt Quick
 presented a frame; run it from a desktop session with a working graphics

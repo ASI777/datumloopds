@@ -22,7 +22,7 @@ class NativeArchitectureBoundaryTests(unittest.TestCase):
         self.assertIn("geometry_->setMesh(mesh)", quick3d_renderer)
         self.assertNotIn("TopoDS", quick3d_renderer)
         self.assertIn("QtQuick3DRenderer renderer(geometry)", app_main)
-        self.assertIn("OcctKernel::tessellate(demoPart.shape)", app_main)
+        self.assertIn("OcctKernel::tessellate(initialObject->shape)", app_main)
 
     def test_document_core_does_not_depend_on_qml_or_quick(self):
         cmake = (ROOT / "CMakeLists.txt").read_text()

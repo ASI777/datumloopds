@@ -1,4 +1,5 @@
 #include "datumloop/io/DldProjectStore.hpp"
+#include "datumloop/io/ElectronicsProjectCodec.hpp"
 #include "datumloop/topology/DatumTopologyResolver.hpp"
 
 #include "datumloop/geometry/OcctKernel.hpp"
@@ -794,7 +795,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     }
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
-    if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 &&
+    if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
@@ -949,13 +950,22 @@ DatumDocument decodeProject(const QJsonObject& root)
         }
     }
     const QJsonValue engineeringValue = root.value(QStringLiteral("engineeringModel"));
-    if (schemaNumber == static_cast<double>(DldProjectStore::SchemaVersion)) {
+    if (schemaNumber >= 4.0) {
         if (!engineeringValue.isObject()) {
             fail(QStringLiteral("Project engineeringModel is missing or invalid."));
         }
         document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject()));
     } else if (!engineeringValue.isUndefined()) {
         fail(QStringLiteral("Project contains engineeringModel data unsupported by its schema version."));
+    }
+    const QJsonValue electronicsValue = root.value(QStringLiteral("electronicsModel"));
+    if (schemaNumber == static_cast<double>(DldProjectStore::SchemaVersion)) {
+        if (!electronicsValue.isObject()) {
+            fail(QStringLiteral("Project electronicsModel is missing or invalid."));
+        }
+        document.setElectronicsModel(decodeElectronicsModel(electronicsValue.toObject()));
+    } else if (!electronicsValue.isUndefined()) {
+        fail(QStringLiteral("Project contains electronicsModel data unsupported by its schema version."));
     }
     document.markSaved();
     return document;
@@ -1009,6 +1019,7 @@ void DldProjectStore::save(DatumDocument& document, const QString& filePath)
         {QStringLiteral("objects"), objects},
         {QStringLiteral("topologyReferences"), topologyReferences},
         {QStringLiteral("engineeringModel"), encodeEngineeringModel(document.engineeringModel())},
+        {QStringLiteral("electronicsModel"), encodeElectronicsModel(document.electronicsModel())},
     };
     const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Indented);
     QSaveFile file(filePath);
