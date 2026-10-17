@@ -7,8 +7,12 @@ image is Ubuntu 26.04 for Linux amd64, identified by its immutable OCI digest.
 APT uses the Ubuntu archive snapshot `20261017T000000Z`; the lock pins CMake,
 GCC/build-essential, Qt 6, OCCT, and ngspice direct packages. Transitive APT
 dependencies resolve from that dated archive snapshot rather than the live
-archive. Ubuntu documents timestamped archive snapshots for reproducible
-package sets in its [snapshot service guide](https://ubuntu.com/server/docs/how-to/software/snapshot-service/).
+archive. The minimal Ubuntu base omits CA roots, so the image first installs
+the version-pinned CA and SSL bootstrap packages listed in the lock from
+Ubuntu's signed archive metadata, then verifies the HTTPS snapshot. Both APT
+index updates fail on partial downloads to avoid falling back to stale or live
+package indexes. Ubuntu documents timestamped archive snapshots for
+reproducible package sets in its [snapshot service guide](https://ubuntu.com/server/docs/how-to/software/snapshot-service/).
 Docker documents digest-pinned base images in its
 [build guidance](https://docs.docker.com/build/building/best-practices/#pin-base-image-versions).
 

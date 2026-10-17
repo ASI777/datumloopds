@@ -1,13 +1,19 @@
 # Linux amd64, Ubuntu 26.04 (Resolute), Ubuntu archive snapshot 20261017T000000Z.
 # Keep this list in sync with the pinned snapshot and base image in
-# native-build.Dockerfile. APT resolves transitive packages only from that
-# immutable archive snapshot.
+# native-build.Dockerfile. The CA bootstrap packages are first fetched at these
+# exact versions from Ubuntu's signed base-image archive over HTTP; every other
+# package and the bootstrap versions are then resolved against the immutable
+# dated snapshot.
 build-essential=12.12ubuntu2.26.04.2
+ca-certificates=20260601~26.04.1
 cmake=4.2.3-2ubuntu2
 libngspice0=45.2+ds-1
+libssl3t64=3.5.5-1ubuntu3.7
 libocct-foundation-dev=7.9.2+dfsg-4
 libocct-modeling-algorithms-dev=7.9.2+dfsg-4
 libocct-modeling-data-dev=7.9.2+dfsg-4
+openssl=3.5.5-1ubuntu3.7
+openssl-provider-legacy=3.5.5-1ubuntu3.7
 qt6-base-dev=6.10.2+dfsg-7
 qt6-declarative-dev=6.10.2+dfsg-3
 qt6-quick3d-dev=6.10.2-1
