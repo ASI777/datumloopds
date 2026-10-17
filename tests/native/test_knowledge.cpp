@@ -65,12 +65,14 @@ int main()
         }, "dimension arithmetic accepted force plus temperature");
 
         const datumloop::EquationRegistry registry = datumloop::makeInitialEquationRegistry();
-        require(registry.equations().size() == 4, "initial equation registry must contain the three original equations and the cantilever model");
+        require(registry.equations().size() == 5, "initial equation registry must contain the original equations and both structural models");
         const auto* newton = registry.find("mechanics.newton.second-law.translation.v1");
         const auto* heat = registry.find("thermal.heat-equation.isotropic.v1");
         const auto* elasticity = registry.find("materials.elasticity.uniaxial-linear.v1");
         const auto* timoshenko = registry.find("structural.timoshenko-beam.isotropic.v1");
+        const auto* elasticity3d = registry.find("structural.linear-elasticity.3d.isotropic-small-strain.v1");
         require(newton != nullptr && heat != nullptr && elasticity != nullptr && timoshenko != nullptr &&
+                    elasticity3d != nullptr &&
                     newton->maturity == datumloop::ModelMaturity::E3 &&
                     registry.findAtLeast(newton->id, datumloop::ModelMaturity::E3) == newton &&
                     registry.findAtLeast(newton->id, datumloop::ModelMaturity::E4) == nullptr,
@@ -81,7 +83,12 @@ int main()
                     newton->variables.front().coordinateSystem == "Cartesian" &&
                     elasticity->weakForm.has_value() && !elasticity->constitutiveRelationships.empty() &&
                     timoshenko->maturity == datumloop::ModelMaturity::E4 && timoshenko->weakForm.has_value() &&
-                    registry.findAtLeast(timoshenko->id, datumloop::ModelMaturity::E4) == timoshenko,
+                    registry.findAtLeast(timoshenko->id, datumloop::ModelMaturity::E4) == timoshenko &&
+                    elasticity3d->maturity == datumloop::ModelMaturity::E3 &&
+                    elasticity3d->weakForm.has_value() &&
+                    elasticity3d->variables[0].quantityType == datumloop::EquationQuantityType::Vector &&
+                    elasticity3d->variables[1].quantityType == datumloop::EquationQuantityType::Tensor2 &&
+                    registry.findAtLeast(elasticity3d->id, datumloop::ModelMaturity::E3) == elasticity3d,
                 "equation formulations must carry explicit strong/weak form and vector frame metadata");
         auto unframedVector = newton->variables.front();
         unframedVector.referenceFrame.clear();

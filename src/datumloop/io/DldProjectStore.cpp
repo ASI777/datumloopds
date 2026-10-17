@@ -24,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace datumloop {
 namespace {
@@ -872,6 +873,422 @@ DatumMotor decodeMotor(const QJsonObject& object)
     return motor;
 }
 
+QJsonArray encodeStringArray(const std::vector<std::string>& values)
+{
+    QJsonArray result;
+    for (const std::string& value : values) result.append(fromUtf8(value));
+    return result;
+}
+
+std::vector<std::string> decodeStringArray(const QJsonValue& value, const QString& field)
+{
+    if (!value.isArray()) fail(QStringLiteral("Engineering field '%1' must be an array.").arg(field));
+    std::vector<std::string> result;
+    for (const QJsonValue& item : value.toArray()) {
+        if (!item.isString() || item.toString().trimmed().isEmpty()) {
+            fail(QStringLiteral("Engineering field '%1' entries must be non-empty strings.").arg(field));
+        }
+        result.push_back(toUtf8(item.toString()));
+    }
+    return result;
+}
+
+QJsonObject encodeBoundaryCondition(const BoundaryCondition& condition)
+{
+    QJsonObject result{
+        {QStringLiteral("id"), fromUtf8(boundaryConditionId(condition))},
+        {QStringLiteral("name"), fromUtf8(std::visit([](const auto& item) { return item.name; }, condition))},
+        {QStringLiteral("cadObjectId"), fromUtf8(boundaryConditionCadObjectId(condition))},
+    };
+    std::visit([&result](const auto& item) {
+        using T = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<T, FixedDisplacement>) {
+            QJsonArray components;
+            for (const bool constrained : item.constrainedComponents) components.append(constrained);
+            result.insert(QStringLiteral("type"), QStringLiteral("fixed_displacement"));
+            result.insert(QStringLiteral("topologyReferenceId"), fromUtf8(item.topologyReferenceId));
+            result.insert(QStringLiteral("displacementM"), encodeVector(item.displacementM));
+            result.insert(QStringLiteral("constrainedComponents"), components);
+        } else if constexpr (std::is_same_v<T, AppliedForce>) {
+            result.insert(QStringLiteral("type"), QStringLiteral("applied_force"));
+            result.insert(QStringLiteral("topologyReferenceId"), fromUtf8(item.topologyReferenceId));
+            result.insert(QStringLiteral("totalForceN"), encodeVector(item.totalForceN));
+        } else if constexpr (std::is_same_v<T, AppliedPressure>) {
+            result.insert(QStringLiteral("type"), QStringLiteral("applied_pressure"));
+            result.insert(QStringLiteral("topologyReferenceId"), fromUtf8(item.topologyReferenceId));
+            result.insert(QStringLiteral("pressurePa"), item.pressurePa);
+        } else if constexpr (std::is_same_v<T, BodyForce>) {
+            result.insert(QStringLiteral("type"), QStringLiteral("body_force"));
+            result.insert(QStringLiteral("forceDensityNPerM3"), encodeVector(item.forceDensityNPerM3));
+        } else if constexpr (std::is_same_v<T, InitialCondition>) {
+            result.insert(QStringLiteral("type"), QStringLiteral("initial_condition"));
+            result.insert(QStringLiteral("displacementM"), encodeVector(item.displacementM));
+            result.insert(QStringLiteral("velocityMPerS"), encodeVector(item.velocityMPerS));
+        }
+    }, condition);
+    return result;
+}
+
+BoundaryCondition decodeBoundaryCondition(const QJsonObject& object)
+{
+    const std::string type = toUtf8(requiredString(object, QStringLiteral("type")));
+    const std::string id = toUtf8(requiredString(object, QStringLiteral("id")));
+    const std::string name = toUtf8(requiredString(object, QStringLiteral("name")));
+    const std::string cadObjectId = toUtf8(requiredString(object, QStringLiteral("cadObjectId")));
+    if (type == "fixed_displacement") {
+        FixedDisplacement result;
+        result.id = id;
+        result.name = name;
+        result.cadObjectId = cadObjectId;
+        result.topologyReferenceId = toUtf8(requiredString(object, QStringLiteral("topologyReferenceId")));
+        result.displacementM = decodeVector(object.value(QStringLiteral("displacementM")),
+                                            QStringLiteral("condition.displacementM"));
+        const QJsonValue componentsValue = object.value(QStringLiteral("constrainedComponents"));
+        if (!componentsValue.isArray() || componentsValue.toArray().size() != 3) {
+            fail(QStringLiteral("Fixed displacement constrainedComponents must contain three booleans."));
+        }
+        for (qsizetype index = 0; index < 3; ++index) {
+            const QJsonValue component = componentsValue.toArray().at(index);
+            if (!component.isBool()) fail(QStringLiteral("Fixed displacement components must be booleans."));
+            result.constrainedComponents[static_cast<std::size_t>(index)] = component.toBool();
+        }
+        return result;
+    }
+    if (type == "applied_force") {
+        return AppliedForce{id, name, cadObjectId,
+                            toUtf8(requiredString(object, QStringLiteral("topologyReferenceId"))),
+                            decodeVector(object.value(QStringLiteral("totalForceN")),
+                                         QStringLiteral("condition.totalForceN"))};
+    }
+    if (type == "applied_pressure") {
+        return AppliedPressure{id, name, cadObjectId,
+                               toUtf8(requiredString(object, QStringLiteral("topologyReferenceId"))),
+                               requiredFiniteNumber(object.value(QStringLiteral("pressurePa")),
+                                                    QStringLiteral("condition.pressurePa"))};
+    }
+    if (type == "body_force") {
+        return BodyForce{id, name, cadObjectId,
+                         decodeVector(object.value(QStringLiteral("forceDensityNPerM3")),
+                                      QStringLiteral("condition.forceDensityNPerM3"))};
+    }
+    if (type == "initial_condition") {
+        return InitialCondition{id, name, cadObjectId,
+                                decodeVector(object.value(QStringLiteral("displacementM")),
+                                             QStringLiteral("condition.displacementM")),
+                                decodeVector(object.value(QStringLiteral("velocityMPerS")),
+                                             QStringLiteral("condition.velocityMPerS"))};
+    }
+    fail(QStringLiteral("Unknown structural condition type '%1'.").arg(QString::fromUtf8(type)));
+}
+
+QJsonObject encodeAnalysisMeshProvenance(const AnalysisMeshProvenance& mesh)
+{
+    return {{QStringLiteral("revisionId"), fromUtf8(mesh.revisionId)},
+            {QStringLiteral("generator"), fromUtf8(mesh.generator)},
+            {QStringLiteral("generatorVersion"), fromUtf8(mesh.generatorVersion)},
+            {QStringLiteral("elementType"), fromUtf8(mesh.elementType)},
+            {QStringLiteral("requestedMaximumElementSizeM"), mesh.requestedMaximumElementSizeM},
+            {QStringLiteral("nodeCount"), static_cast<double>(mesh.nodeCount)},
+            {QStringLiteral("elementCount"), static_cast<double>(mesh.elementCount)},
+            {QStringLiteral("minimumScaledJacobian"), mesh.minimumScaledJacobian},
+            {QStringLiteral("maximumAspectRatio"), mesh.maximumAspectRatio}};
+}
+
+AnalysisMeshProvenance decodeAnalysisMeshProvenance(const QJsonValue& value)
+{
+    if (!value.isObject()) fail(QStringLiteral("Analysis mesh provenance must be an object."));
+    const QJsonObject object = value.toObject();
+    AnalysisMeshProvenance mesh;
+    mesh.revisionId = toUtf8(requiredString(object, QStringLiteral("revisionId")));
+    mesh.generator = toUtf8(requiredString(object, QStringLiteral("generator")));
+    mesh.generatorVersion = toUtf8(requiredString(object, QStringLiteral("generatorVersion")));
+    mesh.elementType = toUtf8(requiredString(object, QStringLiteral("elementType")));
+    mesh.requestedMaximumElementSizeM =
+        requiredFiniteNumber(object.value(QStringLiteral("requestedMaximumElementSizeM")),
+                             QStringLiteral("analysis.mesh.requestedMaximumElementSizeM"));
+    const double nodes = requiredFiniteNumber(object.value(QStringLiteral("nodeCount")),
+                                              QStringLiteral("analysis.mesh.nodeCount"));
+    const double elements = requiredFiniteNumber(object.value(QStringLiteral("elementCount")),
+                                                  QStringLiteral("analysis.mesh.elementCount"));
+    if (nodes < 0.0 || std::floor(nodes) != nodes || elements < 0.0 || std::floor(elements) != elements) {
+        fail(QStringLiteral("Analysis mesh nodeCount and elementCount must be non-negative integers."));
+    }
+    mesh.nodeCount = static_cast<std::uint64_t>(nodes);
+    mesh.elementCount = static_cast<std::uint64_t>(elements);
+    mesh.minimumScaledJacobian =
+        requiredFiniteNumber(object.value(QStringLiteral("minimumScaledJacobian")),
+                             QStringLiteral("analysis.mesh.minimumScaledJacobian"));
+    mesh.maximumAspectRatio =
+        requiredFiniteNumber(object.value(QStringLiteral("maximumAspectRatio")),
+                             QStringLiteral("analysis.mesh.maximumAspectRatio"));
+    return mesh;
+}
+
+QJsonObject encodeFieldDataset(const FieldDataset& field)
+{
+    QJsonArray values;
+    for (const double value : field.values) values.append(value);
+    return {{QStringLiteral("id"), fromUtf8(field.id)},
+            {QStringLiteral("fieldType"), fromUtf8(fieldTypeName(field.fieldType))},
+            {QStringLiteral("location"), fromUtf8(fieldLocationName(field.location))},
+            {QStringLiteral("components"), encodeStringArray(field.components)},
+            {QStringLiteral("units"), fromUtf8(field.units)},
+            {QStringLiteral("meshRevisionId"), fromUtf8(field.meshRevisionId)},
+            {QStringLiteral("solverRunId"), fromUtf8(field.solverRunId)},
+            {QStringLiteral("values"), values}};
+}
+
+FieldDataset decodeFieldDataset(const QJsonValue& value)
+{
+    if (!value.isObject()) fail(QStringLiteral("Structural field dataset entries must be objects."));
+    const QJsonObject object = value.toObject();
+    FieldDataset field;
+    field.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    const std::string typeName = toUtf8(requiredString(object, QStringLiteral("fieldType")));
+    const auto type = fieldTypeFromName(typeName);
+    if (!type.has_value()) fail(QStringLiteral("Unknown structural field type '%1'.").arg(fromUtf8(typeName)));
+    field.fieldType = *type;
+    const std::string locationName = toUtf8(requiredString(object, QStringLiteral("location")));
+    const auto location = fieldLocationFromName(locationName);
+    if (!location.has_value()) fail(QStringLiteral("Unknown structural field location '%1'.").arg(fromUtf8(locationName)));
+    field.location = *location;
+    field.components = decodeStringArray(object.value(QStringLiteral("components")), QStringLiteral("field.components"));
+    field.units = toUtf8(requiredString(object, QStringLiteral("units")));
+    field.meshRevisionId = toUtf8(requiredString(object, QStringLiteral("meshRevisionId")));
+    field.solverRunId = toUtf8(requiredString(object, QStringLiteral("solverRunId")));
+    const QJsonValue values = object.value(QStringLiteral("values"));
+    if (!values.isArray()) fail(QStringLiteral("Structural field values must be an array."));
+    field.values.reserve(static_cast<std::size_t>(values.toArray().size()));
+    for (const QJsonValue& valueItem : values.toArray()) {
+        field.values.push_back(requiredFiniteNumber(valueItem, QStringLiteral("field.values[]")));
+    }
+    return field;
+}
+
+QJsonObject encodeAnalysisRunProvenance(const AnalysisRunProvenance& provenance)
+{
+    return {{QStringLiteral("solverRunId"), fromUtf8(provenance.solverRunId)},
+            {QStringLiteral("timestampUtc"), fromUtf8(provenance.timestampUtc)},
+            {QStringLiteral("sourceProjectId"), fromUtf8(provenance.sourceProjectId)},
+            {QStringLiteral("sourceDocumentRevision"), static_cast<double>(provenance.sourceDocumentRevision)},
+            {QStringLiteral("cadObjectId"), fromUtf8(provenance.cadObjectId)},
+            {QStringLiteral("geometryFeatureId"), encodeOptionalString(provenance.geometryFeatureId)},
+            {QStringLiteral("materialDefinitionId"), fromUtf8(provenance.materialDefinitionId)},
+            {QStringLiteral("materialRevision"), fromUtf8(provenance.materialRevision)},
+            {QStringLiteral("materialStateId"), encodeOptionalString(provenance.materialStateId)},
+            {QStringLiteral("analysisTemperatureK"), encodeOptionalNumber(provenance.analysisTemperatureK)},
+            {QStringLiteral("temperatureRangeVerified"), provenance.temperatureRangeVerified},
+            {QStringLiteral("equationDefinitionId"), fromUtf8(provenance.equationDefinitionId)},
+            {QStringLiteral("equationMaturity"), fromUtf8(modelMaturityName(provenance.equationMaturity))},
+            {QStringLiteral("solverId"), fromUtf8(provenance.solverId)},
+            {QStringLiteral("solverVersion"), fromUtf8(provenance.solverVersion)},
+            {QStringLiteral("mesh"), encodeAnalysisMeshProvenance(provenance.mesh)},
+            {QStringLiteral("topologyReferenceIds"), encodeStringArray(provenance.topologyReferenceIds)},
+            {QStringLiteral("boundaryConditionIds"), encodeStringArray(provenance.boundaryConditionIds)},
+            {QStringLiteral("absoluteTolerance"), provenance.absoluteTolerance},
+            {QStringLiteral("relativeTolerance"), provenance.relativeTolerance},
+            {QStringLiteral("maximumIterations"), static_cast<double>(provenance.maximumIterations)},
+            {QStringLiteral("agentProposalId"), encodeOptionalString(provenance.agentProposalId)}};
+}
+
+ModelMaturity decodeModelMaturity(const QJsonValue& value)
+{
+    const QString name = requiredString(QJsonObject{{QStringLiteral("maturity"), value}},
+                                        QStringLiteral("maturity"));
+    const std::string text = toUtf8(name);
+    if (text == "E0") return ModelMaturity::E0;
+    if (text == "E1") return ModelMaturity::E1;
+    if (text == "E2") return ModelMaturity::E2;
+    if (text == "E3") return ModelMaturity::E3;
+    if (text == "E4") return ModelMaturity::E4;
+    if (text == "E5") return ModelMaturity::E5;
+    if (text == "E6") return ModelMaturity::E6;
+    fail(QStringLiteral("Unknown engineering equation maturity '%1'.").arg(name));
+}
+
+AnalysisRunProvenance decodeAnalysisRunProvenance(const QJsonValue& value)
+{
+    if (!value.isObject()) fail(QStringLiteral("Structural run provenance must be an object."));
+    const QJsonObject object = value.toObject();
+    AnalysisRunProvenance provenance;
+    provenance.solverRunId = toUtf8(requiredString(object, QStringLiteral("solverRunId")));
+    provenance.timestampUtc = toUtf8(requiredString(object, QStringLiteral("timestampUtc")));
+    provenance.sourceProjectId = toUtf8(requiredString(object, QStringLiteral("sourceProjectId")));
+    const double documentRevision = requiredFiniteNumber(
+        object.value(QStringLiteral("sourceDocumentRevision")), QStringLiteral("provenance.sourceDocumentRevision"));
+    if (documentRevision < 0.0 || std::floor(documentRevision) != documentRevision) {
+        fail(QStringLiteral("Source document revision must be a non-negative integer."));
+    }
+    provenance.sourceDocumentRevision = static_cast<std::uint64_t>(documentRevision);
+    provenance.cadObjectId = toUtf8(requiredString(object, QStringLiteral("cadObjectId")));
+    provenance.geometryFeatureId = decodeOptionalString(object, QStringLiteral("geometryFeatureId"));
+    provenance.materialDefinitionId = toUtf8(requiredString(object, QStringLiteral("materialDefinitionId")));
+    provenance.materialRevision = toUtf8(requiredString(object, QStringLiteral("materialRevision")));
+    provenance.materialStateId = decodeOptionalString(object, QStringLiteral("materialStateId"));
+    provenance.analysisTemperatureK = decodeOptionalNumber(object, QStringLiteral("analysisTemperatureK"));
+    const QJsonValue temperatureVerified = object.value(QStringLiteral("temperatureRangeVerified"));
+    if (!temperatureVerified.isBool()) fail(QStringLiteral("temperatureRangeVerified must be boolean."));
+    provenance.temperatureRangeVerified = temperatureVerified.toBool();
+    provenance.equationDefinitionId = toUtf8(requiredString(object, QStringLiteral("equationDefinitionId")));
+    provenance.equationMaturity = decodeModelMaturity(object.value(QStringLiteral("equationMaturity")));
+    provenance.solverId = toUtf8(requiredString(object, QStringLiteral("solverId")));
+    provenance.solverVersion = toUtf8(requiredString(object, QStringLiteral("solverVersion")));
+    provenance.mesh = decodeAnalysisMeshProvenance(object.value(QStringLiteral("mesh")));
+    provenance.topologyReferenceIds = decodeStringArray(object.value(QStringLiteral("topologyReferenceIds")),
+                                                          QStringLiteral("provenance.topologyReferenceIds"));
+    provenance.boundaryConditionIds = decodeStringArray(object.value(QStringLiteral("boundaryConditionIds")),
+                                                         QStringLiteral("provenance.boundaryConditionIds"));
+    provenance.absoluteTolerance =
+        requiredFiniteNumber(object.value(QStringLiteral("absoluteTolerance")), QStringLiteral("provenance.absoluteTolerance"));
+    provenance.relativeTolerance =
+        requiredFiniteNumber(object.value(QStringLiteral("relativeTolerance")), QStringLiteral("provenance.relativeTolerance"));
+    const double maximumIterations = requiredFiniteNumber(
+        object.value(QStringLiteral("maximumIterations")), QStringLiteral("provenance.maximumIterations"));
+    if (maximumIterations < 0.0 || std::floor(maximumIterations) != maximumIterations ||
+        maximumIterations > std::numeric_limits<std::uint32_t>::max()) {
+        fail(QStringLiteral("Maximum solver iterations must be a non-negative integer."));
+    }
+    provenance.maximumIterations = static_cast<std::uint32_t>(maximumIterations);
+    provenance.agentProposalId = decodeOptionalString(object, QStringLiteral("agentProposalId"));
+    return provenance;
+}
+
+QJsonObject encodeStructuralRun(const StructuralAnalysisRun& run)
+{
+    QJsonArray fields;
+    for (const FieldDataset& field : run.fields) fields.append(encodeFieldDataset(field));
+    return {{QStringLiteral("provenance"), encodeAnalysisRunProvenance(run.provenance)},
+            {QStringLiteral("converged"), run.converged},
+            {QStringLiteral("iterations"), static_cast<double>(run.iterations)},
+            {QStringLiteral("relativeResidual"), run.relativeResidual},
+            {QStringLiteral("appliedForceN"), encodeVector(run.appliedForceN)},
+            {QStringLiteral("reactionForceN"), encodeVector(run.reactionForceN)},
+            {QStringLiteral("relativeForceBalanceError"), run.relativeForceBalanceError},
+            {QStringLiteral("tipDisplacementM"), run.tipDisplacementM},
+            {QStringLiteral("maximumDisplacementM"), run.maximumDisplacementM},
+            {QStringLiteral("sectionAxialStressPa"), run.sectionAxialStressPa},
+            {QStringLiteral("sectionStressSamplePositionM"), encodeVector(run.sectionStressSamplePositionM)},
+            {QStringLiteral("maximumVonMisesStressPa"), run.maximumVonMisesStressPa},
+            {QStringLiteral("strainEnergyJ"), run.strainEnergyJ},
+            {QStringLiteral("fields"), fields}};
+}
+
+StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value)
+{
+    if (!value.isObject()) fail(QStringLiteral("Structural analysis run entries must be objects."));
+    const QJsonObject object = value.toObject();
+    StructuralAnalysisRun run;
+    run.provenance = decodeAnalysisRunProvenance(object.value(QStringLiteral("provenance")));
+    const QJsonValue converged = object.value(QStringLiteral("converged"));
+    if (!converged.isBool()) fail(QStringLiteral("Structural run converged must be boolean."));
+    run.converged = converged.toBool();
+    const double iterations = requiredFiniteNumber(object.value(QStringLiteral("iterations")),
+                                                   QStringLiteral("run.iterations"));
+    if (iterations < 0.0 || std::floor(iterations) != iterations ||
+        iterations > std::numeric_limits<std::uint32_t>::max()) {
+        fail(QStringLiteral("Structural run iterations must be a non-negative integer."));
+    }
+    run.iterations = static_cast<std::uint32_t>(iterations);
+    run.relativeResidual =
+        requiredFiniteNumber(object.value(QStringLiteral("relativeResidual")), QStringLiteral("run.relativeResidual"));
+    run.appliedForceN = decodeVector(object.value(QStringLiteral("appliedForceN")), QStringLiteral("run.appliedForceN"));
+    run.reactionForceN = decodeVector(object.value(QStringLiteral("reactionForceN")), QStringLiteral("run.reactionForceN"));
+    run.relativeForceBalanceError = requiredFiniteNumber(object.value(QStringLiteral("relativeForceBalanceError")),
+                                                         QStringLiteral("run.relativeForceBalanceError"));
+    run.tipDisplacementM = requiredFiniteNumber(object.value(QStringLiteral("tipDisplacementM")),
+                                                 QStringLiteral("run.tipDisplacementM"));
+    run.maximumDisplacementM = requiredFiniteNumber(object.value(QStringLiteral("maximumDisplacementM")),
+                                                     QStringLiteral("run.maximumDisplacementM"));
+    run.sectionAxialStressPa = requiredFiniteNumber(object.value(QStringLiteral("sectionAxialStressPa")),
+                                                     QStringLiteral("run.sectionAxialStressPa"));
+    run.sectionStressSamplePositionM = decodeVector(object.value(QStringLiteral("sectionStressSamplePositionM")),
+                                                     QStringLiteral("run.sectionStressSamplePositionM"));
+    run.maximumVonMisesStressPa = requiredFiniteNumber(object.value(QStringLiteral("maximumVonMisesStressPa")),
+                                                        QStringLiteral("run.maximumVonMisesStressPa"));
+    run.strainEnergyJ = requiredFiniteNumber(object.value(QStringLiteral("strainEnergyJ")),
+                                              QStringLiteral("run.strainEnergyJ"));
+    const QJsonValue fields = object.value(QStringLiteral("fields"));
+    if (!fields.isArray()) fail(QStringLiteral("Structural run fields must be an array."));
+    for (const QJsonValue& field : fields.toArray()) run.fields.push_back(decodeFieldDataset(field));
+    return run;
+}
+
+QJsonObject encodeStructuralStudy(const StructuralAnalysisStudy& study)
+{
+    QJsonArray conditions;
+    for (const BoundaryCondition& condition : study.boundaryConditions) {
+        conditions.append(encodeBoundaryCondition(condition));
+    }
+    QJsonArray runs;
+    for (const StructuralAnalysisRun& run : study.runs) runs.append(encodeStructuralRun(run));
+    QJsonValue convergence(QJsonValue::Null);
+    if (study.meshConvergence.has_value()) {
+        const StructuralMeshConvergence& item = *study.meshConvergence;
+        convergence = QJsonObject{{QStringLiteral("solverRunIds"), encodeStringArray(item.solverRunIds)},
+                                  {QStringLiteral("relativeTipDisplacementChange"), item.relativeTipDisplacementChange},
+                                  {QStringLiteral("relativeStrainEnergyChange"), item.relativeStrainEnergyChange},
+                                  {QStringLiteral("relativeSectionStressChange"), item.relativeSectionStressChange},
+                                  {QStringLiteral("tolerance"), item.tolerance},
+                                  {QStringLiteral("converged"), item.converged}};
+    }
+    return {{QStringLiteral("id"), fromUtf8(study.id)},
+            {QStringLiteral("name"), fromUtf8(study.name)},
+            {QStringLiteral("cadObjectId"), fromUtf8(study.cadObjectId)},
+            {QStringLiteral("materialDefinitionId"), fromUtf8(study.materialDefinitionId)},
+            {QStringLiteral("materialStateId"), encodeOptionalString(study.materialStateId)},
+            {QStringLiteral("equationDefinitionId"), fromUtf8(study.equationDefinitionId)},
+            {QStringLiteral("boundaryConditions"), conditions},
+            {QStringLiteral("runs"), runs},
+            {QStringLiteral("meshConvergence"), convergence}};
+}
+
+StructuralAnalysisStudy decodeStructuralStudy(const QJsonValue& value)
+{
+    if (!value.isObject()) fail(QStringLiteral("Structural study entries must be objects."));
+    const QJsonObject object = value.toObject();
+    StructuralAnalysisStudy study;
+    study.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    study.name = toUtf8(requiredString(object, QStringLiteral("name")));
+    study.cadObjectId = toUtf8(requiredString(object, QStringLiteral("cadObjectId")));
+    study.materialDefinitionId = toUtf8(requiredString(object, QStringLiteral("materialDefinitionId")));
+    study.materialStateId = decodeOptionalString(object, QStringLiteral("materialStateId"));
+    study.equationDefinitionId = toUtf8(requiredString(object, QStringLiteral("equationDefinitionId")));
+    const QJsonValue conditions = object.value(QStringLiteral("boundaryConditions"));
+    if (!conditions.isArray()) fail(QStringLiteral("Structural study boundaryConditions must be an array."));
+    for (const QJsonValue& condition : conditions.toArray()) {
+        if (!condition.isObject()) fail(QStringLiteral("Structural study condition entries must be objects."));
+        study.boundaryConditions.push_back(decodeBoundaryCondition(condition.toObject()));
+    }
+    const QJsonValue runs = object.value(QStringLiteral("runs"));
+    if (!runs.isArray()) fail(QStringLiteral("Structural study runs must be an array."));
+    for (const QJsonValue& run : runs.toArray()) study.runs.push_back(decodeStructuralRun(run));
+    const QJsonValue convergence = object.value(QStringLiteral("meshConvergence"));
+    if (convergence.isObject()) {
+        const QJsonObject item = convergence.toObject();
+        StructuralMeshConvergence record;
+        record.solverRunIds = decodeStringArray(item.value(QStringLiteral("solverRunIds")),
+                                                QStringLiteral("convergence.solverRunIds"));
+        record.relativeTipDisplacementChange = requiredFiniteNumber(
+            item.value(QStringLiteral("relativeTipDisplacementChange")),
+            QStringLiteral("convergence.relativeTipDisplacementChange"));
+        record.relativeStrainEnergyChange = requiredFiniteNumber(
+            item.value(QStringLiteral("relativeStrainEnergyChange")),
+            QStringLiteral("convergence.relativeStrainEnergyChange"));
+        record.relativeSectionStressChange = requiredFiniteNumber(
+            item.value(QStringLiteral("relativeSectionStressChange")),
+            QStringLiteral("convergence.relativeSectionStressChange"));
+        record.tolerance = requiredFiniteNumber(item.value(QStringLiteral("tolerance")),
+                                                QStringLiteral("convergence.tolerance"));
+        const QJsonValue converged = item.value(QStringLiteral("converged"));
+        if (!converged.isBool()) fail(QStringLiteral("Mesh convergence status must be boolean."));
+        record.converged = converged.toBool();
+        study.meshConvergence = std::move(record);
+    } else if (!convergence.isNull()) {
+        fail(QStringLiteral("Structural study meshConvergence must be an object or null."));
+    }
+    return study;
+}
+
 QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
 {
     QJsonArray mechanisms;
@@ -882,9 +1299,14 @@ QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
     for (const DatumMotor& motor : model.motors) {
         motors.append(encodeMotor(motor));
     }
+    QJsonArray studies;
+    for (const StructuralAnalysisStudy& study : model.structuralStudies) {
+        studies.append(encodeStructuralStudy(study));
+    }
     return {
         {QStringLiteral("mechanisms"), mechanisms},
         {QStringLiteral("motors"), motors},
+        {QStringLiteral("structuralStudies"), studies},
     };
 }
 
@@ -907,6 +1329,25 @@ DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object, int proj
             fail(QStringLiteral("Engineering motor entries must be objects."));
         }
         model.motors.push_back(decodeMotor(motorValue.toObject()));
+    }
+    const QJsonValue studiesValue = object.value(QStringLiteral("structuralStudies"));
+    if (projectSchemaVersion >= 7 && !studiesValue.isArray()) {
+        fail(QStringLiteral("Schema-seven engineering model structuralStudies must be an array."));
+    }
+    if (studiesValue.isArray()) {
+        if (projectSchemaVersion < 7 && !studiesValue.toArray().isEmpty()) {
+            fail(QStringLiteral("Structural analyses require schema version seven or newer."));
+        }
+        if (projectSchemaVersion < 7) {
+            // Older projects may carry the empty array emitted by a newer
+            // writer during migration tests; it contains no unsupported data.
+        } else {
+            for (const QJsonValue& studyValue : studiesValue.toArray()) {
+                model.structuralStudies.push_back(decodeStructuralStudy(studyValue));
+            }
+        }
+    } else if (!studiesValue.isUndefined()) {
+        fail(QStringLiteral("Engineering structuralStudies must be an array."));
     }
     try {
         model.validate();
@@ -1079,7 +1520,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
     if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
-        schemaNumber != 5.0 &&
+        schemaNumber != 5.0 && schemaNumber != 6.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
@@ -1233,15 +1674,6 @@ DatumDocument decodeProject(const QJsonObject& root)
             }
         }
     }
-    const QJsonValue engineeringValue = root.value(QStringLiteral("engineeringModel"));
-    if (schemaNumber >= 4.0) {
-        if (!engineeringValue.isObject()) {
-            fail(QStringLiteral("Project engineeringModel is missing or invalid."));
-        }
-        document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject(), static_cast<int>(schemaNumber)));
-    } else if (!engineeringValue.isUndefined()) {
-        fail(QStringLiteral("Project contains engineeringModel data unsupported by its schema version."));
-    }
     const QJsonValue electronicsValue = root.value(QStringLiteral("electronicsModel"));
     if (schemaNumber >= 5.0) {
         if (!electronicsValue.isObject()) {
@@ -1250,6 +1682,15 @@ DatumDocument decodeProject(const QJsonObject& root)
         document.setElectronicsModel(decodeElectronicsModel(electronicsValue.toObject()));
     } else if (!electronicsValue.isUndefined()) {
         fail(QStringLiteral("Project contains electronicsModel data unsupported by its schema version."));
+    }
+    const QJsonValue engineeringValue = root.value(QStringLiteral("engineeringModel"));
+    if (schemaNumber >= 4.0) {
+        if (!engineeringValue.isObject()) {
+            fail(QStringLiteral("Project engineeringModel is missing or invalid."));
+        }
+        document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject(), static_cast<int>(schemaNumber)));
+    } else if (!engineeringValue.isUndefined()) {
+        fail(QStringLiteral("Project contains engineeringModel data unsupported by its schema version."));
     }
     document.markSaved();
     return document;

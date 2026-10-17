@@ -46,9 +46,29 @@ bool hasEngineeringIdentity(const DatumEngineeringModel& model, const std::strin
             return true;
         }
     }
-    return std::any_of(model.motors.begin(), model.motors.end(), [&id](const auto& motor) {
-        return motor.id == id;
-    });
+    if (std::any_of(model.motors.begin(), model.motors.end(), [&id](const auto& motor) {
+            return motor.id == id;
+        })) {
+        return true;
+    }
+    for (const StructuralAnalysisStudy& study : model.structuralStudies) {
+        if (study.id == id ||
+            std::any_of(study.boundaryConditions.begin(), study.boundaryConditions.end(),
+                        [&id](const BoundaryCondition& condition) {
+                            return boundaryConditionId(condition) == id;
+                        })) {
+            return true;
+        }
+        for (const StructuralAnalysisRun& run : study.runs) {
+            if (run.provenance.solverRunId == id || run.provenance.mesh.revisionId == id ||
+                std::any_of(run.fields.begin(), run.fields.end(), [&id](const FieldDataset& field) {
+                    return field.id == id;
+                })) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void reserveEngineeringIdentities(const DatumEngineeringModel& model,
@@ -68,6 +88,17 @@ void reserveEngineeringIdentities(const DatumEngineeringModel& model,
     for (const DatumMotor& motor : model.motors) {
         reservedIds.insert(motor.id);
     }
+    for (const StructuralAnalysisStudy& study : model.structuralStudies) {
+        reservedIds.insert(study.id);
+        for (const BoundaryCondition& condition : study.boundaryConditions) {
+            reservedIds.insert(boundaryConditionId(condition));
+        }
+        for (const StructuralAnalysisRun& run : study.runs) {
+            reservedIds.insert(run.provenance.solverRunId);
+            reservedIds.insert(run.provenance.mesh.revisionId);
+            for (const FieldDataset& field : run.fields) reservedIds.insert(field.id);
+        }
+    }
 }
 
 void reserveElectronicsIdentities(const DatumElectronicsModel& model,
@@ -78,7 +109,10 @@ void reserveElectronicsIdentities(const DatumElectronicsModel& model,
             throw std::invalid_argument("electronics entity UUID collides with an existing document identity");
         }
     };
-    for (const MaterialDefinition& material : model.materials) reserve(material.id);
+    for (const MaterialDefinition& material : model.materials) {
+        reserve(material.id);
+        for (const MaterialSource& source : material.sources) reserve(source.id);
+    }
     for (const MaterialState& state : model.materialStates) reserve(state.id);
     for (const CircuitDocument& circuit : model.circuits) {
         reserve(circuit.id);
@@ -512,6 +546,76 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
             }
         }
     }
+    for (const StructuralAnalysisStudy& study : model.structuralStudies) {
+        if (!reservedIds.insert(study.id).second) {
+            throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+        }
+        if (object(study.cadObjectId) == nullptr) {
+            throw std::invalid_argument("structural study must reference an existing CAD object");
+        }
+        const MaterialDefinition* material = electronicsModel_.material(study.materialDefinitionId);
+        if (material == nullptr) {
+            throw std::invalid_argument("structural study must reference an existing material definition");
+        }
+        try {
+            material->validate();
+        } catch (const std::invalid_argument& error) {
+            throw std::invalid_argument(std::string("structural study material is invalid: ") + error.what());
+        }
+        if (study.materialStateId.has_value()) {
+            const auto state = std::find_if(
+                electronicsModel_.materialStates.begin(), electronicsModel_.materialStates.end(),
+                [&study](const MaterialState& item) { return item.id == *study.materialStateId; });
+            if (state == electronicsModel_.materialStates.end() ||
+                state->materialDefinitionId != study.materialDefinitionId) {
+                throw std::invalid_argument("structural study material state must reference its assigned material");
+            }
+        }
+        for (const BoundaryCondition& condition : study.boundaryConditions) {
+            const std::string conditionId = boundaryConditionId(condition);
+            if (!reservedIds.insert(conditionId).second ||
+                boundaryConditionCadObjectId(condition) != study.cadObjectId) {
+                throw std::invalid_argument("structural condition UUID or CAD object reference is invalid");
+            }
+            const std::optional<std::string> topologyId = boundaryConditionTopologyReferenceId(condition);
+            if (topologyId.has_value()) {
+                const auto topology = std::find_if(
+                    topologyReferences_.begin(), topologyReferences_.end(), [&topologyId](const auto& reference) {
+                        return reference.id == *topologyId;
+                    });
+                if (topology == topologyReferences_.end() || topology->objectId != study.cadObjectId ||
+                    topology->subshapeType != DatumSubshapeType::Face) {
+                    throw std::invalid_argument("structural boundary conditions must reference a persisted CAD face on their body");
+                }
+            }
+        }
+        for (const StructuralAnalysisRun& run : study.runs) {
+            if (!reservedIds.insert(run.provenance.solverRunId).second ||
+                !reservedIds.insert(run.provenance.mesh.revisionId).second ||
+                run.provenance.sourceProjectId != projectId_ ||
+                run.provenance.cadObjectId != study.cadObjectId ||
+                run.provenance.materialDefinitionId != study.materialDefinitionId ||
+                run.provenance.materialStateId != study.materialStateId ||
+                run.provenance.equationDefinitionId != study.equationDefinitionId) {
+                throw std::invalid_argument("structural result provenance must match its project and study inputs");
+            }
+            for (const std::string& topologyId : run.provenance.topologyReferenceIds) {
+                const auto topology = std::find_if(topologyReferences_.begin(), topologyReferences_.end(),
+                                                   [&topologyId](const auto& reference) {
+                                                       return reference.id == topologyId;
+                                                   });
+                if (topology == topologyReferences_.end() || topology->objectId != study.cadObjectId ||
+                    topology->subshapeType != DatumSubshapeType::Face) {
+                    throw std::invalid_argument("analysis provenance must reference existing faces on its CAD body");
+                }
+            }
+            for (const FieldDataset& field : run.fields) {
+                if (!reservedIds.insert(field.id).second) {
+                    throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+                }
+            }
+        }
+    }
 
     if (engineeringModel_ != model) {
         engineeringModel_ = std::move(model);
@@ -537,6 +641,21 @@ void DatumDocument::setElectronicsModel(DatumElectronicsModel model)
     }
     reserveEngineeringIdentities(engineeringModel_, reservedIds);
     reserveElectronicsIdentities(model, reservedIds);
+    for (const StructuralAnalysisStudy& study : engineeringModel_.structuralStudies) {
+        if (model.material(study.materialDefinitionId) == nullptr) {
+            throw std::invalid_argument("material catalog update would orphan a structural study");
+        }
+        if (study.materialStateId.has_value()) {
+            const auto state = std::find_if(
+                model.materialStates.begin(), model.materialStates.end(), [&study](const MaterialState& item) {
+                    return item.id == *study.materialStateId;
+                });
+            if (state == model.materialStates.end() ||
+                state->materialDefinitionId != study.materialDefinitionId) {
+                throw std::invalid_argument("material catalog update would orphan a structural study state");
+            }
+        }
+    }
 
     if (electronicsModel_ != model) {
         electronicsModel_ = std::move(model);

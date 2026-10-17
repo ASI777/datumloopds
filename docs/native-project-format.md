@@ -199,17 +199,20 @@ replaces its document and clears the old command history. A failed load leaves
 the open document untouched. Saving uses `QSaveFile`; the document becomes
 clean only after the atomic file commit succeeds.
 
-Schema version 6 reads versions 1 through 5. Version 1 files receive initial
+Schema version 7 reads versions 1 through 6. Version 1 files receive initial
 face, edge, and vertex references; version 2 through 4 references, object
 identities, and supported engineering data are preserved. Versions 1 through 3
 load with an empty engineering model; versions 1 through 4 load with an empty
 electronics model. Engineering data in a schema 1, 2, or 3 file and electronics
 data in a schema 1 through 4 file are rejected rather than discarded. Schemas 5
-and 6 require their electronics model. Schema 5 mechanisms and motors migrate as
+through 7 require their electronics model. Schema 5 mechanisms and motors migrate as
 legacy records with no explicit body/joint/actuator/contact/requirement
-definitions. Unknown schema versions are rejected. Equation definitions,
-physics solver requests/results, robot/sensor/action specs, and simulation
-state are not yet persisted in schema 6. The object feature graph
+definitions. Unknown schema versions are rejected. Schema 7 adds sourced
+material properties/states, structural study inputs, persistent CAD-face
+references, analysis mesh provenance, MFEM field datasets, solver-run
+provenance, and convergence records. Other equation definitions, generic solver
+requests/results, robot/sensor/action specs, and simulation state are not yet
+persisted. The object feature graph
 is an append-ordered DAG with
 explicit feature UUIDs, owner, type, input feature UUIDs,
 parameters in millimetres, and a geometry backend identifier. The first native

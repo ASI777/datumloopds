@@ -514,7 +514,7 @@ void DatumEngineeringModel::validate() const
     std::unordered_set<std::string> ids;
     std::unordered_map<std::string, const MechanismSpec*> mechanismsById;
     std::unordered_map<std::string, const DatumMotor*> motorsById;
-    ids.reserve(mechanisms.size() + motors.size());
+    ids.reserve(mechanisms.size() + motors.size() + structuralStudies.size());
 
     for (const MechanismSpec& mechanism : mechanisms) {
         if (!isDatumUuid(mechanism.id) || !hasText(mechanism.name) || !ids.insert(mechanism.id).second) {
@@ -623,6 +623,27 @@ void DatumEngineeringModel::validate() const
                 const auto motor = motorsById.find(*actuator.motorId);
                 if (motor == motorsById.end() || motor->second->mechanismId != mechanism.id) {
                     throw std::invalid_argument("actuator motor must belong to the same mechanism");
+                }
+            }
+        }
+    }
+    for (const StructuralAnalysisStudy& study : structuralStudies) {
+        study.validate();
+        if (!ids.insert(study.id).second) {
+            throw std::invalid_argument("structural analysis study UUIDs must be unique within the engineering model");
+        }
+        for (const BoundaryCondition& condition : study.boundaryConditions) {
+            if (!ids.insert(boundaryConditionId(condition)).second) {
+                throw std::invalid_argument("physics condition UUIDs must be unique within the engineering model");
+            }
+        }
+        for (const StructuralAnalysisRun& run : study.runs) {
+            if (!ids.insert(run.provenance.solverRunId).second) {
+                throw std::invalid_argument("solver run UUIDs must be unique within the engineering model");
+            }
+            for (const FieldDataset& field : run.fields) {
+                if (!ids.insert(field.id).second) {
+                    throw std::invalid_argument("field dataset UUIDs must be unique within the engineering model");
                 }
             }
         }

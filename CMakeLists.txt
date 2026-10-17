@@ -24,6 +24,7 @@ add_library(datumloop_core STATIC
     src/datumloop/core/DatumUuid.cpp
     src/datumloop/core/DatumTopologyReference.cpp
     src/datumloop/engineering/DatumEngineeringModel.cpp
+    src/datumloop/engineering/StructuralAnalysis.cpp
     src/datumloop/knowledge/EquationRegistry.cpp
     src/datumloop/materials/MaterialModel.cpp
     src/datumloop/electronics/ElectronicsModel.cpp

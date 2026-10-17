@@ -55,6 +55,41 @@ void validatePhaseFractions(const std::vector<MaterialPhaseFraction>& values)
 
 }  // namespace
 
+std::string materialSourceKindName(MaterialSourceKind kind)
+{
+    switch (kind) {
+    case MaterialSourceKind::ManufacturerDatasheet: return "manufacturer_datasheet";
+    case MaterialSourceKind::MaterialDatabase: return "material_database";
+    case MaterialSourceKind::PublishedSource: return "published_source";
+    case MaterialSourceKind::ExperimentalMeasurement: return "experimental_measurement";
+    case MaterialSourceKind::UserInput: return "user_input";
+    case MaterialSourceKind::EstimatedAssumption: return "estimated_assumption";
+    case MaterialSourceKind::CalibratedValue: return "calibrated_value";
+    }
+    throw std::invalid_argument("unknown material source kind");
+}
+
+std::optional<MaterialSourceKind> materialSourceKindFromName(const std::string& name)
+{
+    if (name == "manufacturer_datasheet") return MaterialSourceKind::ManufacturerDatasheet;
+    if (name == "material_database") return MaterialSourceKind::MaterialDatabase;
+    if (name == "published_source") return MaterialSourceKind::PublishedSource;
+    if (name == "experimental_measurement") return MaterialSourceKind::ExperimentalMeasurement;
+    if (name == "user_input") return MaterialSourceKind::UserInput;
+    if (name == "estimated_assumption") return MaterialSourceKind::EstimatedAssumption;
+    if (name == "calibrated_value") return MaterialSourceKind::CalibratedValue;
+    return std::nullopt;
+}
+
+void MaterialSource::validate() const
+{
+    if (!isDatumUuid(id) || !hasText(title) ||
+        (!hasText(reference) && !hasText(url))) {
+        throw std::invalid_argument("material source requires a UUID, title, and reference or URL");
+    }
+    (void)materialSourceKindName(kind);
+}
+
 void MaterialDefinition::validate() const
 {
     if (!isDatumUuid(id) || !hasText(name)) {
@@ -84,6 +119,13 @@ void MaterialDefinition::validate() const
     if (microstructure.has_value()) {
         validateMicrostructure(*microstructure);
     }
+    std::unordered_set<std::string> sourceIds;
+    for (const MaterialSource& source : sources) {
+        source.validate();
+        if (!sourceIds.insert(source.id).second) {
+            throw std::invalid_argument("material source UUIDs must be unique within the definition");
+        }
+    }
     for (const MaterialProcessHistoryEntry& step : processHistory) {
         if (!hasText(step.process)) {
             throw std::invalid_argument("material process history requires a process name");
@@ -99,6 +141,20 @@ void MaterialDefinition::validate() const
         if (property.confidence.has_value() &&
             (!std::isfinite(*property.confidence) || *property.confidence < 0.0 || *property.confidence > 1.0)) {
             throw std::invalid_argument("material property confidence must be in [0, 1]");
+        }
+        if (property.sourceId.has_value() &&
+            (!isDatumUuid(*property.sourceId) || !sourceIds.contains(*property.sourceId))) {
+            throw std::invalid_argument("material property sourceId must reference a source in its material definition");
+        }
+        if (property.absoluteUncertainty.has_value() &&
+            (!std::isfinite(*property.absoluteUncertainty) || *property.absoluteUncertainty < 0.0)) {
+            throw std::invalid_argument("material property absolute uncertainty must be finite and non-negative");
+        }
+        requireOptionalPositive(property.minimumTemperatureK, "material property minimumTemperatureK");
+        requireOptionalPositive(property.maximumTemperatureK, "material property maximumTemperatureK");
+        if (property.minimumTemperatureK.has_value() && property.maximumTemperatureK.has_value() &&
+            *property.maximumTemperatureK < *property.minimumTemperatureK) {
+            throw std::invalid_argument("material property temperature range must not be reversed");
         }
         if (property.law == MaterialPropertyLaw::Constant) {
             if (!property.constantValue.has_value() || !std::isfinite(*property.constantValue) ||
@@ -138,6 +194,11 @@ void MaterialState::validate() const
     for (const std::string& reference : fieldDatasetReferences) {
         if (!hasText(reference)) {
             throw std::invalid_argument("material field dataset references must not be empty");
+        }
+    }
+    for (const std::string& item : provenance) {
+        if (!hasText(item)) {
+            throw std::invalid_argument("material state provenance entries must not be empty");
         }
     }
 }

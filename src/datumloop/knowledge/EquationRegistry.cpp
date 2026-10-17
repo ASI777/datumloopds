@@ -408,11 +408,80 @@ EquationRegistry makeInitialEquationRegistry()
     };
     timoshenko.maturity = ModelMaturity::E4;
 
+    EquationDefinition elasticity3d;
+    elasticity3d.id = "structural.linear-elasticity.3d.isotropic-small-strain.v1";
+    elasticity3d.name = "Three-dimensional small-strain isotropic linear elasticity";
+    elasticity3d.domain = "structural";
+    elasticity3d.symbolicForm = "div(sigma) + b = 0; sigma = lambda tr(epsilon) I + 2 mu epsilon; epsilon = sym(grad(u))";
+    elasticity3d.strongForm = "div(sigma) + b = 0; sigma = C:epsilon; epsilon = 1/2(grad(u) + grad(u)^T)";
+    elasticity3d.weakForm =
+        "integral_Omega epsilon(v):C:epsilon(u) dOmega = "
+        "integral_Omega v.b dOmega + integral_Gamma_t v.t dGamma";
+    const UnitDimension volumetricForce = UnitDimension::newton().divide(UnitDimension::meter().pow(3));
+    const UnitDimension surfaceForce = UnitDimension::newton().divide(UnitDimension::meter().pow(2));
+    elasticity3d.variables = {
+        variable("u", "displacement", UnitDimension::meter(), EquationQuantityType::Vector,
+                 "body-local-frame", "Cartesian"),
+        variable("sigma", "Cauchy stress", UnitDimension::pascal(), EquationQuantityType::Tensor2,
+                 "body-local-frame", "Cartesian"),
+        variable("epsilon", "small-strain tensor", UnitDimension::dimensionless(),
+                 EquationQuantityType::Tensor2, "body-local-frame", "Cartesian"),
+        variable("b", "body-force density", volumetricForce, EquationQuantityType::Vector,
+                 "body-local-frame", "Cartesian"),
+        variable("t", "surface traction", surfaceForce, EquationQuantityType::Vector,
+                 "body-local-frame", "Cartesian"),
+        variable("lambda", "first Lamé parameter", UnitDimension::pascal()),
+        variable("mu", "shear modulus", UnitDimension::pascal()),
+    };
+    elasticity3d.leftTerms = {term("integral_Omega epsilon(v):C:epsilon(u) dOmega", energy)};
+    elasticity3d.rightTerms = {term("integral_Omega v.b dOmega", energy),
+                               term("integral_Gamma_t v.t dGamma", energy)};
+    elasticity3d.constitutiveRelationships = {
+        "mu = E / (2 (1 + nu))",
+        "lambda = E nu / ((1 + nu) (1 - 2 nu))",
+        "sigma = lambda tr(epsilon) I + 2 mu epsilon",
+        "epsilon = 1/2(grad(u) + grad(u)^T)",
+    };
+    elasticity3d.assumptions = {
+        "Three-dimensional continuum",
+        "Small strain and displacement",
+        "Static equilibrium",
+        "Homogeneous isotropic linear-elastic material",
+        "No plasticity, contact, large deformation, or thermal strain",
+    };
+    elasticity3d.validityRange =
+        "Stable isotropic linear elasticity with E > 0 and -1 < nu < 0.5, within the sourced material-property range.";
+    elasticity3d.boundaryConditions = {
+        "Essential displacement constraints on persisted CAD faces",
+        "Surface traction and body-force density",
+        "Unloaded boundaries have zero natural traction",
+    };
+    elasticity3d.sources = {
+        mitSource("Lecture 4: Development of Constitutive Equations", "MIT 2.080J, Fall 2013",
+                  "https://ocw.mit.edu/courses/2-080j-structural-mechanics-fall-2013/32670f14cec210d98c5c7fe9dbf73eb6_MIT2_080JF13_Lecture4.pdf"),
+    };
+    elasticity3d.verifications = {
+        verification("elasticity-3d-dimensions-v1", "dimensional-analysis",
+                     "Both sides of equilibrium have N/m^3 and both sides of the weak form have J.",
+                     false, "SI dimension calculation"),
+        verification("elasticity-3d-constitutive-v1", "symbolic-check",
+                     "The isotropic Lamé form is equivalent to Hooke elasticity for a small symmetric strain tensor.",
+                     false, elasticity3d.sources.front().url),
+        verification("elasticity-3d-cad-cantilever-v1", "analytical-benchmark",
+                     "CAD-driven 3D MFEM results are compared with the slender-beam displacement and section-stress estimates.",
+                     true, "reports/validation/mfem-3d-elasticity.json"),
+        verification("elasticity-3d-mesh-convergence-v1", "mesh-convergence",
+                     "Tip displacement, strain energy, and a midspan section stress are checked on three mesh resolutions.",
+                     false, "reports/validation/mfem-3d-elasticity.json"),
+    };
+    elasticity3d.maturity = ModelMaturity::E3;
+
     EquationRegistry registry;
     registry.add(std::move(newton));
     registry.add(std::move(heat));
     registry.add(std::move(elasticity));
     registry.add(std::move(timoshenko));
+    registry.add(std::move(elasticity3d));
     return registry;
 }
 
