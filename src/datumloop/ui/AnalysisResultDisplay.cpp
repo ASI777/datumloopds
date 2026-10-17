@@ -14,7 +14,8 @@ namespace datumloop {
 namespace {
 
 struct BoundaryFace {
-    std::array<std::uint32_t, 4> orderedNodes{};
+    std::vector<std::uint32_t> orderedNodes;
+    Vector3 cellCenterMm{};
     std::size_t elementIndex = 0;
     std::uint8_t occurrenceCount = 0;
 };
@@ -210,43 +211,43 @@ AnalysisResultDisplay buildAnalysisResultDisplay(const StructuralAnalysisRun& ru
                            -std::numeric_limits<double>::infinity()};
 
     std::vector<Vector3> displayPositions(mesh.nodePositionsM.size());
-    Vector3 modelCenterMm{0.0, 0.0, 0.0};
     for (std::size_t node = 0; node < mesh.nodePositionsM.size(); ++node) {
         for (std::size_t axis = 0; axis < 3; ++axis) {
             displayPositions[node][axis] = (mesh.nodePositionsM[node][axis] +
                 deformationScale * displacement.values[node * 3 + axis]) * 1e3;  // CAD viewport mm
         }
-        modelCenterMm = add(modelCenterMm, displayPositions[node]);
-    }
-    for (double& component : modelCenterMm) {
-        component /= static_cast<double>(mesh.nodePositionsM.size());
     }
 
-    static constexpr std::array<std::array<std::uint8_t, 4>, 6> localFaceNodes{{
+    static constexpr std::array<std::array<std::uint8_t, 4>, 6> hexFaces{{
         {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 1, 5, 4}},
         {{1, 2, 6, 5}}, {{2, 3, 7, 6}}, {{3, 0, 4, 7}},
     }};
-    std::map<std::array<std::uint32_t, 4>, BoundaryFace> faces;
-    for (std::size_t elementIndex = 0; elementIndex < mesh.hexahedra.size(); ++elementIndex) {
-        const auto& element = mesh.hexahedra[elementIndex];
-        for (const auto& localFace : localFaceNodes) {
-            BoundaryFace face;
-            face.elementIndex = elementIndex;
-            face.occurrenceCount = 1;
-            for (std::size_t index = 0; index < localFace.size(); ++index) {
-                face.orderedNodes[index] = element[localFace[index]];
-            }
-            auto key = face.orderedNodes;
-            std::sort(key.begin(), key.end());
-            const auto [found, inserted] = faces.emplace(key, face);
-            if (!inserted) {
-                ++found->second.occurrenceCount;
-                if (found->second.occurrenceCount > 2) {
+    static constexpr std::array<std::array<std::uint8_t, 3>, 4> tetFaces{{
+        {{0, 1, 2}}, {{0, 3, 1}}, {{0, 2, 3}}, {{1, 3, 2}},
+    }};
+    std::map<std::vector<std::uint32_t>, BoundaryFace> faces;
+    const auto collectFaces = [&](const auto& elements, const auto& localFaces) {
+        for (std::size_t elementIndex=0; elementIndex<elements.size(); ++elementIndex) {
+            const auto& element=elements[elementIndex];
+            Vector3 center{};
+            for (const auto node : element) center=add(center, displayPositions[node]);
+            for (double& component : center) component/=static_cast<double>(element.size());
+            for (const auto& localFace : localFaces) {
+                BoundaryFace face;
+                face.elementIndex=elementIndex;
+                face.cellCenterMm=center;
+                face.occurrenceCount=1;
+                for (const auto index : localFace) face.orderedNodes.push_back(element[index]);
+                auto key=face.orderedNodes;
+                std::sort(key.begin(), key.end());
+                const auto [found,inserted]=faces.emplace(key,face);
+                if (!inserted && ++found->second.occurrenceCount>2)
                     throw std::invalid_argument("analysis mesh contains a non-manifold internal face");
-                }
             }
         }
-    }
+    };
+    collectFaces(mesh.hexahedra,hexFaces);
+    collectFaces(mesh.tetrahedra,tetFaces);
 
     std::size_t boundaryFaceCount = 0;
     for (const auto& [key, face] : faces) {
@@ -274,23 +275,25 @@ AnalysisResultDisplay buildAnalysisResultDisplay(const StructuralAnalysisRun& ru
     for (const auto& [key, face] : faces) {
         (void)key;
         if (face.occurrenceCount != 1) continue;
-        std::array<std::uint32_t, 4> nodes = face.orderedNodes;
+        auto nodes = face.orderedNodes;
         const Vector3 edge1 = subtract(displayPositions[nodes[1]], displayPositions[nodes[0]]);
         const Vector3 edge2 = subtract(displayPositions[nodes[2]], displayPositions[nodes[0]]);
         Vector3 normal = normalized(cross(edge1, edge2));
         Vector3 faceCenter{0.0, 0.0, 0.0};
         for (const std::uint32_t node : nodes) faceCenter = add(faceCenter, displayPositions[node]);
-        for (double& component : faceCenter) component *= 0.25;
-        if (dot(normal, subtract(faceCenter, modelCenterMm)) < 0.0) {
-            std::swap(nodes[1], nodes[3]);
+        for (double& component : faceCenter) component /= static_cast<double>(nodes.size());
+        if (dot(normal, subtract(faceCenter, face.cellCenterMm)) < 0.0) {
+            std::reverse(nodes.begin()+1, nodes.end());
             normal = {-normal[0], -normal[1], -normal[2]};
         }
         appendVertex(nodes[0], face.elementIndex, normal);
         appendVertex(nodes[1], face.elementIndex, normal);
         appendVertex(nodes[2], face.elementIndex, normal);
-        appendVertex(nodes[0], face.elementIndex, normal);
-        appendVertex(nodes[2], face.elementIndex, normal);
-        appendVertex(nodes[3], face.elementIndex, normal);
+        if (nodes.size() == 4) {
+            appendVertex(nodes[0], face.elementIndex, normal);
+            appendVertex(nodes[2], face.elementIndex, normal);
+            appendVertex(nodes[3], face.elementIndex, normal);
+        }
     }
     return result;
 }

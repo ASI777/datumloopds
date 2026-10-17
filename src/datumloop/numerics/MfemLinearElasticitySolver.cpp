@@ -283,6 +283,10 @@ int maximumBoundaryAttribute(const AnalysisMesh& mesh)
 
 void validateMeshAgainstCurrentCad(const DatumDocument& document, const AnalysisMesh& mesh)
 {
+    if (!mesh.tetrahedra.empty()) {
+        validateTetrahedralMeshAgainstCad(document, mesh, 0.01, 0.01);
+        return;
+    }
     AnalysisMeshSettings settings;
     settings.maximumElementSizeM = mesh.provenance.requestedMaximumElementSizeM;
     settings.maximumElementAspectRatio = mesh.provenance.maximumAspectRatio;
@@ -318,6 +322,13 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     const AnalysisMesh& mesh,
     const LinearElasticitySolverSettings& settings) const
 {
+    const bool tetrahedral = !mesh.tetrahedra.empty();
+    if (tetrahedral && !settings.sectionStressSamplePositionM)
+        throw std::invalid_argument("tetrahedral elasticity requires an explicit material stress sample point");
+    if (settings.sectionStressSamplePositionM &&
+        !std::all_of(settings.sectionStressSamplePositionM->begin(), settings.sectionStressSamplePositionM->end(),
+                     [](double x) { return std::isfinite(x); }))
+        throw std::invalid_argument("stress sample point must contain finite SI coordinates");
     study.validate();
     mesh.validate();
     if (mesh.cadObjectId != study.cadObjectId || mesh.sourceDocumentRevision != document.revision()) {
@@ -332,8 +343,8 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
         settings.maximumIterations == 0 ||
         settings.maximumIterations > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
         mesh.nodes.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
-        mesh.elements.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
-        mesh.boundaryElements.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        mesh.elementCount() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+        mesh.boundaryElementCount() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw std::invalid_argument("linear elasticity solver settings or mesh sizes are invalid");
     }
     validateMeshAgainstCurrentCad(document, mesh);
@@ -345,8 +356,8 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     }
     const IsotropicMaterial material = resolveMaterial(document, study);
 
-    mfem::Mesh mfemMesh(3, static_cast<int>(mesh.nodes.size()), static_cast<int>(mesh.elements.size()),
-                        static_cast<int>(mesh.boundaryElements.size()), 3);
+    mfem::Mesh mfemMesh(3, static_cast<int>(mesh.nodes.size()), static_cast<int>(mesh.elementCount()),
+                        static_cast<int>(mesh.boundaryElementCount()), 3);
     for (const AnalysisNode& node : mesh.nodes) {
         const std::array<mfem::real_t, 3> point{
             node.positionM[0], node.positionM[1], node.positionM[2]};
@@ -364,12 +375,25 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
                        [](std::uint32_t index) { return static_cast<int>(index); });
         mfemMesh.AddBdrQuad(vertices.data(), element.attribute);
     }
-    mfemMesh.FinalizeHexMesh(1, 0, true);
+    for (const AnalysisTetElement& element : mesh.tetrahedra) {
+        std::array<int, 4> vertices{};
+        std::transform(element.nodeIndices.begin(), element.nodeIndices.end(), vertices.begin(),
+                       [](std::uint32_t index) { return static_cast<int>(index); });
+        mfemMesh.AddTet(vertices.data(), 1);
+    }
+    for (const AnalysisBoundaryTriangle& element : mesh.boundaryTriangles) {
+        std::array<int, 3> vertices{};
+        std::transform(element.nodeIndices.begin(), element.nodeIndices.end(), vertices.begin(),
+                       [](std::uint32_t index) { return static_cast<int>(index); });
+        mfemMesh.AddBdrTriangle(vertices.data(), element.attribute);
+    }
+    if (tetrahedral) mfemMesh.FinalizeTetMesh(1, 0, false);
+    else mfemMesh.FinalizeHexMesh(1, 0, true);
     mfemMesh.SetAttributes();
     if (mfemMesh.Dimension() != 3 || mfemMesh.GetNV() != static_cast<int>(mesh.nodes.size()) ||
-        mfemMesh.GetNE() != static_cast<int>(mesh.elements.size()) ||
-        mfemMesh.GetNBE() != static_cast<int>(mesh.boundaryElements.size())) {
-        throw std::runtime_error("MFEM did not preserve the explicit CAD-derived hexahedral mesh");
+        mfemMesh.GetNE() != static_cast<int>(mesh.elementCount()) ||
+        mfemMesh.GetNBE() != static_cast<int>(mesh.boundaryElementCount())) {
+        throw std::runtime_error("MFEM did not preserve the explicit CAD-derived mesh");
     }
 
     mfem::H1_FECollection collection(1, 3);
@@ -379,6 +403,20 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     for (auto& marker : essentialMarkers) {
         marker.SetSize(maxAttribute);
         marker = 0;
+    }
+    std::map<int, std::vector<std::uint32_t>> boundaryNodes;
+    const auto addBoundaryNodes = [&](const auto& elements) {
+        for (const auto& element : elements) {
+            auto& nodes = boundaryNodes[element.attribute];
+            nodes.insert(nodes.end(), element.nodeIndices.begin(), element.nodeIndices.end());
+        }
+    };
+    addBoundaryNodes(mesh.boundaryElements);
+    addBoundaryNodes(mesh.boundaryTriangles);
+    for (auto& [attribute, nodes] : boundaryNodes) {
+        (void)attribute;
+        std::sort(nodes.begin(), nodes.end());
+        nodes.erase(std::unique(nodes.begin(), nodes.end()), nodes.end());
     }
     std::map<std::pair<std::uint32_t, int>, double> prescribedValues;
     mfem::GridFunction solutionField(&finiteElementSpace);
@@ -391,9 +429,8 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
                 if (!fixed->constrainedComponents[static_cast<std::size_t>(component)]) continue;
                 essentialMarkers[static_cast<std::size_t>(component)][attribute - 1] = 1;
             }
-            for (const AnalysisBoundaryElement& element : mesh.boundaryElements) {
-                if (element.attribute != attribute) continue;
-                for (const std::uint32_t node : element.nodeIndices) {
+            {
+                for (const std::uint32_t node : boundaryNodes.at(attribute)) {
                     for (int component = 0; component < 3; ++component) {
                         if (!fixed->constrainedComponents[static_cast<std::size_t>(component)]) continue;
                         const double value = fixed->displacementM[static_cast<std::size_t>(component)];
@@ -417,7 +454,7 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
         mfem::Array<int> vertexDofs;
         finiteElementSpace.GetVertexVDofs(static_cast<int>(key.first), vertexDofs);
         if (vertexDofs.Size() != 3) {
-            throw std::runtime_error("MFEM Q1 vector space did not return three vertex degrees of freedom");
+            throw std::runtime_error("MFEM order-one vector space did not return three vertex degrees of freedom");
         }
         mfem::real_t sign = 1.0;
         const int dof = mfem::FiniteElementSpace::DecodeDof(vertexDofs[key.second], sign);
@@ -454,26 +491,30 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
         rightHandSide.AddBoundaryIntegrator(new mfem::VectorBoundaryLFIntegrator(*coefficient), *marker);
         loadCoefficients.push_back(std::move(coefficient));
         boundaryMarkers.push_back(std::move(marker));
-        for (const AnalysisBoundaryElement& element : mesh.boundaryElements) {
-            if (element.attribute == region.attribute) {
-                loadedVertices.insert(element.nodeIndices.begin(), element.nodeIndices.end());
-            }
-        }
+        const auto& nodes = boundaryNodes.at(region.attribute);
+        loadedVertices.insert(nodes.begin(), nodes.end());
     };
     const ShapeMetrics cadMetrics = OcctKernel::measure(object->shape);
     const double cadVolumeM3 = cadMetrics.volume * 1e-9;
     if (!std::isfinite(cadVolumeM3) || cadVolumeM3 <= 0.0) {
         throw std::invalid_argument("structural study CAD body must have a positive finite exact volume");
     }
+    double meshVolumeM3 = 0.0;
+    for (int element = 0; element < mfemMesh.GetNE(); ++element)
+        meshVolumeM3 += mfemMesh.GetElementVolume(element);
+    if (!std::isfinite(meshVolumeM3) || meshVolumeM3 <= 0.0)
+        throw std::invalid_argument("analysis mesh has no positive finite volume");
     for (const BoundaryCondition& condition : study.boundaryConditions) {
         if (const auto* force = std::get_if<AppliedForce>(&condition)) {
             addSurfaceLoad(force->topologyReferenceId, force->totalForceN);
         } else if (const auto* pressure = std::get_if<AppliedPressure>(&condition)) {
             const AnalysisBoundaryRegion& region = boundaryRegion(mesh, pressure->topologyReferenceId);
+            if (std::abs(norm(region.outwardNormal) - 1.0) > 1e-10)
+                throw std::invalid_argument("uniform pressure currently requires a planar face with a unit normal");
             const Vector3 force = scaled(region.outwardNormal, -pressure->pressurePa * region.areaM2);
             addSurfaceLoad(pressure->topologyReferenceId, force);
         } else if (const auto* bodyForce = std::get_if<BodyForce>(&condition)) {
-            const Vector3 resultant = scaled(bodyForce->forceDensityNPerM3, cadVolumeM3);
+            const Vector3 resultant = scaled(bodyForce->forceDensityNPerM3, meshVolumeM3);
             totalAppliedForce = add(totalAppliedForce, resultant);
             mfem::Vector bodyLoad(3);
             for (int component = 0; component < 3; ++component) {
@@ -554,19 +595,23 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     run.provenance.temperatureRangeVerified = material.temperatureRangeVerified;
     run.provenance.equationDefinitionId = equation->id;
     run.provenance.equationMaturity = equation->maturity;
-    run.provenance.solverId = solverId();
+    run.provenance.solverId = tetrahedral ? "mfem.serial-h1-p1-3d-linear-elasticity" : solverId();
     run.provenance.solverVersion = solverVersion();
     run.provenance.mesh = mesh.provenance;
+    run.provenance.mesh.geometrySha256 = mesh.geometrySha256;
+    run.provenance.mesh.backendBuildInfo = mesh.backendBuildInfo;
     AnalysisMeshSnapshot meshSnapshot;
     meshSnapshot.meshRevisionId = mesh.provenance.revisionId;
     meshSnapshot.nodePositionsM.reserve(mesh.nodes.size());
     for (const AnalysisNode& node : mesh.nodes) {
         meshSnapshot.nodePositionsM.push_back(node.positionM);
     }
-    meshSnapshot.hexahedra.reserve(mesh.elements.size());
+    meshSnapshot.hexahedra.reserve(mesh.elementCount());
     for (const AnalysisHexElement& element : mesh.elements) {
         meshSnapshot.hexahedra.push_back(element.nodeIndices);
     }
+    for (const AnalysisTetElement& element : mesh.tetrahedra)
+        meshSnapshot.tetrahedra.push_back(element.nodeIndices);
     run.meshSnapshot = std::move(meshSnapshot);
     run.provenance.topologyReferenceIds = mesh.topologyReferenceIds;
     run.provenance.absoluteTolerance = settings.absoluteTolerance;
@@ -603,7 +648,7 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     for (std::size_t vertex = 0; vertex < mesh.nodes.size(); ++vertex) {
         mfem::Array<int> vertexDofs;
         finiteElementSpace.GetVertexVDofs(static_cast<int>(vertex), vertexDofs);
-        if (vertexDofs.Size() != 3) throw std::runtime_error("MFEM Q1 vector vertex has an unexpected degree count");
+        if (vertexDofs.Size() != 3) throw std::runtime_error("MFEM order-one vector vertex has an unexpected degree count");
         for (int component = 0; component < 3; ++component) {
             mfem::real_t sign = 1.0;
             const int dof = mfem::FiniteElementSpace::DecodeDof(vertexDofs[component], sign);
@@ -651,7 +696,7 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     const auto stressTensorAt = [&mfemMesh, &solutionField, &material](
                                     std::size_t element, const mfem::IntegrationPoint& point) {
         mfem::ElementTransformation* transformation = mfemMesh.GetElementTransformation(static_cast<int>(element));
-        if (transformation == nullptr) throw std::runtime_error("MFEM did not return a hex element transformation");
+        if (transformation == nullptr) throw std::runtime_error("MFEM did not return an element transformation");
         transformation->SetIntPoint(&point);
         mfem::DenseMatrix gradient;
         solutionField.GetVectorGradient(*transformation, gradient);
@@ -685,7 +730,7 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     strain.units = "1";
     strain.meshRevisionId = mesh.provenance.revisionId;
     strain.solverRunId = run.provenance.solverRunId;
-    strain.values.reserve(mesh.elements.size() * 6);
+    strain.values.reserve(mesh.elementCount() * 6);
 
     FieldDataset stress;
     stress.id = createDatumUuidV4();
@@ -695,7 +740,7 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     stress.units = "Pa";
     stress.meshRevisionId = mesh.provenance.revisionId;
     stress.solverRunId = run.provenance.solverRunId;
-    stress.values.reserve(mesh.elements.size() * 6);
+    stress.values.reserve(mesh.elementCount() * 6);
 
     FieldDataset vonMises;
     vonMises.id = createDatumUuidV4();
@@ -705,10 +750,10 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
     vonMises.units = "Pa";
     vonMises.meshRevisionId = mesh.provenance.revisionId;
     vonMises.solverRunId = run.provenance.solverRunId;
-    vonMises.values.reserve(mesh.elements.size());
+    vonMises.values.reserve(mesh.elementCount());
 
-    const mfem::IntegrationPoint& centerPoint = mfem::Geometries.GetCenter(mfem::Geometry::CUBE);
-    for (std::size_t element = 0; element < mesh.elements.size(); ++element) {
+    const mfem::IntegrationPoint& centerPoint = mfem::Geometries.GetCenter(tetrahedral ? mfem::Geometry::TETRAHEDRON : mfem::Geometry::CUBE);
+    for (std::size_t element = 0; element < mesh.elementCount(); ++element) {
         const auto [strainTensor, stressTensor] = stressTensorAt(element, centerPoint);
         const double vm = std::sqrt(0.5 * (
             std::pow(stressTensor[0][0] - stressTensor[1][1], 2) +
@@ -741,16 +786,19 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
         0.75 * 0.5 * dimensions[stressOffsetAxis];
     samplePoint[neutralAxis] = 0.5 * (minimum[neutralAxis] + maximum[neutralAxis]);
 
+    if (settings.sectionStressSamplePositionM) samplePoint = *settings.sectionStressSamplePositionM;
     double axialStressSum = 0.0;
     std::size_t adjacentElementCount = 0;
-    for (std::size_t element = 0; element < mesh.elements.size(); ++element) {
+    for (std::size_t element = 0; element < mesh.elementCount(); ++element) {
         Vector3 elementMinimum{
             std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
             std::numeric_limits<double>::infinity()};
         Vector3 elementMaximum{
             -std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
             -std::numeric_limits<double>::infinity()};
-        for (const std::uint32_t node : mesh.elements[element].nodeIndices) {
+        mfem::Array<int> elementVertices;
+        mfemMesh.GetElementVertices(static_cast<int>(element), elementVertices);
+        for (const int node : elementVertices) {
             for (std::size_t axis = 0; axis < 3; ++axis) {
                 elementMinimum[axis] = std::min(elementMinimum[axis], mesh.nodes[node].positionM[axis]);
                 elementMaximum[axis] = std::max(elementMaximum[axis], mesh.nodes[node].positionM[axis]);
@@ -771,9 +819,9 @@ StructuralAnalysisRun MfemLinearElasticitySolver::solve(
             physicalPoint[axis] = samplePoint[static_cast<std::size_t>(axis)];
         }
         mfem::ElementTransformation* transformation = mfemMesh.GetElementTransformation(static_cast<int>(element));
-        if (transformation == nullptr || transformation->TransformBack(physicalPoint, point) != 0) {
-            throw std::runtime_error("MFEM could not map the fixed section sample into a candidate hex element");
-        }
+        if (transformation == nullptr)
+            throw std::runtime_error("MFEM did not return an element transformation");
+        if (transformation->TransformBack(physicalPoint, point) != 0) continue;
         const auto tensors = stressTensorAt(element, point);
         axialStressSum += tensors.second[longestAxis][longestAxis];
         ++adjacentElementCount;

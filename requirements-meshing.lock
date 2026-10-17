@@ -1,0 +1,6 @@
+# Optional external worker; CPython/Linux x86_64 wheel, Python ctypes API.
+# GPL-2.0-or-later with upstream exception. Source: https://gmsh.info/
+# Tested artifact: gmsh-4.15.2-py2.py3-none-manylinux_2_24_x86_64.whl
+# Wheel runtime reports Linux64 SDK, OCC 7.8.1, build date 20260324.
+# Native core does not link libgmsh. No default build-image dependency added.
+gmsh==4.15.2 --hash=sha256:4076a948ce22625330d1413d4982e22b5c69fc2f0f7951f5df64c778cf54108c

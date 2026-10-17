@@ -32,9 +32,15 @@ void requireFiniteNonnegative(double value, const char* field)
 
 void validateMeshProvenance(const AnalysisMeshProvenance& mesh)
 {
+    if (mesh.elementType == "tetrahedron4" &&
+        (mesh.geometrySha256.size() != 64 ||
+         !std::all_of(mesh.geometrySha256.begin(), mesh.geometrySha256.end(), [](char c) {
+             return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+         }) || !hasText(mesh.backendBuildInfo)))
+        throw std::invalid_argument("tetrahedral run requires exact geometry digest and backend build provenance");
     if (!isDatumUuid(mesh.revisionId) || !hasText(mesh.generator) || !hasText(mesh.generatorVersion) ||
         !hasText(mesh.elementType) || !std::isfinite(mesh.requestedMaximumElementSizeM) ||
-        mesh.requestedMaximumElementSizeM <= 0.0 || mesh.nodeCount < 8 || mesh.elementCount == 0 ||
+        mesh.requestedMaximumElementSizeM <= 0.0 || mesh.nodeCount < (mesh.elementType == "tetrahedron4" ? 4u : 8u) || mesh.elementCount == 0 ||
         !std::isfinite(mesh.minimumScaledJacobian) || mesh.minimumScaledJacobian <= 0.0 ||
         !std::isfinite(mesh.maximumAspectRatio) || mesh.maximumAspectRatio < 1.0) {
         throw std::invalid_argument("analysis mesh provenance is incomplete or invalid");
@@ -176,7 +182,10 @@ std::optional<FieldLocation> fieldLocationFromName(const std::string& name)
 void AnalysisMeshSnapshot::validate(const AnalysisMeshProvenance& provenance) const
 {
     if (meshRevisionId != provenance.revisionId || nodePositionsM.size() != provenance.nodeCount ||
-        hexahedra.size() != provenance.elementCount || nodePositionsM.size() < 8 || hexahedra.empty()) {
+        hexahedra.size() + tetrahedra.size() != provenance.elementCount ||
+        (provenance.elementType == "tetrahedron4"
+            ? (!hexahedra.empty() || tetrahedra.empty() || nodePositionsM.size() < 4)
+            : (!tetrahedra.empty() || hexahedra.empty() || nodePositionsM.size() < 8))) {
         throw std::invalid_argument("analysis mesh snapshot does not match its mesh provenance");
     }
     for (const Vector3& position : nodePositionsM) {
@@ -184,13 +193,27 @@ void AnalysisMeshSnapshot::validate(const AnalysisMeshProvenance& provenance) co
             throw std::invalid_argument("analysis mesh snapshot coordinates must be finite SI values");
         }
     }
-    for (const auto& hexahedron : hexahedra) {
-        std::unordered_set<std::uint32_t> uniqueNodes;
-        for (const std::uint32_t nodeIndex : hexahedron) {
-            if (nodeIndex >= nodePositionsM.size() || !uniqueNodes.insert(nodeIndex).second) {
-                throw std::invalid_argument("analysis mesh snapshot contains an invalid hexahedron node index");
+    const auto validateIndices = [&](const auto& elements) {
+        for (const auto& element : elements) {
+            std::unordered_set<std::uint32_t> uniqueNodes;
+            for (const std::uint32_t nodeIndex : element) {
+                if (nodeIndex >= nodePositionsM.size() || !uniqueNodes.insert(nodeIndex).second)
+                    throw std::invalid_argument("analysis mesh snapshot contains an invalid element node index");
             }
         }
+    };
+    validateIndices(hexahedra);
+    validateIndices(tetrahedra);
+    for (const auto& t : tetrahedra) {
+        const auto& a = nodePositionsM[t[0]];
+        std::array<Vector3, 3> d{};
+        for (std::size_t i=0;i<3;++i) for (std::size_t j=0;j<3;++j)
+            d[i][j] = nodePositionsM[t[i+1]][j] - a[j];
+        const double det = d[0][0]*(d[1][1]*d[2][2]-d[1][2]*d[2][1])
+                         -d[0][1]*(d[1][0]*d[2][2]-d[1][2]*d[2][0])
+                         +d[0][2]*(d[1][0]*d[2][1]-d[1][1]*d[2][0]);
+        if (!std::isfinite(det) || det <= 0.0)
+            throw std::invalid_argument("analysis mesh snapshot contains an inverted tetrahedron");
     }
 }
 

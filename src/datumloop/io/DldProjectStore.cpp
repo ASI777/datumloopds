@@ -1044,7 +1044,9 @@ QJsonObject encodeAnalysisMeshProvenance(const AnalysisMeshProvenance& mesh)
             {QStringLiteral("nodeCount"), static_cast<double>(mesh.nodeCount)},
             {QStringLiteral("elementCount"), static_cast<double>(mesh.elementCount)},
             {QStringLiteral("minimumScaledJacobian"), mesh.minimumScaledJacobian},
-            {QStringLiteral("maximumAspectRatio"), mesh.maximumAspectRatio}};
+            {QStringLiteral("maximumAspectRatio"), mesh.maximumAspectRatio},
+            {QStringLiteral("geometrySha256"), fromUtf8(mesh.geometrySha256)},
+            {QStringLiteral("backendBuildInfo"), fromUtf8(mesh.backendBuildInfo)}};
 }
 
 AnalysisMeshProvenance decodeAnalysisMeshProvenance(const QJsonValue& value)
@@ -1074,6 +1076,13 @@ AnalysisMeshProvenance decodeAnalysisMeshProvenance(const QJsonValue& value)
     mesh.maximumAspectRatio =
         requiredFiniteNumber(object.value(QStringLiteral("maximumAspectRatio")),
                              QStringLiteral("analysis.mesh.maximumAspectRatio"));
+    for (const auto* key : {"geometrySha256", "backendBuildInfo"}) {
+        const QJsonValue field = object.value(QLatin1String(key));
+        if (!field.isUndefined() && !field.isString())
+            fail(QStringLiteral("Analysis mesh identity fields must be strings."));
+    }
+    mesh.geometrySha256 = toUtf8(object.value(QStringLiteral("geometrySha256")).toString());
+    mesh.backendBuildInfo = toUtf8(object.value(QStringLiteral("backendBuildInfo")).toString());
     return mesh;
 }
 
@@ -1101,9 +1110,16 @@ QJsonObject encodeAnalysisMeshSnapshot(const AnalysisMeshSnapshot& snapshot)
         for (const std::uint32_t index : element) indices.append(static_cast<double>(index));
         hexahedra.append(indices);
     }
+    QJsonArray tetrahedra;
+    for (const auto& element : snapshot.tetrahedra) {
+        QJsonArray indices;
+        for (const std::uint32_t index : element) indices.append(static_cast<double>(index));
+        tetrahedra.append(indices);
+    }
     return {{QStringLiteral("meshRevisionId"), fromUtf8(snapshot.meshRevisionId)},
             {QStringLiteral("nodePositionsM"), nodes},
-            {QStringLiteral("hexahedra"), hexahedra}};
+            {QStringLiteral("hexahedra"), hexahedra},
+            {QStringLiteral("tetrahedra"), tetrahedra}};
 }
 
 FieldDataset decodeFieldDataset(const QJsonValue& value)
@@ -1246,12 +1262,14 @@ QJsonObject encodeStructuralRun(const StructuralAnalysisRun& run)
             {QStringLiteral("fields"), fields}};
 }
 
-StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value)
+StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value, int projectSchemaVersion)
 {
     if (!value.isObject()) fail(QStringLiteral("Structural analysis run entries must be objects."));
     const QJsonObject object = value.toObject();
     StructuralAnalysisRun run;
     run.provenance = decodeAnalysisRunProvenance(object.value(QStringLiteral("provenance")));
+    if (projectSchemaVersion < 10 && run.provenance.mesh.elementType == "tetrahedron4")
+        fail(QStringLiteral("Tetrahedral structural runs require schema ten or newer."));
     const QJsonValue snapshotValue = object.value(QStringLiteral("meshSnapshot"));
     if (snapshotValue.isObject()) {
         const QJsonObject snapshotObject = snapshotValue.toObject();
@@ -1264,8 +1282,15 @@ StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value)
         }
         const QJsonArray nodes = nodesValue.toArray();
         const QJsonArray hexahedra = hexahedraValue.toArray();
+        const QJsonValue tetrahedraValue = snapshotObject.value(QStringLiteral("tetrahedra"));
+        if (!tetrahedraValue.isUndefined() && !tetrahedraValue.isArray())
+            fail(QStringLiteral("Structural tetrahedra must be an array."));
+        const QJsonArray tetrahedra = tetrahedraValue.toArray();
+        if (projectSchemaVersion < 10 &&
+            (!tetrahedra.isEmpty() || run.provenance.mesh.elementType == "tetrahedron4"))
+            fail(QStringLiteral("Tetrahedral field snapshots require schema ten or newer."));
         if (static_cast<std::uint64_t>(nodes.size()) != run.provenance.mesh.nodeCount ||
-            static_cast<std::uint64_t>(hexahedra.size()) != run.provenance.mesh.elementCount) {
+            static_cast<std::uint64_t>(hexahedra.size()+tetrahedra.size()) != run.provenance.mesh.elementCount) {
             fail(QStringLiteral("Structural mesh snapshot counts do not match their run provenance."));
         }
         snapshot.nodePositionsM.reserve(static_cast<std::size_t>(nodes.size()));
@@ -1289,6 +1314,20 @@ StructuralAnalysisRun decodeStructuralRun(const QJsonValue& value)
                 indices[static_cast<std::size_t>(index)] = static_cast<std::uint32_t>(nodeIndex);
             }
             snapshot.hexahedra.push_back(indices);
+        }
+        snapshot.tetrahedra.reserve(static_cast<std::size_t>(tetrahedra.size()));
+        for (const QJsonValue& elementValue : tetrahedra) {
+            if (!elementValue.isArray() || elementValue.toArray().size() != 4)
+                fail(QStringLiteral("Structural tetrahedra must contain four node indices."));
+            std::array<std::uint32_t, 4> indices{};
+            const QJsonArray element = elementValue.toArray();
+            for (qsizetype i=0; i<4; ++i) {
+                const double index = requiredFiniteNumber(element.at(i), QStringLiteral("meshSnapshot.tetrahedra[][]"));
+                if (index < 0.0 || std::floor(index) != index || index > std::numeric_limits<std::uint32_t>::max())
+                    fail(QStringLiteral("Tetrahedral node indices must be non-negative 32-bit integers."));
+                indices[static_cast<std::size_t>(i)] = static_cast<std::uint32_t>(index);
+            }
+            snapshot.tetrahedra.push_back(indices);
         }
         try {
             snapshot.validate(run.provenance.mesh);
@@ -1362,7 +1401,7 @@ QJsonObject encodeStructuralStudy(const StructuralAnalysisStudy& study)
             {QStringLiteral("meshConvergence"), convergence}};
 }
 
-StructuralAnalysisStudy decodeStructuralStudy(const QJsonValue& value)
+StructuralAnalysisStudy decodeStructuralStudy(const QJsonValue& value, int projectSchemaVersion)
 {
     if (!value.isObject()) fail(QStringLiteral("Structural study entries must be objects."));
     const QJsonObject object = value.toObject();
@@ -1381,7 +1420,7 @@ StructuralAnalysisStudy decodeStructuralStudy(const QJsonValue& value)
     }
     const QJsonValue runs = object.value(QStringLiteral("runs"));
     if (!runs.isArray()) fail(QStringLiteral("Structural study runs must be an array."));
-    for (const QJsonValue& run : runs.toArray()) study.runs.push_back(decodeStructuralRun(run));
+    for (const QJsonValue& run : runs.toArray()) study.runs.push_back(decodeStructuralRun(run, projectSchemaVersion));
     const QJsonValue convergence = object.value(QStringLiteral("meshConvergence"));
     if (convergence.isObject()) {
         const QJsonObject item = convergence.toObject();
@@ -1476,7 +1515,7 @@ DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object, int proj
             // writer during migration tests; it contains no unsupported data.
         } else {
             for (const QJsonValue& studyValue : studiesValue.toArray()) {
-                model.structuralStudies.push_back(decodeStructuralStudy(studyValue));
+                model.structuralStudies.push_back(decodeStructuralStudy(studyValue, projectSchemaVersion));
             }
         }
     } else if (!studiesValue.isUndefined()) {
@@ -1653,7 +1692,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
     if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
-        schemaNumber != 5.0 && schemaNumber != 6.0 && schemaNumber != 7.0 && schemaNumber != 8.0 &&
+        schemaNumber != 5.0 && schemaNumber != 6.0 && schemaNumber != 7.0 && schemaNumber != 8.0 && schemaNumber != 9.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }

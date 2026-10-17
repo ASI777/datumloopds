@@ -11,11 +11,13 @@ struct LinearElasticitySolverSettings {
     double absoluteTolerance = 1e-12;
     double relativeTolerance = 1e-10;
     std::uint32_t maximumIterations = 20000;
+    // Required for arbitrary tetrahedral parts. Must lie in material, not a hole.
+    // Records the normal stress along the longest CAD bounding-box axis.
+    std::optional<Vector3> sectionStressSamplePositionM;
 };
 
-// Serial MFEM H1/Q1 solution of the static, small-strain isotropic elasticity
-// equation on the explicit CAD-derived AnalysisMesh. The first CAD mesher is
-// intentionally limited to axis-aligned rectangular OCCT solids.
+// Serial MFEM H1/Q1 (hex) or H1/P1 (tet) solution of the static, small-strain isotropic elasticity
+// equation on an explicit, independently checked CAD-derived AnalysisMesh.
 class MfemLinearElasticitySolver final {
 public:
     [[nodiscard]] std::string solverId() const;

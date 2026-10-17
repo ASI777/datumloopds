@@ -82,6 +82,8 @@ struct AnalysisMeshProvenance {
     std::uint64_t elementCount = 0;
     double minimumScaledJacobian = 0.0;
     double maximumAspectRatio = 0.0;
+    std::string geometrySha256;
+    std::string backendBuildInfo;
 
     friend bool operator==(const AnalysisMeshProvenance&, const AnalysisMeshProvenance&) = default;
 };
@@ -93,6 +95,7 @@ struct AnalysisMeshSnapshot {
     std::string meshRevisionId;
     std::vector<Vector3> nodePositionsM;
     std::vector<std::array<std::uint32_t, 8>> hexahedra;
+    std::vector<std::array<std::uint32_t, 4>> tetrahedra;
 
     void validate(const AnalysisMeshProvenance& provenance) const;
 
@@ -173,8 +176,9 @@ struct StructuralAnalysisRun {
     double relativeForceBalanceError = 0.0;
     double tipDisplacementM = 0.0;
     double maximumDisplacementM = 0.0;
-    // Absolute axial stress at a fixed midspan section point, 75% from the
-    // neutral axis toward the positive first transverse axis.
+    // Absolute normal stress along the longest mesh bounding-box axis at the
+    // recorded material point. Rectangular fixtures default to a midspan point;
+    // arbitrary tetrahedral parts require an explicit solver setting.
     double sectionAxialStressPa = 0.0;
     Vector3 sectionStressSamplePositionM{0.0, 0.0, 0.0};
     double maximumVonMisesStressPa = 0.0;
