@@ -113,18 +113,30 @@ resets history after a successful open, and exposes dirty state to the shell.
 See [`native-project-format.md`](native-project-format.md) for the supported
 fields and current limitations.
 
-QML composes `DatumWorkspace`, `DatumArea`, reusable `DatumRegion` and
-`DatumEditor` bases, and a common `EditorHost`. The Design area loads explicit
-Outliner, Viewport, and Properties editors. The viewport implementation is
-behind `IViewportRenderer`; its current `QtQuick3DRenderer` adapter forwards
-only `TriangleMesh` display data. The exact B-Rep stays in the document and is
-not reconstructed from that mesh. `PickingService` maps a renderer hit to the
-selected document object or topology reference by persistent ID. The native
-viewport supports Object, Face, Edge, and Vertex modes. A Qt Quick 3D local hit
-point and normal are resolved against the exact OCCT shape, then matched to a
-stored topology UUID and the current output feature when available; ambiguous
-results remain unresolved. Large-model acceleration and distinct subshape
-highlight geometry remain future work.
+`Main.qml` composes the application shell, project dialogs, and shortcuts;
+`DatumWorkspace` composes the header, `DatumArea`, and status bar. The area
+contains replaceable `EditorHost` instances for the Outliner, Viewport, and
+Properties editors. Each editor has its own QML component and can be replaced
+through the common host without moving viewport or panel behavior back into
+the application shell.
+
+The viewport display handoff is behind `IViewportRenderer`. Its current
+`QtQuick3DRenderer` adapter accepts only `TriangleMesh` and writes it to the
+Qt Quick 3D geometry item. `DatumDocument` owns the exact `TopoDS_Shape`; the
+render mesh is disposable and is neither persisted as CAD geometry nor used to
+reconstruct a shape. `ViewportEditor` still owns Qt Quick 3D camera, input, and
+render-hit extraction, so changing rendering backends will require replacing
+that presentation component while keeping the document model and hit-resolution
+service intact. This is an incremental renderer boundary, not a backend-neutral
+scene graph yet.
+
+`PickingService` maps backend hits to persistent DatumLoop identities before
+selection changes. It resolves object IDs directly and resolves face, edge,
+and vertex hits against the exact OCCT shape, matching a stored topology UUID
+and current output feature when available. Ambiguous or unsupported results
+remain unresolved. The native viewport supports Object, Face, Edge, and Vertex
+modes. Large-model acceleration and distinct subshape highlight geometry
+remain future work.
 
 SMLib remains an optional secondary geometry backend. FreeCAD remains isolated
 in the compatibility subsystem and is not linked into the standalone native
@@ -156,8 +168,13 @@ The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
 version-three `.dld` save/open with an initial recomputable feature graph. The
-renderer boundary, display-mesh architecture check, native independence check,
-and pointer-driven UI check are included.
+renderer/display-mesh boundary, workspace/editor composition, picking-service
+boundary, and native independence are guarded by architecture checks. An XTest
+pointer smoke covers the visible viewport and Move workflow when the Qt XCB
+runtime is available. The 2026-10-17 recheck could not start the XCB window
+because `xcb-cursor0` is missing; the offscreen check only verifies QML and
+viewport-data initialization. Hardware-GPU behavior remains unverified. See
+[`native-baseline.md`](native-baseline.md) for this run's results.
 Further editors and engineering workflows are later work.
 
 ### Current native implementation status

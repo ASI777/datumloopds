@@ -23,7 +23,7 @@
 - `make native-independence-check` — passes with no FreeCAD, Coin, or SoQt dynamic dependencies or native include bindings.
 - `xvfb-run ... DatumLoopDS --smoke` — passes and presents five frames with software OpenGL. Hardware-GPU behavior is not covered.
 - `make native-pointer-smoke` — XTest clicks the viewport to select the solid and a face by persistent UUID, orbits and zooms the camera, then exercises Move cancel, confirm, undo, and redo.
-- `make check` — 18 tests run: 17 pass and the optional smlibpy integration test is skipped because smlibpy is not installed in the default Python environment. The SMLib-enabled suite previously passed all 16 integration tests, including STEP and USD B-Rep round trips.
+- `make check` — 20 tests run: 19 pass and the optional smlibpy integration test is skipped because smlibpy is not installed in the default Python environment. The SMLib-enabled suite previously passed all 16 integration tests, including STEP and USD B-Rep round trips.
 - `make freecad-check` — the compatibility smoke passes geometry operations and project save/reopen with the locally installed FreeCAD 1.1.1. This is not a validation of the pinned FreeCAD 1.1.3 fork build.
 - `scripts/check-freecad-gui.sh` against the fork's FreeCAD 1.1.3 GUI — workbench registration, docks, project metadata, and a visible viewport solid pass under Xvfb with software OpenGL.
 - The Release build compiled all targets from the FreeCAD fork's existing configured build tree and installed into a temporary prefix. A fresh configure has not been confirmed: rerunning CMake with the current Python 3.14 interpreter stops in the Pivy compatibility check because that interpreter cannot import Pivy. No system package or user installation was changed.

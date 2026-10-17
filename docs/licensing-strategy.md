@@ -71,7 +71,7 @@ The native target keeps these source boundaries independently reviewable:
   and [FreeCAD contribution/license guidance](https://github.com/FreeCAD/FreeCAD/blob/main/CONTRIBUTING.md#4-licensing-ownership-and-credit).
 - [Qt 6 licensing](https://doc.qt.io/qt-6.10/licensing.html) and [Qt 6.10
   third-party component inventory](https://doc.qt.io/qt-6.10/licenses-used-in-qt.html).
-- [Open CASCADE licensing statement](https://dev.opencascade.org/sites/default/files/pdf/Preliminaries.pdf).
+- [Open CASCADE Technology license](https://github.com/Open-Cascade-SAS/OCCT/blob/master/dox/license.md), plus the exact OCCT 7.9.2 distribution used by the native build.
 - [smlibpy upstream repository and license summary](https://github.com/awv-informatik/smlibpy), plus its checked-out `LICENSE` and `NOTICE`.
 - [setuptools upstream project](https://github.com/pypa/setuptools), plus the
   pinned package version in `requirements-build.lock`.

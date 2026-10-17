@@ -6,25 +6,32 @@ The repository retains a Python workbench hosted by FreeCAD and a
 backend-neutral Python geometry contract with FreeCAD `Part` and optional
 SMLib adapters. This is the compatibility subsystem. The standalone C++20 / Qt
 6 application with direct OCCT APIs is the primary architecture. The Python
-suite has 18 tests: 17 pass in the default Python environment and the optional
+suite has 20 tests: 19 pass in the default Python environment and the optional
 SMLib integration test is skipped unless `smlibpy` is installed. The
 FreeCADCmd smoke and seven-case OCCT/SMLib benchmark remain compatibility
 evidence; they do not verify a standalone application.
 
 The native target is a C++20/Qt 6 Quick/QML executable. OCCT is its primary
-exact kernel. SMLib remains optional. Existing FreeCAD files and adapters stay
-available while the native document, geometry, selection, and command paths
-continue to grow. Native project persistence is not implemented yet.
+exact kernel, and SMLib remains optional. `DatumDocument` owns stable object and
+feature UUIDs, hierarchy, typed properties, exact B-Rep shapes, topology
+references, and the initial object-scoped parametric feature graph. The native
+`.dld` format is at schema 3, writes exact B-Rep and feature definitions, and
+migrates schema 1 and 2 projects. FreeCAD `.FCStd` support remains isolated in
+the compatibility workbench; native persistence does not replace that import
+and migration path.
 
 The native executable currently configures and builds against Qt 6.10.2 and
 OCCT 7.9.2. Its OCCT core and UI-model checks cover exact geometry,
-stable-ID picking, and Move preview/cancel/commit/undo/redo. The QML smoke loads
-the common editor host and the Outliner, Viewport, and Properties components.
-An offscreen run creates and tessellates the exact OCCT box, but Qt Quick 3D
-does not render through Qt's offscreen plugin. The frame smoke passes under
-Xvfb and visual inspection confirms the exact solid and editor layout. An XTest
-pointer smoke passes for viewport picking, camera orbit and zoom, Move cancel
-and confirm, and undo/redo. Hardware-GPU behavior remains unverified.
+stable-ID picking, and Move preview/cancel/commit/undo/redo. The QML shell
+composes a `DatumWorkspace`, `DatumArea`, `EditorHost`, and the Outliner,
+Viewport, and Properties components. `IViewportRenderer` isolates the
+display-mesh handoff; `PickingService` resolves render hits against exact
+geometry and persistent topology references. An offscreen run creates and
+tessellates the exact OCCT box, but Qt Quick 3D does not render through Qt's
+offscreen plugin. Earlier frame and XTest pointer smokes passed under Xvfb with
+software rendering. In the 2026-10-17 recheck, the XCB smoke could not start
+because `xcb-cursor0` was unavailable; see [`native-baseline.md`](native-baseline.md).
+Hardware-GPU behavior remains unverified.
 
 The transitional FreeCAD 1.1.3 fork build completed from its configured build
 tree. Its FreeCADCmd geometry/project smoke and the GUI smoke for workbench,
@@ -43,7 +50,7 @@ interpreter; see the milestone status report.
 | Exact OCCT geometry | FreeCAD `Part`, `TopoShape`, and bundled OCCT bindings | `src/datumloopds/geometry/occt/backend.py`, `geometry/benchmark.py` | Direct C++ OCCT geometry API | Native geometry tests cover primitives, measures, validity, Booleans, STEP, and tessellation |
 | Optional SMLib geometry | `smlibpy==0.3.4`; Python package and C++ bindings | `src/datumloopds/geometry/smlib/backend.py` | Optional `SmlibKernel` adapter | Native adapter is independently built and can be omitted without losing OCCT workflows |
 | Workbench panels and properties | FreeCAD `FreeCADGui`, PySide widgets, host docking | `src/datumloopds/freecad/shell.py` | Qt Quick editor components, view models, typed properties | Selection, properties, sizing, and workspace state are verified in the native app |
-| Selection and hover | `FreeCADGui.Selection` and FreeCAD object/subelement handles | `src/datumloopds/freecad/shell.py`, `tests/FreeCADWidgetSmoke.FCMacro` | `PickingService` resolves viewport object hits by stable ID; persistent subshape references are future work | Object selection resolves to stable DatumLoop identities and synchronizes editors; face/edge/vertex identity remains to be implemented |
+| Selection and hover | `FreeCADGui.Selection` and FreeCAD object/subelement handles | `src/datumloopds/freecad/shell.py`, `tests/FreeCADWidgetSmoke.FCMacro` | `PickingService` resolves object hits and exact-geometry face, edge, and vertex hits to stable object and topology UUIDs | Continue rejecting ambiguous topology matches; preserve the FreeCAD selection adapter until legacy workflows and `.FCStd` migration are covered |
 | Undo and document mutation | FreeCAD document transactions and GUI-thread document edits | FreeCAD host today; not yet a standalone feature API | DatumLoop commands and document transactions | Native command execute/undo/redo and preview/cancel tests pass without host calls |
 | Project metadata | Standard-library Python; metadata currently stored on FreeCAD document objects | `src/datumloopds/project.py`, `freecad/project_actions.py` | Native document metadata and migrations | `.dld` metadata validates, migrates, and round trips in a headless core test |
 | Geometry benchmark and reporting | FreeCADCmd for OCCT; separate optional SMLib runtime | `scripts/`, `reports/geometry-benchmark/` | Native C++ OCCT regression and performance checks, retaining the Python cross-kernel benchmark | Direct OCCT results are measured; compatibility comparison remains available where both backends are installed |
@@ -64,20 +71,21 @@ interpreter; see the milestone status report.
 - Do not remove `.FCStd` support until the native project format can import and
   export the existing files required by the machine engineering workflow.
 
-## First controlled slice
+## Current native slice
 
-The initial native slice establishes a buildable `DatumLoopDS` executable, a
-DatumLoop design-token module, a minimal core document, exact OCCT box creation,
-and an OCCT-derived viewport mesh. The Design workspace contains resizable CAD
-Viewport, Engineering Outliner, and Properties editors. Selection drives the
-property panel. Camera orbit/pan/zoom and frame-selected controls are native.
-The first Move command previews a numeric translation along X/Y/Z and either
-commits it as an undoable command or cancels it without changing the document.
+The current native slice builds `DatumLoopDS`, creates exact OCCT geometry,
+persists it in versioned `.dld` projects, and recomputes its initial feature
+graph. The Design workspace contains replaceable Outliner, Viewport, and
+Properties editors. Selection drives the property panel through
+`PickingService`; camera orbit/pan/zoom and frame-selected controls are native.
+Move previews a numeric translation along X/Y/Z and either commits it as an
+undoable command or cancels it without changing the document.
 
-This is a foundation, not a replacement for Part Design, assemblies, project
-migration, engineering metadata, or simulation. The FreeCAD 1.1.3 compatibility
-shell's configured build and GUI smoke pass, but a clean configure remains
-open. Keep FreeCAD integration until native equivalents for the workflows in
-scope are implemented and tested. The XTest pointer smoke covers viewport
-selection, camera orbit and zoom, and the Move cancel/confirm/undo/redo path;
-hardware-GPU behavior remains unverified.
+This is a foundation, not a replacement for Part Design, assemblies, native
+engineering semantics, or simulation. The FreeCAD 1.1.3 compatibility shell's
+configured build and GUI smoke pass, but a clean configure remains open. Keep
+FreeCAD integration until native equivalents for the workflows in scope are
+implemented and tested. The XTest pointer smoke covers viewport selection,
+camera orbit and zoom, and the Move cancel/confirm/undo/redo path when the Qt
+XCB runtime is available; this recheck could not launch it. Hardware-GPU
+behavior remains unverified.
