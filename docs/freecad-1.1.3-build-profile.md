@@ -1,8 +1,10 @@
-# FreeCAD 1.1.3 clean build profile
+# FreeCAD 1.1.3 compatibility build profile
 
-This document records the clean compatibility-fork build and smoke evidence
-used by the DatumLoop DS milestone. The build preserves FreeCAD's CAD engine
-and adds the DatumLoop DS application branding.
+**FREECAD COMPATIBILITY BUILD: currently failing / non-blocking.** This profile
+records earlier local compatibility evidence and the latest hosted failure.
+FreeCAD remains limited to `.FCStd` migration, regression/reference,
+import/export assistance, and concrete compatibility defects. It is not part of
+the normal DatumLoop native push or pull-request checks.
 
 ## Source and toolchain
 
@@ -29,9 +31,9 @@ the immutable snapshot fixes the transitive package metadata. The package list
 follows the fork's `tools/build/Docker/ubuntuQt6.sh` and includes Xvfb, the Qt
 X11 plugin runtime, and Mesa software OpenGL for the GUI smoke.
 
-The clean build, isolated install, FreeCADCmd project round-trip smoke, and
-software-rendered GUI viewport smoke run in
-[`reproducible-freecad-build.yml`](../.github/workflows/reproducible-freecad-build.yml).
+The manually dispatched compatibility build, isolated install, FreeCADCmd
+project round-trip smoke, and software-rendered GUI viewport smoke run in
+[`freecad-compatibility-ci.yml`](../.github/workflows/freecad-compatibility-ci.yml).
 The workflow checks out this source revision and recursively initializes the
 fork's submodules at commit `b6b11c9cabeeee14fd192856f5749af620ea7183`.
 To run the same check from a clean clone, place the FreeCAD checkout next to
@@ -94,4 +96,6 @@ matching runtime when launching from a development shell.
 
 These checks verify the FreeCAD compatibility fork in a software-rendered
 environment. They do not verify hardware-GPU behavior or complete the separate
-standalone native application milestone.
+standalone native application milestone. They are earlier local smoke evidence;
+the current hosted run is failing as recorded in
+[`freecad-run-39028748447.md`](../reports/compatibility/freecad-run-39028748447.md).
