@@ -86,7 +86,7 @@ int main(int argc,char* argv[]) {
         require(loaded.engineeringModel()==model,"DLD round trip lost requirements, source evidence, interfaces or changes");
         QFile file(path); require(file.open(QIODevice::ReadOnly),"could not read saved project");
         auto root=QJsonDocument::fromJson(file.readAll()).object(); file.close();
-        require(root.value("schemaVersion").toInt()==9,"requirements were written using the wrong project schema");
+        require(root.value("schemaVersion").toInt()==datumloop::DldProjectStore::SchemaVersion,"requirements were written using the wrong project schema");
         root.insert("schemaVersion",8);
         require(file.open(QIODevice::WriteOnly|QIODevice::Truncate),"could not write old-schema fixture");
         file.write(QJsonDocument(root).toJson()); file.close();

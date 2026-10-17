@@ -1,0 +1,21 @@
+{
+    "carrier_fea_status": "not_run",
+    "dld_round_trip": true,
+    "expected_strain_energy_j": 1.7959770114942526e-07,
+    "expected_strain_xx": 1.7959770114942526e-06,
+    "expected_stress_xx_pa": 124999.99999999999,
+    "expected_tip_ux_m": 3.591954022988505e-08,
+    "force_balance_error": 2.6598179222386786e-09,
+    "hex_strain_energy_j": 1.7959770114942627e-07,
+    "iterations": 46,
+    "maximum_nodal_displacement_error_m": 7.239906914048745e-17,
+    "mfem_version": "4.10.0",
+    "nodes": 329,
+    "reaction_x_n": -9.999999998666066,
+    "relative_residual": 5.8878381839756546e-09,
+    "solver": "mfem.serial-h1-p1-3d-linear-elasticity",
+    "test": "exact_uniaxial_affine_patch",
+    "tet_fields_displayed": true,
+    "tet_strain_energy_j": 1.7959770114942417e-07,
+    "tetrahedra": 1096
+}

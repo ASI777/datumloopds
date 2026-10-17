@@ -238,6 +238,16 @@ if(BUILD_TESTING)
         ENVIRONMENT "DATUMLOOP_MJCF_OUTPUT=${DATUMLOOP_MJCF_OUTPUT}")
 
     if(DATUMLOOP_ENABLE_MFEM AND MFEM_FOUND)
+        add_executable(datumloop-mfem-tet-tests tests/native/test_mfem_tetrahedra.cpp)
+        target_link_libraries(datumloop-mfem-tet-tests PRIVATE datumloop_mfem_backend datumloop_meshing datumloop_ui)
+        target_compile_definitions(datumloop-mfem-tet-tests PRIVATE
+            DATUMLOOP_CARRIER_STUDY="${CMAKE_SOURCE_DIR}/examples/parts/maxon-ecx-flat-22-l/design-study.json"
+            DATUMLOOP_GMSH_PYTHON="${DATUMLOOP_GMSH_PYTHON}"
+            DATUMLOOP_GMSH_WORKER="${CMAKE_SOURCE_DIR}/scripts/gmsh_analysis_worker.py")
+        add_test(NAME datumloop-mfem-tet-tests COMMAND datumloop-mfem-tet-tests
+            --report "${CMAKE_CURRENT_BINARY_DIR}/reports/mfem-tet-patch.json")
+        set_tests_properties(datumloop-mfem-tet-tests PROPERTIES SKIP_RETURN_CODE 77)
+
         add_executable(datumloop-mfem-tests tests/native/test_mfem_solver.cpp)
         target_link_libraries(datumloop-mfem-tests PRIVATE datumloop_mfem_backend)
         add_test(NAME datumloop-mfem-tests COMMAND datumloop-mfem-tests)

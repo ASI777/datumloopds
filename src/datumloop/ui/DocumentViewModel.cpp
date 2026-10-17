@@ -678,6 +678,24 @@ bool DocumentViewModel::validateAnalysisRunForDisplay(const StructuralAnalysisRu
     settings.maximumElementCount = std::max<std::uint64_t>(
         settings.maximumElementCount, run.provenance.mesh.elementCount);
     try {
+        if (run.provenance.mesh.elementType == "tetrahedron4") {
+            run.meshSnapshot->validate(run.provenance.mesh);
+            if (run.provenance.mesh.geometrySha256.empty() ||
+                analysisGeometrySha256(*object) != run.provenance.mesh.geometrySha256) {
+                reason = "the exact CAD geometry differs from the tetrahedral result source";
+                return false;
+            }
+            for (const auto& id : run.provenance.topologyReferenceIds) {
+                const auto& references = document_->topologyReferences();
+                if (std::none_of(references.begin(), references.end(), [&](const auto& ref) {
+                    return ref.id == id && ref.objectId == object->id;
+                })) {
+                    reason = "a tetrahedral result source face no longer exists";
+                    return false;
+                }
+            }
+            return true;
+        }
         const AnalysisMesh currentMesh = OcctPrismAnalysisMesher::generate(
             *document_, run.provenance.cadObjectId, settings);
         if (currentMesh.provenance.generator != run.provenance.mesh.generator ||
