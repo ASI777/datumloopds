@@ -48,6 +48,24 @@ void writeObject(const QString& path, const QJsonObject& object)
     require(file.write(QJsonDocument(object).toJson()) > 0, "test project JSON write failed");
 }
 
+QJsonObject removeVersionSixMechanismFields(QJsonObject root)
+{
+    QJsonObject engineering = root.value(QStringLiteral("engineeringModel")).toObject();
+    QJsonArray mechanisms = engineering.value(QStringLiteral("mechanisms")).toArray();
+    for (qsizetype index = 0; index < mechanisms.size(); ++index) {
+        QJsonObject mechanism = mechanisms.at(index).toObject();
+        for (const QString& key : {QStringLiteral("specVersion"), QStringLiteral("bodies"),
+                                   QStringLiteral("joints"), QStringLiteral("actuators"),
+                                   QStringLiteral("contacts"), QStringLiteral("requirements")}) {
+            mechanism.remove(key);
+        }
+        mechanisms.replace(index, mechanism);
+    }
+    engineering.insert(QStringLiteral("mechanisms"), mechanisms);
+    root.insert(QStringLiteral("engineeringModel"), engineering);
+    return root;
+}
+
 bool loadFails(const QString& path)
 {
     try {
@@ -95,6 +113,37 @@ int main(int argc, char* argv[])
         mechanism.id = uuid().toStdString();
         mechanism.name = "Round-trip mechanism";
         mechanism.bodyObjectIds = {parentId, childId};
+        const auto parentObject = document.object(parentId);
+        require(parentObject != nullptr && parentObject->featureGraph.outputFeatureId().has_value(),
+                "round-trip parent has no native feature source");
+        datumloop::DatumMechanismBody baseBody;
+        baseBody.id = uuid().toStdString();
+        baseBody.name = "Base body";
+        baseBody.cadObjectId = parentId;
+        baseBody.geometrySource = {datumloop::DatumGeometrySourceKind::NativeFeatureGraph,
+                                   *parentObject->featureGraph.outputFeatureId(), "feature-graph-v1"};
+        baseBody.massKg = 3.0;
+        baseBody.centerOfMassLocalM = datumloop::Vector3{0.01, 0.0, 0.005};
+        baseBody.inertiaTensorKgM2 = datumloop::DatumInertiaTensorKgM2{0.02, 0.03, 0.04, 0.0, 0.0, 0.0};
+        baseBody.propertyEvidence = {
+            {"massKg", datumloop::DatumPropertyEvidenceKind::Measured, "fixture scale", "scale-run-1", 0.99},
+            {"centerOfMassLocalM", datumloop::DatumPropertyEvidenceKind::GeometryDerived, "CAD mass properties", "feature-graph-v1", 1.0},
+            {"inertiaTensorKgM2", datumloop::DatumPropertyEvidenceKind::GeometryDerived, "CAD mass properties", "feature-graph-v1", 1.0},
+        };
+        datumloop::DatumMechanismBody movingBody;
+        movingBody.id = uuid().toStdString();
+        movingBody.name = "Moving carriage";
+        movingBody.cadObjectId = childId;
+        movingBody.geometrySource = {datumloop::DatumGeometrySourceKind::EmbeddedBRep, childId, "import-record-1"};
+        movingBody.massKg = 0.8;
+        movingBody.centerOfMassLocalM = datumloop::Vector3{0.0, 0.0, 0.0};
+        movingBody.inertiaTensorKgM2 = datumloop::DatumInertiaTensorKgM2{0.0005, 0.0008, 0.001, 0.0, 0.0, 0.0};
+        movingBody.propertyEvidence = {
+            {"massKg", datumloop::DatumPropertyEvidenceKind::UserSpecified, "test fixture", "fixture-v1", 1.0},
+            {"centerOfMassLocalM", datumloop::DatumPropertyEvidenceKind::Estimated, "test fixture estimate", "fixture-v1", 0.7},
+            {"inertiaTensorKgM2", datumloop::DatumPropertyEvidenceKind::Estimated, "test fixture estimate", "fixture-v1", 0.7},
+        };
+        mechanism.bodies = {baseBody, movingBody};
         datumloop::DatumMotor motor;
         motor.id = uuid().toStdString();
         motor.mechanismId = mechanism.id;
@@ -124,6 +173,59 @@ int main(int argc, char* argv[])
         axis.directionInBaseFrame = {1.0, 0.0, 0.0};
         axis.actuatorMotorId = motor.id;
         mechanism.axes.push_back(axis);
+        datumloop::DatumJoint slideJoint;
+        slideJoint.id = uuid().toStdString();
+        slideJoint.name = "Carriage slide";
+        slideJoint.type = datumloop::DatumJointType::Prismatic;
+        slideJoint.bodyAId = baseBody.id;
+        slideJoint.bodyBId = movingBody.id;
+        slideJoint.frameInBodyA.originM = {0.0, 0.0, 0.02};
+        slideJoint.frameInBodyB.originM = {0.0, 0.0, -0.01};
+        slideJoint.lowerLimitSi = 0.0;
+        slideJoint.upperLimitSi = 0.15;
+        mechanism.joints.push_back(slideJoint);
+        datumloop::DatumActuator actuator;
+        actuator.id = uuid().toStdString();
+        actuator.name = "Servo slide command";
+        actuator.jointId = slideJoint.id;
+        actuator.mode = datumloop::DatumActuatorControlMode::Position;
+        actuator.motorId = motor.id;
+        actuator.trajectory = {{0.0, 0.0}, {0.5, 0.075}, {1.0, 0.15}};
+        actuator.maximumEffortSi = 120.0;
+        actuator.maximumRateSi = 0.1;
+        mechanism.actuators.push_back(actuator);
+        const auto parentFace = std::find_if(capturedReferences.begin(), capturedReferences.end(), [](const auto& reference) {
+            return reference.subshapeType == datumloop::DatumSubshapeType::Face;
+        });
+        const auto childFace = std::find_if(document.topologyReferences().begin(), document.topologyReferences().end(),
+                                             [&childId](const auto& reference) {
+                                                 return reference.objectId == childId &&
+                                                        reference.subshapeType == datumloop::DatumSubshapeType::Face;
+                                             });
+        require(parentFace != capturedReferences.end() && childFace != document.topologyReferences().end(),
+                "round-trip mechanism fixture lacks explicit contact surface references");
+        datumloop::DatumContactPair contact;
+        contact.id = uuid().toStdString();
+        contact.name = "Carriage guide contact";
+        contact.bodyAId = baseBody.id;
+        contact.bodyBId = movingBody.id;
+        contact.surfaceAReferenceId = parentFace->id;
+        contact.surfaceBReferenceId = childFace->id;
+        contact.law = datumloop::DatumContactLaw::Coulomb;
+        contact.frictionCoefficient = 0.12;
+        contact.normalStiffnessNPerM = 1.0e7;
+        contact.normalDampingNsPerM = 100.0;
+        contact.restitution = 0.05;
+        mechanism.contacts.push_back(contact);
+        datumloop::DatumRequirement travel;
+        travel.id = uuid().toStdString();
+        travel.name = "Minimum axis travel";
+        travel.metricId = "axis.travel";
+        travel.unit = "m";
+        travel.relation = datumloop::DatumRequirementRelation::GreaterOrEqual;
+        travel.minimumSi = 0.12;
+        travel.hardConstraint = true;
+        mechanism.requirements.push_back(travel);
         engineeringModel.mechanisms.push_back(mechanism);
         engineeringModel.motors.push_back(motor);
         datumloop::DatumMotor unspecifiedMotor;
@@ -131,8 +233,6 @@ int main(int argc, char* argv[])
         unspecifiedMotor.mechanismId = mechanism.id;
         unspecifiedMotor.name = "Unspecified motor";
         engineeringModel.motors.push_back(unspecifiedMotor);
-        document.setEngineeringModel(engineeringModel);
-
         datumloop::DatumElectronicsModel electronicsModel;
         datumloop::MaterialDefinition fr4;
         fr4.id = uuid().toStdString();
@@ -191,6 +291,7 @@ int main(int argc, char* argv[])
                             0.0007, 0.0003, {frontLayerId, backLayerId}});
         electronicsModel.pcbs.push_back(pcb);
         document.setElectronicsModel(electronicsModel);
+        document.setEngineeringModel(engineeringModel);
 
         const TopoDS_Shape regeneratedBox = datumloop::OcctKernel::box({40.0, 30.0, 20.0});
         for (const datumloop::DatumTopologyReference& reference : capturedReferences) {
@@ -256,13 +357,22 @@ int main(int argc, char* argv[])
         require(manifest.open(QIODevice::ReadOnly), "saved project could not be opened");
         const QByteArray manifestBytes = manifest.readAll();
         const QJsonObject root = QJsonDocument::fromJson(manifestBytes).object();
-        require(root.value(QStringLiteral("schemaVersion")).toInt() == 5,
-                "saved project did not include the version-five schema");
+        require(root.value(QStringLiteral("schemaVersion")).toInt() == 6,
+                "saved project did not include the version-six schema");
         require(root.value(QStringLiteral("engineeringModel")).toObject()
                     .value(QStringLiteral("mechanisms")).toArray().size() == 1 &&
                     root.value(QStringLiteral("engineeringModel")).toObject()
                     .value(QStringLiteral("motors")).toArray().size() == 2,
                 "saved project omitted engineering mechanisms or motors");
+        const QJsonObject encodedMechanism = root.value(QStringLiteral("engineeringModel")).toObject()
+            .value(QStringLiteral("mechanisms")).toArray().at(0).toObject();
+        require(encodedMechanism.value(QStringLiteral("specVersion")).toInt() == 1 &&
+                    encodedMechanism.value(QStringLiteral("bodies")).toArray().size() == 2 &&
+                    encodedMechanism.value(QStringLiteral("joints")).toArray().size() == 1 &&
+                    encodedMechanism.value(QStringLiteral("actuators")).toArray().size() == 1 &&
+                    encodedMechanism.value(QStringLiteral("contacts")).toArray().size() == 1 &&
+                    encodedMechanism.value(QStringLiteral("requirements")).toArray().size() == 1,
+                "schema-six project omitted versioned bodies, joints, actuators, contacts, or requirements");
         require(root.value(QStringLiteral("topologyReferences")).toArray().size() ==
                     static_cast<qsizetype>(document.topologyReferences().size()),
                 "saved project omitted its persistent topology references");
@@ -414,13 +524,36 @@ int main(int argc, char* argv[])
                     .value(QStringLiteral("motors")).toArray().isEmpty(),
                 "saving a schema-v3 project did not write the current schema and empty engineering model");
 
-        QJsonObject versionFour = root;
+        datumloop::DatumEngineeringModel legacyEngineeringModel = engineeringModel;
+        legacyEngineeringModel.mechanisms.front().bodies.clear();
+        legacyEngineeringModel.mechanisms.front().joints.clear();
+        legacyEngineeringModel.mechanisms.front().actuators.clear();
+        legacyEngineeringModel.mechanisms.front().contacts.clear();
+        legacyEngineeringModel.mechanisms.front().requirements.clear();
+        QJsonObject versionFive = removeVersionSixMechanismFields(root);
+        versionFive.insert(QStringLiteral("schemaVersion"), 5);
+        const QString versionFivePath = temporaryDirectory.filePath(QStringLiteral("schema-v5.dld"));
+        writeObject(versionFivePath, versionFive);
+        datumloop::DatumDocument migratedVersionFive = datumloop::DldProjectStore::load(versionFivePath);
+        require(migratedVersionFive.engineeringModel() == legacyEngineeringModel &&
+                    migratedVersionFive.electronicsModel() == electronicsModel &&
+                    !migratedVersionFive.isDirty(),
+                "schema-v5 project did not preserve legacy engineering and electronics data");
+        datumloop::DldProjectStore::save(migratedVersionFive, versionFivePath);
+        QFile migratedV5Manifest(versionFivePath);
+        require(migratedV5Manifest.open(QIODevice::ReadOnly), "migrated schema-v5 project could not be reopened");
+        const QJsonObject migratedV5Root = QJsonDocument::fromJson(migratedV5Manifest.readAll()).object();
+        require(migratedV5Root.value(QStringLiteral("schemaVersion")).toInt() ==
+                    datumloop::DldProjectStore::SchemaVersion,
+                "saving a schema-v5 project did not write the current schema");
+
+        QJsonObject versionFour = removeVersionSixMechanismFields(root);
         versionFour.insert(QStringLiteral("schemaVersion"), 4);
         versionFour.remove(QStringLiteral("electronicsModel"));
         const QString versionFourPath = temporaryDirectory.filePath(QStringLiteral("schema-v4.dld"));
         writeObject(versionFourPath, versionFour);
         datumloop::DatumDocument migratedVersionFour = datumloop::DldProjectStore::load(versionFourPath);
-        require(migratedVersionFour.engineeringModel() == engineeringModel &&
+        require(migratedVersionFour.engineeringModel() == legacyEngineeringModel &&
                     migratedVersionFour.electronicsModel() == datumloop::DatumElectronicsModel{},
                 "schema-v4 project did not preserve engineering data and default electronics data");
         datumloop::DldProjectStore::save(migratedVersionFour, versionFourPath);
@@ -511,7 +644,7 @@ int main(int argc, char* argv[])
                                 loadedBooleanObject->featureGraph.features().end(), [](const auto& feature) {
                                     return feature.status == datumloop::DatumFeatureStatus::Succeeded;
                                 }),
-                "Boolean feature DAG did not recompute and round-trip through schema 5");
+                "Boolean feature DAG did not recompute and round-trip through schema 6");
 
         loaded.setName("Edited assembly");
         require(loaded.isDirty(), "document metadata edits should mark the document dirty");

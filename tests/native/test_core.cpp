@@ -267,9 +267,183 @@ int main()
         axis.directionInBaseFrame = {1.0, 0.0, 0.0};
         axis.actuatorMotorId = motor.id;
         mechanism.axes.push_back(axis);
+
+        const auto makeBody = [](const datumloop::DatumDocument& owner,
+                                 const std::string& objectId,
+                                 const std::string& name,
+                                 const std::string& materialId) {
+            const datumloop::DatumObject* object = owner.object(objectId);
+            require(object != nullptr && object->featureGraph.outputFeatureId().has_value(),
+                    "test mechanism body must have a native feature source");
+            datumloop::DatumMechanismBody body;
+            body.id = datumloop::createDatumUuidV4();
+            body.name = name;
+            body.cadObjectId = objectId;
+            body.geometrySource = {datumloop::DatumGeometrySourceKind::NativeFeatureGraph,
+                                   *object->featureGraph.outputFeatureId(), "feature-graph-v1"};
+            body.massKg = 2.0;
+            body.centerOfMassLocalM = datumloop::Vector3{0.0, 0.0, 0.01};
+            body.inertiaTensorKgM2 = datumloop::DatumInertiaTensorKgM2{0.01, 0.02, 0.03, 0.0, 0.0, 0.0};
+            body.materialDefinitionId = materialId;
+            body.propertyEvidence = {
+                {"massKg", datumloop::DatumPropertyEvidenceKind::UserSpecified, "fixture mass input", "fixture-v1", 1.0},
+                {"centerOfMassLocalM", datumloop::DatumPropertyEvidenceKind::UserSpecified, "fixture COM input", "fixture-v1", 1.0},
+                {"inertiaTensorKgM2", datumloop::DatumPropertyEvidenceKind::UserSpecified, "fixture inertia input", "fixture-v1", 1.0},
+            };
+            return body;
+        };
+        const std::string materialDefinitionId = datumloop::createDatumUuidV4();
+        datumloop::DatumMechanismBody baseBody = makeBody(engineeringDocument, baseObjectId, "Base", materialDefinitionId);
+        datumloop::DatumMechanismBody movingBody = makeBody(engineeringDocument, movingObjectId, "Carriage", materialDefinitionId);
+        mechanism.bodies = {baseBody, movingBody};
+        datumloop::DatumJoint joint;
+        joint.id = datumloop::createDatumUuidV4();
+        joint.name = "Linear slide";
+        joint.type = datumloop::DatumJointType::Prismatic;
+        joint.bodyAId = baseBody.id;
+        joint.bodyBId = movingBody.id;
+        joint.lowerLimitSi = 0.0;
+        joint.upperLimitSi = 0.25;
+        mechanism.joints.push_back(joint);
+        datumloop::DatumActuator actuator;
+        actuator.id = datumloop::createDatumUuidV4();
+        actuator.name = "Axis command";
+        actuator.jointId = joint.id;
+        actuator.mode = datumloop::DatumActuatorControlMode::Position;
+        actuator.motorId = motor.id;
+        actuator.trajectory = {{0.0, 0.0}, {1.0, 0.25}};
+        actuator.maximumRateSi = 0.25;
+        mechanism.actuators.push_back(actuator);
+        const auto movingFace = std::find_if(
+            engineeringDocument.topologyReferences().begin(), engineeringDocument.topologyReferences().end(),
+            [&movingObjectId](const auto& reference) {
+                return reference.objectId == movingObjectId &&
+                       reference.subshapeType == datumloop::DatumSubshapeType::Face;
+            });
+        require(movingFace != engineeringDocument.topologyReferences().end(),
+                "test carriage has no persistent contact surface reference");
+        datumloop::DatumContactPair contact;
+        contact.id = datumloop::createDatumUuidV4();
+        contact.name = "Guide contact";
+        contact.bodyAId = baseBody.id;
+        contact.bodyBId = movingBody.id;
+        contact.surfaceAReferenceId = mountingFace->id;
+        contact.surfaceBReferenceId = movingFace->id;
+        contact.law = datumloop::DatumContactLaw::Coulomb;
+        contact.frictionCoefficient = 0.15;
+        mechanism.contacts.push_back(contact);
+        datumloop::DatumRequirement travelRequirement;
+        travelRequirement.id = datumloop::createDatumUuidV4();
+        travelRequirement.name = "Minimum travel";
+        travelRequirement.metricId = "axis.travel";
+        travelRequirement.unit = "m";
+        travelRequirement.relation = datumloop::DatumRequirementRelation::GreaterOrEqual;
+        travelRequirement.minimumSi = 0.2;
+        mechanism.requirements.push_back(travelRequirement);
         engineeringModel.mechanisms.push_back(mechanism);
         engineeringModel.motors.push_back(motor);
         engineeringModel.validate();
+
+        datumloop::MaterialDefinition mechanismMaterial;
+        mechanismMaterial.id = materialDefinitionId;
+        mechanismMaterial.name = "Sourced mechanism steel";
+        mechanismMaterial.propertyModels = {
+            {"elastic.youngs_modulus", "Pa", "", "", datumloop::MaterialPropertyLaw::Constant,
+             210.0e9, {}, "verified test fixture", "fixture-v1", 1.0},
+            {"elastic.poisson_ratio", "1", "", "", datumloop::MaterialPropertyLaw::Constant,
+             0.29, {}, "verified test fixture", "fixture-v1", 1.0},
+        };
+        datumloop::MechanismValidationContext mechanismContext;
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Kinematics;
+        mechanismContext.documentObjectIds = {baseObjectId, movingObjectId};
+        mechanismContext.materialDefinitions = {mechanismMaterial};
+        for (const auto& reference : engineeringDocument.topologyReferences()) {
+            mechanismContext.surfaceReferences.push_back({reference.id, reference.objectId, reference.subshapeType});
+        }
+        require(datumloop::validateMechanismForStudy(engineeringModel, mechanism.id, mechanismContext).readyForStudy(),
+                "complete mechanism definition was not ready for a kinematic study");
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Dynamics;
+        require(datumloop::validateMechanismForStudy(engineeringModel, mechanism.id, mechanismContext).readyForStudy(),
+                "sourced mass properties did not satisfy the dynamic study readiness gate");
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Structural;
+        require(datumloop::validateMechanismForStudy(engineeringModel, mechanism.id, mechanismContext).readyForStudy(),
+                "sourced elastic material properties did not satisfy the structural input gate");
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Contact;
+        require(datumloop::validateMechanismForStudy(engineeringModel, mechanism.id, mechanismContext).readyForStudy(),
+                "contact surfaces and friction data did not satisfy the contact input gate");
+
+        datumloop::MechanismValidationContext missingConstitutiveContext = mechanismContext;
+        missingConstitutiveContext.studyKind = datumloop::MechanismStudyKind::Structural;
+        missingConstitutiveContext.materialDefinitions.front().propertyModels.clear();
+        const auto missingConstitutiveReport = datumloop::validateMechanismForStudy(
+            engineeringModel, mechanism.id, missingConstitutiveContext);
+        require(!missingConstitutiveReport.readyForStudy() &&
+                    std::any_of(missingConstitutiveReport.diagnostics.begin(), missingConstitutiveReport.diagnostics.end(),
+                                [](const auto& item) {
+                                    return item.code == datumloop::MechanismDiagnosticCode::MissingMaterialProperty;
+                                }),
+                "structural readiness accepted a material without sourced elastic constants");
+
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Dynamics;
+        datumloop::DatumEngineeringModel missingMass = engineeringModel;
+        missingMass.mechanisms.front().bodies.back().massKg.reset();
+        missingMass.mechanisms.front().bodies.back().propertyEvidence.erase(
+            std::remove_if(missingMass.mechanisms.front().bodies.back().propertyEvidence.begin(),
+                           missingMass.mechanisms.front().bodies.back().propertyEvidence.end(),
+                           [](const auto& evidence) { return evidence.propertyId == "massKg"; }),
+            missingMass.mechanisms.front().bodies.back().propertyEvidence.end());
+        const auto missingMassReport = datumloop::validateMechanismForStudy(
+            missingMass, mechanism.id, mechanismContext);
+        require(!missingMassReport.readyForStudy() &&
+                    std::any_of(missingMassReport.diagnostics.begin(), missingMassReport.diagnostics.end(),
+                                [](const auto& item) { return item.code == datumloop::MechanismDiagnosticCode::MissingMass; }),
+                "dynamic readiness did not identify an unresolved body mass");
+
+        mechanismContext.studyKind = datumloop::MechanismStudyKind::Contact;
+        datumloop::DatumEngineeringModel unknownFriction = engineeringModel;
+        unknownFriction.mechanisms.front().contacts.front().frictionCoefficient.reset();
+        const auto missingFrictionReport = datumloop::validateMechanismForStudy(
+            unknownFriction, mechanism.id, mechanismContext);
+        require(!missingFrictionReport.readyForStudy() &&
+                    std::any_of(missingFrictionReport.diagnostics.begin(), missingFrictionReport.diagnostics.end(),
+                                [](const auto& item) {
+                                    return item.code == datumloop::MechanismDiagnosticCode::MissingFrictionCoefficient;
+                                }),
+                "contact readiness did not preserve an unknown friction coefficient as unresolved");
+
+        datumloop::MechanismValidationContext edgeContactContext = mechanismContext;
+        edgeContactContext.studyKind = datumloop::MechanismStudyKind::Contact;
+        const auto edgeContactSurface = std::find_if(
+            edgeContactContext.surfaceReferences.begin(), edgeContactContext.surfaceReferences.end(),
+            [&contact](const auto& reference) { return reference.id == *contact.surfaceAReferenceId; });
+        require(edgeContactSurface != edgeContactContext.surfaceReferences.end(),
+                "contact surface was absent from validation context");
+        edgeContactSurface->subshapeType = datumloop::DatumSubshapeType::Edge;
+        const auto edgeContactReport = datumloop::validateMechanismForStudy(
+            engineeringModel, mechanism.id, edgeContactContext);
+        require(!edgeContactReport.readyForStudy() &&
+                    std::any_of(edgeContactReport.diagnostics.begin(), edgeContactReport.diagnostics.end(),
+                                [](const auto& item) {
+                                    return item.code == datumloop::MechanismDiagnosticCode::InvalidContactSurfaceReference;
+                                }),
+                "contact readiness accepted an edge reference as a contact surface");
+
+        datumloop::DatumEngineeringModel disconnected = engineeringModel;
+        const std::string isolatedObjectId = engineeringDocument.createBox("Unconnected component", {5.0, 5.0, 5.0}).id;
+        datumloop::DatumMechanismBody isolatedBody = makeBody(
+            engineeringDocument, isolatedObjectId, "Unconnected component", materialDefinitionId);
+        disconnected.mechanisms.front().bodyObjectIds.push_back(isolatedObjectId);
+        disconnected.mechanisms.front().bodies.push_back(isolatedBody);
+        disconnected.validate();
+        mechanismContext.documentObjectIds.push_back(isolatedObjectId);
+        const auto disconnectedReport = datumloop::validateMechanismForStudy(
+            disconnected, mechanism.id, mechanismContext);
+        require(!disconnectedReport.readyForStudy() &&
+                    std::any_of(disconnectedReport.diagnostics.begin(), disconnectedReport.diagnostics.end(),
+                                [](const auto& item) {
+                                    return item.code == datumloop::MechanismDiagnosticCode::DisconnectedBodies;
+                                }),
+                "mechanism readiness did not diagnose an unconnected body");
 
         datumloop::DatumEngineeringModel overflowingInertia = engineeringModel;
         overflowingInertia.motors.front().inertiaTensorKgM2 =

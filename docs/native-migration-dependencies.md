@@ -15,9 +15,9 @@ The native target is a C++20/Qt 6 Quick/QML executable. OCCT is its primary
 exact kernel, and SMLib remains optional. `DatumDocument` owns stable object and
 feature UUIDs, hierarchy, typed properties, exact B-Rep shapes, topology
 references, an initial object-scoped parametric feature graph, and separate
-engineering/electronics models. The native `.dld` format is at schema 5,
-writes exact B-Rep, feature definitions, engineering metadata, materials,
-circuits, and PCB data, and migrates schema 1 through 4 projects. FreeCAD
+engineering/electronics models. The native `.dld` format is at schema 6,
+writes exact B-Rep, feature definitions, versioned mechanism data, materials,
+circuits, and PCB data, and migrates schema 1 through 5 projects. FreeCAD
 `.FCStd` support remains isolated in the compatibility workbench; native
 persistence does not replace that import and migration path.
 

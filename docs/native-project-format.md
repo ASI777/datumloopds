@@ -1,7 +1,7 @@
 # Native DatumLoop project format (`.dld`)
 
 The native application saves projects as UTF-8 JSON in a `.dld` file. Schema
-version 5 is provisional and stores the document state supported by the current
+version 6 is provisional and stores the document state supported by the current
 native core:
 
 - project UUID and name;
@@ -11,7 +11,11 @@ native core:
 - exact OCCT B-Rep geometry, encoded as Base64 with its OCCT stream version;
 - persistent face, edge, and vertex references with owner identity, optional
   feature identity, geometric/topological signatures, and parent references;
-- engineering mechanisms and datum axes linked to CAD body object IDs;
+- versioned mechanism definitions with stable body IDs mapped one-to-one to
+  CAD objects, geometry-source descriptors, optional mass properties and their
+  provenance, coordinate frames, fixed/revolute/prismatic/spherical/universal
+  joints, position/velocity/effort actuators and sampled trajectories, contact
+  pairs, and requirement limits; legacy axes remain available for older data;
 - motors with optional CAD representation, physical properties, actuator data,
   mounting references, encoder, and supplier data;
 - common material definitions and states with optional composition, phase,
@@ -27,7 +31,7 @@ Example structure (the geometry payload is abbreviated):
 ```json
 {
   "format": "datumloop-project",
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "project": { "id": "…", "name": "Assembly" },
   "objects": [{
     "id": "…",
@@ -73,9 +77,60 @@ Example structure (the geometry payload is abbreviated):
   }],
   "engineeringModel": {
     "mechanisms": [{
+      "specVersion": 1,
       "id": "…",
       "name": "Linear axis",
       "bodyObjectIds": ["…", "…"],
+      "bodies": [{
+        "id": "…",
+        "name": "Carriage",
+        "cadObjectId": "…",
+        "geometrySource": {
+          "kind": "native-feature-graph",
+          "locator": "…",
+          "revision": ""
+        },
+        "massKg": 2.4,
+        "centerOfMassLocalM": [0, 0, 0],
+        "inertiaTensorKgM2": [0.01, 0.01, 0.01, 0, 0, 0],
+        "materialDefinitionId": null,
+        "propertyEvidence": [
+          { "propertyId": "massKg", "kind": "geometry-derived",
+            "reference": "…", "revision": "…", "confidence": null },
+          { "propertyId": "centerOfMassLocalM", "kind": "geometry-derived",
+            "reference": "…", "revision": "…", "confidence": null },
+          { "propertyId": "inertiaTensorKgM2", "kind": "geometry-derived",
+            "reference": "…", "revision": "…", "confidence": null }
+        ]
+      }, {
+        "id": "…",
+        "name": "Base",
+        "cadObjectId": "…",
+        "geometrySource": {
+          "kind": "embedded-brep",
+          "locator": "…",
+          "revision": ""
+        },
+        "massKg": null,
+        "centerOfMassLocalM": null,
+        "inertiaTensorKgM2": null,
+        "materialDefinitionId": null,
+        "propertyEvidence": []
+      }],
+      "joints": [{
+        "id": "…",
+        "name": "Linear guide",
+        "type": "prismatic",
+        "bodyAId": "…",
+        "bodyBId": "…",
+        "frameInBodyA": { "originM": [0, 0, 0], "orientationWxyz": [1, 0, 0, 0] },
+        "frameInBodyB": { "originM": [0, 0, 0], "orientationWxyz": [1, 0, 0, 0] },
+        "lowerLimitSi": 0,
+        "upperLimitSi": 0.5
+      }],
+      "actuators": [],
+      "contacts": [],
+      "requirements": [],
       "axes": [{
         "id": "…",
         "name": "X travel",
@@ -144,15 +199,17 @@ replaces its document and clears the old command history. A failed load leaves
 the open document untouched. Saving uses `QSaveFile`; the document becomes
 clean only after the atomic file commit succeeds.
 
-Schema version 5 reads versions 1 through 4. Version 1 files receive initial
+Schema version 6 reads versions 1 through 5. Version 1 files receive initial
 face, edge, and vertex references; version 2 through 4 references, object
 identities, and supported engineering data are preserved. Versions 1 through 3
 load with an empty engineering model; versions 1 through 4 load with an empty
 electronics model. Engineering data in a schema 1, 2, or 3 file and electronics
-data in a schema 1 through 4 file are rejected rather than discarded. Schema 5
-requires its electronics model. Unknown schema versions are rejected. Equation
-definitions, physics solver requests/results, robot/sensor/action specs, and
-simulation state are not yet persisted in schema 5. The object feature graph
+data in a schema 1 through 4 file are rejected rather than discarded. Schemas 5
+and 6 require their electronics model. Schema 5 mechanisms and motors migrate as
+legacy records with no explicit body/joint/actuator/contact/requirement
+definitions. Unknown schema versions are rejected. Equation definitions,
+physics solver requests/results, robot/sensor/action specs, and simulation
+state are not yet persisted in schema 6. The object feature graph
 is an append-ordered DAG with
 explicit feature UUIDs, owner, type, input feature UUIDs,
 parameters in millimetres, and a geometry backend identifier. The first native
@@ -174,11 +231,16 @@ Feature graph replacement is an undoable document command. It creates a new
 initial topology-reference set for that object's output; it does not yet
 preserve subshape UUIDs through arbitrary feature changes. Object-to-object
 references, sketch and manufacturing features, rotational transforms,
-assembly relationships, joints, simulation state, and a general migration
-framework remain unsupported. `DatumEngineeringModel` currently supports
-mechanisms, linear/rotary datum axes, and motors only. An axis records body
-references, a metre-valued origin, and a dimensionless direction; it does not
-apply a kinematic constraint. Motor mass is in kg, inertia in kg m², center of
+assembly editing, simulation state, and a general migration framework remain
+unsupported. `DatumEngineeringModel` stores the version-one mechanism data
+listed above, legacy linear/rotary datum axes, and motors. A mechanism readiness
+report checks input completeness for a selected study kind; it does not execute
+a solver, check nonlinear constraint consistency, or establish numerical
+verification. Geometry-source descriptors are references only: the UI does
+not yet import or execute STEP/SMLibPy sources or calculate mass properties. A
+legacy axis records body references, a metre-valued origin, and a dimensionless
+direction; it does not apply a kinematic constraint. Motor mass is in kg,
+inertia in kg m², center of
 mass and axis origin in m, speed in rad/s, torque in N·m, voltage in V, current
 in A, thermal resistance in K/W, thermal capacity in J/K, and temperature in
 K. Optional physical fields remain unknown when `null`; the application does
@@ -189,7 +251,7 @@ geometry payloads into assets.
 
 The tests cover exact-shape and feature-graph round-trip, primitive and Boolean
 recompute, UUID identity, hierarchy, translation, all four property types, dirty
-tracking, schema-v1/v2/v3/v4 migration, engineering and electronics/material
+tracking, schema-v1/v2/v3/v4/v5 migration, engineering and electronics/material
 round-trip and reference validation, face/edge/vertex reference resolution and point picking, ambiguity
 rejection, parent relationships, display tessellation regeneration, and
 rejection of unsupported or malformed data.

@@ -14,7 +14,7 @@
 - The Python geometry contract defines portable shape/value types, capabilities, typed unsupported-operation errors, and backend adapters. Its FreeCAD Part adapter remains the compatibility CAD path. The native C++ application with direct OCCT APIs is the primary architecture; SMLib remains optional.
 - Exact cross-kernel conversion goes through STEP. Tessellation remains a display and analysis representation, not an exact modeling source.
 - The deterministic seven-case OCCT / SMLib benchmark matched volume, area, bounds, center of mass, and validity tolerances in all seven cases for FreeCAD 1.1.1 / SMLib 0.3.4. Exact topology counts are reported separately because the kernels may split the same geometry differently. See [the comparison report](../reports/geometry-benchmark/comparison.md) and its JSON reports.
-- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates exact OCCT solids, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object/face/edge/vertex picks through stable IDs, and supports camera navigation and previewable Move. The initial feature DAG evaluates box/cylinder/sphere/cone primitives, translation, and exact Boolean union/cut/intersection; generated `TopoDS_Shape` values remain authoritative and feature graph replacement is undoable. Native `.dld` schema 5 stores feature definitions, exact B-Rep results, mechanism/motor data, materials, circuits, and PCB models; it reads v1-v4 projects and preserves supported prior engineering data. The topology matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Large-model acceleration and distinct subshape highlight geometry remain open.
+- The native C++/Qt 6 application builds and runs without FreeCAD. Its Design slice creates exact OCCT solids, provides a renderer boundary and decomposed Viewport / Outliner / Properties editors, resolves object/face/edge/vertex picks through stable IDs, and supports camera navigation and previewable Move. The initial feature DAG evaluates box/cylinder/sphere/cone primitives, translation, and exact Boolean union/cut/intersection; generated `TopoDS_Shape` values remain authoritative and feature graph replacement is undoable. Native `.dld` schema 6 stores feature definitions, exact B-Rep results, the versioned mechanism-definition foundation, motors, materials, circuits, and PCB models; it reads v1-v5 projects and preserves supported prior engineering data. The topology matcher rejects ambiguous results and does not promise stable naming through arbitrary feature edits. Large-model acceleration and distinct subshape highlight geometry remain open.
 
 ## Checks run
 
@@ -33,6 +33,10 @@
 
 ## Remaining work
 
+- Add a declared native C++ dependency lock or equivalent clean-room build
+  environment for the compiler, Qt, OCCT, and optional solver packages. The
+  build profile records the verified host configuration, but that is not yet
+  a repository-managed lock for a clean checkout.
 - Verify rendering on a hardware GPU; the current viewport frame and pointer checks use Xvfb software OpenGL.
 - Extend feature dependency editing and recompute invalidation; add provenance-aware topology migration, large-model acceleration, and subshape highlighting. The current signature matcher is only an initial strategy.
 - Continue native engineering workflows before replacing corresponding compatibility paths.

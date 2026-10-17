@@ -312,12 +312,132 @@ std::optional<std::string> decodeOptionalString(const QJsonObject& object, const
     return toUtf8(value.toString());
 }
 
-QJsonObject encodeMechanism(const DatumMechanism& mechanism)
+QJsonObject encodeCoordinateFrame(const DatumCoordinateFrame& frame)
+{
+    QJsonArray orientation;
+    for (double component : frame.orientationWxyz) orientation.append(component);
+    return {
+        {QStringLiteral("originM"), encodeVector(frame.originM)},
+        {QStringLiteral("orientationWxyz"), orientation},
+    };
+}
+
+DatumCoordinateFrame decodeCoordinateFrame(const QJsonValue& value, const QString& field)
+{
+    if (!value.isObject()) fail(QStringLiteral("%1 must be an object.").arg(field));
+    const QJsonObject object = value.toObject();
+    DatumCoordinateFrame frame;
+    frame.originM = decodeVector(object.value(QStringLiteral("originM")), field + QStringLiteral(".originM"));
+    const QJsonValue orientationValue = object.value(QStringLiteral("orientationWxyz"));
+    if (!orientationValue.isArray() || orientationValue.toArray().size() != 4) {
+        fail(QStringLiteral("%1.orientationWxyz must contain four quaternion components.").arg(field));
+    }
+    const QJsonArray orientation = orientationValue.toArray();
+    for (qsizetype index = 0; index < 4; ++index) {
+        frame.orientationWxyz[static_cast<std::size_t>(index)] = requiredFiniteNumber(
+            orientation.at(index), QStringLiteral("%1.orientationWxyz[%2]").arg(field).arg(index));
+    }
+    return frame;
+}
+
+QJsonObject encodeMechanismBody(const DatumMechanismBody& body)
+{
+    QJsonValue inertiaValue(QJsonValue::Null);
+    if (body.inertiaTensorKgM2.has_value()) {
+        QJsonArray inertia;
+        for (double component : *body.inertiaTensorKgM2) inertia.append(component);
+        inertiaValue = inertia;
+    }
+    QJsonArray evidence;
+    for (const DatumPropertyEvidence& item : body.propertyEvidence) {
+        evidence.append(QJsonObject{
+            {QStringLiteral("propertyId"), fromUtf8(item.propertyId)},
+            {QStringLiteral("kind"), fromUtf8(datumPropertyEvidenceKindName(item.kind))},
+            {QStringLiteral("reference"), fromUtf8(item.reference)},
+            {QStringLiteral("revision"), fromUtf8(item.revision)},
+            {QStringLiteral("confidence"), encodeOptionalNumber(item.confidence)},
+        });
+    }
+    return {
+        {QStringLiteral("id"), fromUtf8(body.id)},
+        {QStringLiteral("name"), fromUtf8(body.name)},
+        {QStringLiteral("cadObjectId"), fromUtf8(body.cadObjectId)},
+        {QStringLiteral("geometrySource"), QJsonObject{
+            {QStringLiteral("kind"), fromUtf8(datumGeometrySourceKindName(body.geometrySource.kind))},
+            {QStringLiteral("locator"), fromUtf8(body.geometrySource.locator)},
+            {QStringLiteral("revision"), fromUtf8(body.geometrySource.revision)},
+        }},
+        {QStringLiteral("massKg"), encodeOptionalNumber(body.massKg)},
+        {QStringLiteral("centerOfMassLocalM"), body.centerOfMassLocalM.has_value()
+             ? QJsonValue(encodeVector(*body.centerOfMassLocalM))
+             : QJsonValue(QJsonValue::Null)},
+        {QStringLiteral("inertiaTensorKgM2"), inertiaValue},
+        {QStringLiteral("materialDefinitionId"), encodeOptionalString(body.materialDefinitionId)},
+        {QStringLiteral("propertyEvidence"), evidence},
+    };
+}
+
+DatumMechanismBody decodeMechanismBody(const QJsonObject& object)
+{
+    DatumMechanismBody body;
+    body.id = toUtf8(requiredString(object, QStringLiteral("id")));
+    body.name = toUtf8(requiredString(object, QStringLiteral("name")));
+    body.cadObjectId = toUtf8(requiredString(object, QStringLiteral("cadObjectId")));
+    const QJsonValue sourceValue = object.value(QStringLiteral("geometrySource"));
+    if (!sourceValue.isObject()) fail(QStringLiteral("Mechanism body geometrySource must be an object."));
+    const QJsonObject source = sourceValue.toObject();
+    const auto sourceKind = datumGeometrySourceKindFromName(
+        toUtf8(requiredString(source, QStringLiteral("kind"))));
+    if (!sourceKind.has_value()) fail(QStringLiteral("Mechanism body geometry-source kind is unsupported."));
+    body.geometrySource.kind = *sourceKind;
+    body.geometrySource.locator = toUtf8(requiredString(source, QStringLiteral("locator")));
+    const QJsonValue revisionValue = source.value(QStringLiteral("revision"));
+    if (!revisionValue.isString()) fail(QStringLiteral("Mechanism body source revision must be a string."));
+    body.geometrySource.revision = toUtf8(revisionValue.toString());
+    body.massKg = decodeOptionalNumber(object, QStringLiteral("massKg"));
+    const QJsonValue centerValue = object.value(QStringLiteral("centerOfMassLocalM"));
+    if (centerValue.isNull()) body.centerOfMassLocalM = std::nullopt;
+    else body.centerOfMassLocalM = decodeVector(centerValue, QStringLiteral("body.centerOfMassLocalM"));
+    const QJsonValue inertiaValue = object.value(QStringLiteral("inertiaTensorKgM2"));
+    if (inertiaValue.isNull()) {
+        body.inertiaTensorKgM2 = std::nullopt;
+    } else if (inertiaValue.isArray() && inertiaValue.toArray().size() == 6) {
+        DatumInertiaTensorKgM2 inertia{};
+        const QJsonArray values = inertiaValue.toArray();
+        for (qsizetype index = 0; index < 6; ++index) {
+            inertia[static_cast<std::size_t>(index)] = requiredFiniteNumber(
+                values.at(index), QStringLiteral("body.inertiaTensorKgM2[%1]").arg(index));
+        }
+        body.inertiaTensorKgM2 = inertia;
+    } else {
+        fail(QStringLiteral("Mechanism body inertiaTensorKgM2 must be null or contain six values."));
+    }
+    body.materialDefinitionId = decodeOptionalString(object, QStringLiteral("materialDefinitionId"));
+    const QJsonValue evidenceValue = object.value(QStringLiteral("propertyEvidence"));
+    if (!evidenceValue.isArray()) fail(QStringLiteral("Mechanism body propertyEvidence must be an array."));
+    for (const QJsonValue& evidenceEntry : evidenceValue.toArray()) {
+        if (!evidenceEntry.isObject()) fail(QStringLiteral("Mechanism body property evidence entry must be an object."));
+        const QJsonObject evidenceObject = evidenceEntry.toObject();
+        const auto kind = datumPropertyEvidenceKindFromName(
+            toUtf8(requiredString(evidenceObject, QStringLiteral("kind"))));
+        if (!kind.has_value()) fail(QStringLiteral("Mechanism body property evidence kind is unsupported."));
+        body.propertyEvidence.push_back({
+            toUtf8(requiredString(evidenceObject, QStringLiteral("propertyId"))),
+            *kind,
+            toUtf8(requiredString(evidenceObject, QStringLiteral("reference"))),
+            toUtf8(requiredString(evidenceObject, QStringLiteral("revision"))),
+            decodeOptionalNumber(evidenceObject, QStringLiteral("confidence")),
+        });
+    }
+    return body;
+}
+
+QJsonObject encodeMechanism(const MechanismSpec& mechanism)
 {
     QJsonArray bodyObjects;
-    for (const std::string& objectId : mechanism.bodyObjectIds) {
-        bodyObjects.append(fromUtf8(objectId));
-    }
+    for (const std::string& objectId : mechanism.bodyObjectIds) bodyObjects.append(fromUtf8(objectId));
+    QJsonArray bodies;
+    for (const DatumMechanismBody& body : mechanism.bodies) bodies.append(encodeMechanismBody(body));
     QJsonArray axes;
     for (const DatumAxis& axis : mechanism.axes) {
         axes.append(QJsonObject{
@@ -333,45 +453,106 @@ QJsonObject encodeMechanism(const DatumMechanism& mechanism)
                  : QJsonValue(QJsonValue::Null)},
         });
     }
+    QJsonArray joints;
+    for (const DatumJoint& joint : mechanism.joints) {
+        joints.append(QJsonObject{
+            {QStringLiteral("id"), fromUtf8(joint.id)},
+            {QStringLiteral("name"), fromUtf8(joint.name)},
+            {QStringLiteral("type"), fromUtf8(datumJointTypeName(joint.type))},
+            {QStringLiteral("bodyAId"), fromUtf8(joint.bodyAId)},
+            {QStringLiteral("bodyBId"), fromUtf8(joint.bodyBId)},
+            {QStringLiteral("frameInBodyA"), encodeCoordinateFrame(joint.frameInBodyA)},
+            {QStringLiteral("frameInBodyB"), encodeCoordinateFrame(joint.frameInBodyB)},
+            {QStringLiteral("lowerLimitSi"), encodeOptionalNumber(joint.lowerLimitSi)},
+            {QStringLiteral("upperLimitSi"), encodeOptionalNumber(joint.upperLimitSi)},
+        });
+    }
+    QJsonArray actuators;
+    for (const DatumActuator& actuator : mechanism.actuators) {
+        QJsonArray trajectory;
+        for (const DatumActuatorPoint& point : actuator.trajectory) {
+            trajectory.append(QJsonObject{
+                {QStringLiteral("timeS"), point.timeS},
+                {QStringLiteral("valueSi"), point.valueSi},
+            });
+        }
+        actuators.append(QJsonObject{
+            {QStringLiteral("id"), fromUtf8(actuator.id)},
+            {QStringLiteral("name"), fromUtf8(actuator.name)},
+            {QStringLiteral("jointId"), fromUtf8(actuator.jointId)},
+            {QStringLiteral("mode"), fromUtf8(datumActuatorControlModeName(actuator.mode))},
+            {QStringLiteral("motorId"), encodeOptionalString(actuator.motorId)},
+            {QStringLiteral("trajectory"), trajectory},
+            {QStringLiteral("maximumEffortSi"), encodeOptionalNumber(actuator.maximumEffortSi)},
+            {QStringLiteral("maximumRateSi"), encodeOptionalNumber(actuator.maximumRateSi)},
+        });
+    }
+    QJsonArray contacts;
+    for (const DatumContactPair& contact : mechanism.contacts) {
+        contacts.append(QJsonObject{
+            {QStringLiteral("id"), fromUtf8(contact.id)},
+            {QStringLiteral("name"), fromUtf8(contact.name)},
+            {QStringLiteral("bodyAId"), fromUtf8(contact.bodyAId)},
+            {QStringLiteral("bodyBId"), fromUtf8(contact.bodyBId)},
+            {QStringLiteral("surfaceAReferenceId"), encodeOptionalString(contact.surfaceAReferenceId)},
+            {QStringLiteral("surfaceBReferenceId"), encodeOptionalString(contact.surfaceBReferenceId)},
+            {QStringLiteral("law"), fromUtf8(datumContactLawName(contact.law))},
+            {QStringLiteral("frictionCoefficient"), encodeOptionalNumber(contact.frictionCoefficient)},
+            {QStringLiteral("normalStiffnessNPerM"), encodeOptionalNumber(contact.normalStiffnessNPerM)},
+            {QStringLiteral("normalDampingNsPerM"), encodeOptionalNumber(contact.normalDampingNsPerM)},
+            {QStringLiteral("restitution"), encodeOptionalNumber(contact.restitution)},
+        });
+    }
+    QJsonArray requirements;
+    for (const DatumRequirement& requirement : mechanism.requirements) {
+        requirements.append(QJsonObject{
+            {QStringLiteral("id"), fromUtf8(requirement.id)},
+            {QStringLiteral("name"), fromUtf8(requirement.name)},
+            {QStringLiteral("metricId"), fromUtf8(requirement.metricId)},
+            {QStringLiteral("unit"), fromUtf8(requirement.unit)},
+            {QStringLiteral("relation"), fromUtf8(datumRequirementRelationName(requirement.relation))},
+            {QStringLiteral("minimumSi"), encodeOptionalNumber(requirement.minimumSi)},
+            {QStringLiteral("maximumSi"), encodeOptionalNumber(requirement.maximumSi)},
+            {QStringLiteral("targetSi"), encodeOptionalNumber(requirement.targetSi)},
+            {QStringLiteral("toleranceSi"), encodeOptionalNumber(requirement.toleranceSi)},
+            {QStringLiteral("hardConstraint"), requirement.hardConstraint},
+        });
+    }
     return {
+        {QStringLiteral("specVersion"), static_cast<int>(mechanism.specVersion)},
         {QStringLiteral("id"), fromUtf8(mechanism.id)},
         {QStringLiteral("name"), fromUtf8(mechanism.name)},
         {QStringLiteral("bodyObjectIds"), bodyObjects},
+        {QStringLiteral("bodies"), bodies},
         {QStringLiteral("axes"), axes},
+        {QStringLiteral("joints"), joints},
+        {QStringLiteral("actuators"), actuators},
+        {QStringLiteral("contacts"), contacts},
+        {QStringLiteral("requirements"), requirements},
     };
 }
 
-DatumMechanism decodeMechanism(const QJsonObject& object)
+MechanismSpec decodeMechanism(const QJsonObject& object, int projectSchemaVersion)
 {
-    DatumMechanism mechanism;
+    MechanismSpec mechanism;
     mechanism.id = toUtf8(requiredString(object, QStringLiteral("id")));
     mechanism.name = toUtf8(requiredString(object, QStringLiteral("name")));
     const QJsonValue bodyObjectsValue = object.value(QStringLiteral("bodyObjectIds"));
-    if (!bodyObjectsValue.isArray()) {
-        fail(QStringLiteral("Mechanism bodyObjectIds must be an array."));
-    }
+    if (!bodyObjectsValue.isArray()) fail(QStringLiteral("Mechanism bodyObjectIds must be an array."));
     for (const QJsonValue& bodyValue : bodyObjectsValue.toArray()) {
-        if (!bodyValue.isString()) {
-            fail(QStringLiteral("Mechanism bodyObjectIds entries must be strings."));
-        }
+        if (!bodyValue.isString()) fail(QStringLiteral("Mechanism bodyObjectIds entries must be strings."));
         mechanism.bodyObjectIds.push_back(toUtf8(bodyValue.toString()));
     }
     const QJsonValue axesValue = object.value(QStringLiteral("axes"));
-    if (!axesValue.isArray()) {
-        fail(QStringLiteral("Mechanism axes must be an array."));
-    }
+    if (!axesValue.isArray()) fail(QStringLiteral("Mechanism axes must be an array."));
     for (const QJsonValue& axisValue : axesValue.toArray()) {
-        if (!axisValue.isObject()) {
-            fail(QStringLiteral("Mechanism axis entry must be an object."));
-        }
+        if (!axisValue.isObject()) fail(QStringLiteral("Mechanism axis entry must be an object."));
         const QJsonObject axisObject = axisValue.toObject();
         DatumAxis axis;
         axis.id = toUtf8(requiredString(axisObject, QStringLiteral("id")));
         axis.name = toUtf8(requiredString(axisObject, QStringLiteral("name")));
         const auto axisType = datumAxisTypeFromName(toUtf8(requiredString(axisObject, QStringLiteral("type"))));
-        if (!axisType.has_value()) {
-            fail(QStringLiteral("Axis type is unsupported."));
-        }
+        if (!axisType.has_value()) fail(QStringLiteral("Axis type is unsupported."));
         axis.type = *axisType;
         axis.baseObjectId = toUtf8(requiredString(axisObject, QStringLiteral("baseObjectId")));
         axis.movingObjectId = toUtf8(requiredString(axisObject, QStringLiteral("movingObjectId")));
@@ -383,12 +564,114 @@ DatumMechanism decodeMechanism(const QJsonObject& object)
             fail(QStringLiteral("Axis actuatorMotorId is missing."));
         }
         const QJsonValue motorValue = axisObject.value(QStringLiteral("actuatorMotorId"));
-        if (motorValue.isString()) {
-            axis.actuatorMotorId = toUtf8(motorValue.toString());
-        } else if (!motorValue.isNull() && !motorValue.isUndefined()) {
+        if (motorValue.isString()) axis.actuatorMotorId = toUtf8(motorValue.toString());
+        else if (!motorValue.isNull() && !motorValue.isUndefined()) {
             fail(QStringLiteral("Axis actuatorMotorId must be a motor UUID or null."));
         }
         mechanism.axes.push_back(std::move(axis));
+    }
+
+    if (projectSchemaVersion >= 6) {
+        const QJsonValue specVersion = object.value(QStringLiteral("specVersion"));
+        if (!specVersion.isDouble() || specVersion.toInt(-1) != 1) {
+            fail(QStringLiteral("MechanismSpec specVersion must be 1."));
+        }
+        mechanism.specVersion = 1;
+        const QJsonValue bodiesValue = object.value(QStringLiteral("bodies"));
+        if (!bodiesValue.isArray()) fail(QStringLiteral("MechanismSpec bodies must be an array."));
+        for (const QJsonValue& bodyValue : bodiesValue.toArray()) {
+            if (!bodyValue.isObject()) fail(QStringLiteral("MechanismSpec body entries must be objects."));
+            mechanism.bodies.push_back(decodeMechanismBody(bodyValue.toObject()));
+        }
+        const QJsonValue jointsValue = object.value(QStringLiteral("joints"));
+        if (!jointsValue.isArray()) fail(QStringLiteral("MechanismSpec joints must be an array."));
+        for (const QJsonValue& jointValue : jointsValue.toArray()) {
+            if (!jointValue.isObject()) fail(QStringLiteral("MechanismSpec joint entries must be objects."));
+            const QJsonObject item = jointValue.toObject();
+            DatumJoint joint;
+            joint.id = toUtf8(requiredString(item, QStringLiteral("id")));
+            joint.name = toUtf8(requiredString(item, QStringLiteral("name")));
+            const auto type = datumJointTypeFromName(toUtf8(requiredString(item, QStringLiteral("type"))));
+            if (!type.has_value()) fail(QStringLiteral("MechanismSpec joint type is unsupported."));
+            joint.type = *type;
+            joint.bodyAId = toUtf8(requiredString(item, QStringLiteral("bodyAId")));
+            joint.bodyBId = toUtf8(requiredString(item, QStringLiteral("bodyBId")));
+            joint.frameInBodyA = decodeCoordinateFrame(item.value(QStringLiteral("frameInBodyA")), QStringLiteral("joint.frameInBodyA"));
+            joint.frameInBodyB = decodeCoordinateFrame(item.value(QStringLiteral("frameInBodyB")), QStringLiteral("joint.frameInBodyB"));
+            joint.lowerLimitSi = decodeOptionalNumber(item, QStringLiteral("lowerLimitSi"));
+            joint.upperLimitSi = decodeOptionalNumber(item, QStringLiteral("upperLimitSi"));
+            mechanism.joints.push_back(std::move(joint));
+        }
+        const QJsonValue actuatorsValue = object.value(QStringLiteral("actuators"));
+        if (!actuatorsValue.isArray()) fail(QStringLiteral("MechanismSpec actuators must be an array."));
+        for (const QJsonValue& actuatorValue : actuatorsValue.toArray()) {
+            if (!actuatorValue.isObject()) fail(QStringLiteral("MechanismSpec actuator entries must be objects."));
+            const QJsonObject item = actuatorValue.toObject();
+            DatumActuator actuator;
+            actuator.id = toUtf8(requiredString(item, QStringLiteral("id")));
+            actuator.name = toUtf8(requiredString(item, QStringLiteral("name")));
+            actuator.jointId = toUtf8(requiredString(item, QStringLiteral("jointId")));
+            const auto mode = datumActuatorControlModeFromName(toUtf8(requiredString(item, QStringLiteral("mode"))));
+            if (!mode.has_value()) fail(QStringLiteral("MechanismSpec actuator mode is unsupported."));
+            actuator.mode = *mode;
+            actuator.motorId = decodeOptionalString(item, QStringLiteral("motorId"));
+            const QJsonValue trajectoryValue = item.value(QStringLiteral("trajectory"));
+            if (!trajectoryValue.isArray()) fail(QStringLiteral("MechanismSpec actuator trajectory must be an array."));
+            for (const QJsonValue& pointValue : trajectoryValue.toArray()) {
+                if (!pointValue.isObject()) fail(QStringLiteral("MechanismSpec actuator trajectory points must be objects."));
+                const QJsonObject point = pointValue.toObject();
+                actuator.trajectory.push_back({
+                    requiredFiniteNumber(point.value(QStringLiteral("timeS")), QStringLiteral("actuator.timeS")),
+                    requiredFiniteNumber(point.value(QStringLiteral("valueSi")), QStringLiteral("actuator.valueSi")),
+                });
+            }
+            actuator.maximumEffortSi = decodeOptionalNumber(item, QStringLiteral("maximumEffortSi"));
+            actuator.maximumRateSi = decodeOptionalNumber(item, QStringLiteral("maximumRateSi"));
+            mechanism.actuators.push_back(std::move(actuator));
+        }
+        const QJsonValue contactsValue = object.value(QStringLiteral("contacts"));
+        if (!contactsValue.isArray()) fail(QStringLiteral("MechanismSpec contacts must be an array."));
+        for (const QJsonValue& contactValue : contactsValue.toArray()) {
+            if (!contactValue.isObject()) fail(QStringLiteral("MechanismSpec contact entries must be objects."));
+            const QJsonObject item = contactValue.toObject();
+            DatumContactPair contact;
+            contact.id = toUtf8(requiredString(item, QStringLiteral("id")));
+            contact.name = toUtf8(requiredString(item, QStringLiteral("name")));
+            contact.bodyAId = toUtf8(requiredString(item, QStringLiteral("bodyAId")));
+            contact.bodyBId = toUtf8(requiredString(item, QStringLiteral("bodyBId")));
+            contact.surfaceAReferenceId = decodeOptionalString(item, QStringLiteral("surfaceAReferenceId"));
+            contact.surfaceBReferenceId = decodeOptionalString(item, QStringLiteral("surfaceBReferenceId"));
+            const auto law = datumContactLawFromName(toUtf8(requiredString(item, QStringLiteral("law"))));
+            if (!law.has_value()) fail(QStringLiteral("MechanismSpec contact law is unsupported."));
+            contact.law = *law;
+            contact.frictionCoefficient = decodeOptionalNumber(item, QStringLiteral("frictionCoefficient"));
+            contact.normalStiffnessNPerM = decodeOptionalNumber(item, QStringLiteral("normalStiffnessNPerM"));
+            contact.normalDampingNsPerM = decodeOptionalNumber(item, QStringLiteral("normalDampingNsPerM"));
+            contact.restitution = decodeOptionalNumber(item, QStringLiteral("restitution"));
+            mechanism.contacts.push_back(std::move(contact));
+        }
+        const QJsonValue requirementsValue = object.value(QStringLiteral("requirements"));
+        if (!requirementsValue.isArray()) fail(QStringLiteral("MechanismSpec requirements must be an array."));
+        for (const QJsonValue& requirementValue : requirementsValue.toArray()) {
+            if (!requirementValue.isObject()) fail(QStringLiteral("MechanismSpec requirement entries must be objects."));
+            const QJsonObject item = requirementValue.toObject();
+            DatumRequirement requirement;
+            requirement.id = toUtf8(requiredString(item, QStringLiteral("id")));
+            requirement.name = toUtf8(requiredString(item, QStringLiteral("name")));
+            requirement.metricId = toUtf8(requiredString(item, QStringLiteral("metricId")));
+            requirement.unit = toUtf8(requiredString(item, QStringLiteral("unit")));
+            const auto relation = datumRequirementRelationFromName(toUtf8(requiredString(item, QStringLiteral("relation"))));
+            if (!relation.has_value()) fail(QStringLiteral("MechanismSpec requirement relation is unsupported."));
+            requirement.relation = *relation;
+            requirement.minimumSi = decodeOptionalNumber(item, QStringLiteral("minimumSi"));
+            requirement.maximumSi = decodeOptionalNumber(item, QStringLiteral("maximumSi"));
+            requirement.targetSi = decodeOptionalNumber(item, QStringLiteral("targetSi"));
+            requirement.toleranceSi = decodeOptionalNumber(item, QStringLiteral("toleranceSi"));
+            const QJsonValue hardValue = item.value(QStringLiteral("hardConstraint"));
+            if (!hardValue.isBool()) fail(QStringLiteral("MechanismSpec requirement hardConstraint must be boolean."));
+            requirement.hardConstraint = hardValue.toBool();
+            mechanism.requirements.push_back(std::move(requirement));
+        }
     }
     return mechanism;
 }
@@ -605,7 +888,7 @@ QJsonObject encodeEngineeringModel(const DatumEngineeringModel& model)
     };
 }
 
-DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object)
+DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object, int projectSchemaVersion)
 {
     DatumEngineeringModel model;
     const QJsonValue mechanismsValue = object.value(QStringLiteral("mechanisms"));
@@ -617,7 +900,7 @@ DatumEngineeringModel decodeEngineeringModel(const QJsonObject& object)
         if (!mechanismValue.isObject()) {
             fail(QStringLiteral("Engineering mechanism entries must be objects."));
         }
-        model.mechanisms.push_back(decodeMechanism(mechanismValue.toObject()));
+        model.mechanisms.push_back(decodeMechanism(mechanismValue.toObject(), projectSchemaVersion));
     }
     for (const QJsonValue& motorValue : motorsValue.toArray()) {
         if (!motorValue.isObject()) {
@@ -796,6 +1079,7 @@ DatumDocument decodeProject(const QJsonObject& root)
     const QJsonValue schemaValue = root.value(QStringLiteral("schemaVersion"));
     const double schemaNumber = schemaValue.isDouble() ? schemaValue.toDouble() : -1.0;
     if (schemaNumber != 1.0 && schemaNumber != 2.0 && schemaNumber != 3.0 && schemaNumber != 4.0 &&
+        schemaNumber != 5.0 &&
         schemaNumber != static_cast<double>(DldProjectStore::SchemaVersion)) {
         fail(QStringLiteral("Unsupported DatumLoop project schema version."));
     }
@@ -954,12 +1238,12 @@ DatumDocument decodeProject(const QJsonObject& root)
         if (!engineeringValue.isObject()) {
             fail(QStringLiteral("Project engineeringModel is missing or invalid."));
         }
-        document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject()));
+        document.setEngineeringModel(decodeEngineeringModel(engineeringValue.toObject(), static_cast<int>(schemaNumber)));
     } else if (!engineeringValue.isUndefined()) {
         fail(QStringLiteral("Project contains engineeringModel data unsupported by its schema version."));
     }
     const QJsonValue electronicsValue = root.value(QStringLiteral("electronicsModel"));
-    if (schemaNumber == static_cast<double>(DldProjectStore::SchemaVersion)) {
+    if (schemaNumber >= 5.0) {
         if (!electronicsValue.isObject()) {
             fail(QStringLiteral("Project electronicsModel is missing or invalid."));
         }

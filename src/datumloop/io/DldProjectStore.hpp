@@ -8,7 +8,7 @@ namespace datumloop {
 
 class DldProjectStore final {
 public:
-    static constexpr int SchemaVersion = 5;
+    static constexpr int SchemaVersion = 6;
 
     [[nodiscard]] static DatumDocument load(const QString& filePath);
     static void save(DatumDocument& document, const QString& filePath);

@@ -24,7 +24,23 @@ bool finite(const Vector3& value)
 bool hasEngineeringIdentity(const DatumEngineeringModel& model, const std::string& id)
 {
     for (const DatumMechanism& mechanism : model.mechanisms) {
-        if (mechanism.id == id || std::any_of(mechanism.axes.begin(), mechanism.axes.end(), [&id](const auto& axis) {
+        if (mechanism.id == id ||
+            std::any_of(mechanism.bodies.begin(), mechanism.bodies.end(), [&id](const auto& body) {
+                return body.id == id;
+            }) ||
+            std::any_of(mechanism.joints.begin(), mechanism.joints.end(), [&id](const auto& joint) {
+                return joint.id == id;
+            }) ||
+            std::any_of(mechanism.actuators.begin(), mechanism.actuators.end(), [&id](const auto& actuator) {
+                return actuator.id == id;
+            }) ||
+            std::any_of(mechanism.contacts.begin(), mechanism.contacts.end(), [&id](const auto& contact) {
+                return contact.id == id;
+            }) ||
+            std::any_of(mechanism.requirements.begin(), mechanism.requirements.end(), [&id](const auto& requirement) {
+                return requirement.id == id;
+            }) ||
+            std::any_of(mechanism.axes.begin(), mechanism.axes.end(), [&id](const auto& axis) {
                 return axis.id == id;
             })) {
             return true;
@@ -40,6 +56,11 @@ void reserveEngineeringIdentities(const DatumEngineeringModel& model,
 {
     for (const DatumMechanism& mechanism : model.mechanisms) {
         reservedIds.insert(mechanism.id);
+        for (const DatumMechanismBody& body : mechanism.bodies) reservedIds.insert(body.id);
+        for (const DatumJoint& joint : mechanism.joints) reservedIds.insert(joint.id);
+        for (const DatumActuator& actuator : mechanism.actuators) reservedIds.insert(actuator.id);
+        for (const DatumContactPair& contact : mechanism.contacts) reservedIds.insert(contact.id);
+        for (const DatumRequirement& requirement : mechanism.requirements) reservedIds.insert(requirement.id);
         for (const DatumAxis& axis : mechanism.axes) {
             reservedIds.insert(axis.id);
         }
@@ -375,8 +396,47 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
                 throw std::invalid_argument("mechanism bodyObjectIds must reference existing CAD objects");
             }
         }
+        for (const DatumMechanismBody& body : mechanism.bodies) {
+            if (!reservedIds.insert(body.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+            if (object(body.cadObjectId) == nullptr) {
+                throw std::invalid_argument("mechanism body geometry source must reference an existing CAD object");
+            }
+            if (body.geometrySource.kind == DatumGeometrySourceKind::NativeFeatureGraph) {
+                const DatumObject* cadObject = object(body.cadObjectId);
+                const bool sourceFeatureExists = cadObject != nullptr &&
+                    std::any_of(cadObject->featureGraph.features().begin(), cadObject->featureGraph.features().end(),
+                                [&body](const DatumFeature& feature) {
+                                    return feature.id == body.geometrySource.locator;
+                                });
+                if (!sourceFeatureExists) {
+                    throw std::invalid_argument("native mechanism body source must reference a feature in its CAD object's feature graph");
+                }
+            }
+        }
         for (const DatumAxis& axis : mechanism.axes) {
             if (!reservedIds.insert(axis.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+        }
+        for (const DatumJoint& joint : mechanism.joints) {
+            if (!reservedIds.insert(joint.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+        }
+        for (const DatumActuator& actuator : mechanism.actuators) {
+            if (!reservedIds.insert(actuator.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+        }
+        for (const DatumContactPair& contact : mechanism.contacts) {
+            if (!reservedIds.insert(contact.id).second) {
+                throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
+            }
+        }
+        for (const DatumRequirement& requirement : mechanism.requirements) {
+            if (!reservedIds.insert(requirement.id).second) {
                 throw std::invalid_argument("engineering entity UUID collides with an existing document identity");
             }
         }
@@ -414,6 +474,38 @@ void DatumDocument::setEngineeringModel(DatumEngineeringModel model)
         }
     }
     for (const DatumMechanism& mechanism : model.mechanisms) {
+        const auto bodyForId = [&mechanism](const std::string& bodyId) -> const DatumMechanismBody* {
+            const auto found = std::find_if(mechanism.bodies.begin(), mechanism.bodies.end(), [&bodyId](const auto& body) {
+                return body.id == bodyId;
+            });
+            return found == mechanism.bodies.end() ? nullptr : &*found;
+        };
+        for (const DatumJoint& joint : mechanism.joints) {
+            if (bodyForId(joint.bodyAId) == nullptr || bodyForId(joint.bodyBId) == nullptr) {
+                throw std::invalid_argument("joint endpoints must reference explicit mechanism body definitions");
+            }
+        }
+        for (const DatumContactPair& contact : mechanism.contacts) {
+            const DatumMechanismBody* bodyA = bodyForId(contact.bodyAId);
+            const DatumMechanismBody* bodyB = bodyForId(contact.bodyBId);
+            if (bodyA == nullptr || bodyB == nullptr) {
+                throw std::invalid_argument("contact pairs must reference explicit mechanism body definitions");
+            }
+            const auto validateSurface = [this](const std::optional<std::string>& referenceId,
+                                                const DatumMechanismBody* body) {
+                if (!referenceId.has_value()) return;
+                const auto topology = std::find_if(topologyReferences_.begin(), topologyReferences_.end(),
+                                                   [&referenceId](const auto& reference) {
+                                                       return reference.id == *referenceId;
+                                                   });
+                if (topology != topologyReferences_.end() &&
+                    (topology->objectId != body->cadObjectId || topology->subshapeType != DatumSubshapeType::Face)) {
+                    throw std::invalid_argument("contact surface reference must be a face on its corresponding CAD body");
+                }
+            };
+            validateSurface(contact.surfaceAReferenceId, bodyA);
+            validateSurface(contact.surfaceBReferenceId, bodyB);
+        }
         for (const DatumAxis& axis : mechanism.axes) {
             if (object(axis.baseObjectId) == nullptr || object(axis.movingObjectId) == nullptr) {
                 throw std::invalid_argument("axis base and moving references must be existing CAD objects");

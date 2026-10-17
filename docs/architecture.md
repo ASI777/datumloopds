@@ -106,11 +106,11 @@ dirty and revision state, topology reference signatures, an object-scoped
 feature graph, and separate engineering and electronics models.
 `DatumElectronicsModel` owns shared material definitions/states, circuits, and
 PCB boards; PCB layers and material regions reference that same material
-collection. `DldProjectStore` reads and writes the version-five `.dld` manifest
+collection. `DldProjectStore` reads and writes the version-six `.dld` manifest
 using Qt Core and OCCT; it persists exact B-Rep geometry and regenerates display
-tessellation after load. Schema v1 through v4 projects migrate with an empty
-electronics model, preserving supported engineering data where the older
-schema allowed it. Feature-backed
+tessellation after load. Schema v1 through v5 projects migrate while preserving
+supported engineering and electronics data where the older schema allowed it.
+Feature-backed
 objects persist their feature inputs and recompute exact shapes on load; direct
 imported geometry remains stored as B-Rep data.
 `DocumentViewModel` provides Save/Open,
@@ -205,14 +205,17 @@ FreeCAD Python workbench -> separate compatibility path
 The native application provides the Design workspace, exact OCCT solids,
 resizable Viewport/Outliner/Properties editors, stable-ID object/face/edge/vertex
 selection, basic camera navigation, previewable Move with undo/redo, and
-version-five `.dld` save/open with an initial recomputable feature graph,
-mechanism/motor metadata, and native material/circuit/PCB models. Separate
+version-six `.dld` save/open with an initial recomputable feature graph,
+mechanism body/joint/actuator/contact/requirement data, motors, and native
+material/circuit/PCB models. Separate
 engineering prototypes add an E0-E6 equation registry, generic solver
 contracts, a 1D cantilever reference and optional MFEM adapter, a held-out
 reduced beam response, provider-neutral scientific-agent routing, and a
 simulated-only one-axis robot/RL environment. The exact exported MJCF runs in
-the MuJoCo runtime check. These engineering prototypes are not persisted in
-`.dld` or exposed in the Qt workspace.
+the MuJoCo runtime check. Those equation, scientific-agent, and robotics
+prototypes are not persisted in `.dld` or exposed in the Qt workspace. The
+mechanism data foundation and its limits are described in
+[`milestone-2-mechanism-definition.md`](milestone-2-mechanism-definition.md).
 Renderer/display-mesh separation,
 workspace/editor composition, picking-service
 boundary, and native independence are guarded by architecture checks. An XTest
@@ -247,7 +250,7 @@ interfaces; they are not production machine solvers or deployment readiness.
 The current CMake build produces `DatumLoopDS`, creates an exact OCCT box,
 derives its display triangles, and loads the decomposed Qt Quick Design
 workspace without loading FreeCAD. Ten CTest targets cover geometry measures,
-`.dld` round-trip and v1-v4 migration, typed properties, hierarchy, dirty state,
+`.dld` round-trip and v1-v5 migration, typed properties, hierarchy, dirty state,
 exact primitive/transform/Boolean recompute, feature status and error
 reporting, engineering/electronics model validation and persistence, stable-ID
 object and subshape picking, move/feature-graph undo/redo, Circuit JSON/KiCad
@@ -289,7 +292,7 @@ but those do not complete the branded application gate by themselves.
 - Keep the existing `.FCStd` workbench path available during migration.
 - New native modules use Qt 6, C++20, and direct OCCT APIs; they do not link to
   FreeCAD, Coin, SoQt, or PySide.
-- The native document owns its stable IDs, geometry, commands, and version-five
+- The native document owns its stable IDs, geometry, commands, and version-six
   `.dld` persistence, including initial face, edge, and vertex reference
   signatures. The previous FreeCAD document model remains the compatibility
   path until native import/export and project workflows are verified.

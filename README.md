@@ -47,15 +47,19 @@ configured package and Python environment to `make native-check`, for example:
 make native-check NATIVE_CMAKE_ARGS="-DMFEM_DIR=/path/to/mfem-config-dir -DDATUMLOOP_MUJOCO_PYTHON=/path/to/python-with-mujoco"
 ```
 
-The native shell can open and save version-five `.dld` projects. The provisional
+The native shell can open and save schema-six `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
 face/edge/vertex references, a recomputable primitive/transform/Boolean feature
-graph, engineering mechanisms and motors, and native material/circuit/PCB
-models. Engineering quantities use SI units and missing optional data remains
-unknown. The circuit solver returns a resistor DC operating point and power
-placeholder only; it does not solve thermal fields. See
+graph, mechanism bodies, joints, actuators, contact pairs and requirements,
+motors, and native material/circuit/PCB models. Engineering quantities use SI
+units and missing optional data remains unknown. The circuit solver returns a
+resistor DC operating point and power placeholder only; it does not solve
+thermal fields. See
 [`docs/native-project-format.md`](docs/native-project-format.md).
+
+The mechanism-definition foundation and its current limits are tracked in
+[`docs/milestone-2-mechanism-definition.md`](docs/milestone-2-mechanism-definition.md).
 
 The first electronics slice imports one PCB from Circuit JSON or a supported
 subset of KiCad `.kicad_pcb` and displays a derived OCCT preview. Try a sample
