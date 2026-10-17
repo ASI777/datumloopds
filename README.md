@@ -90,6 +90,12 @@ but no angular tolerance; the report records that limitation.
 project save/reopen path. To check the real GUI viewport on a machine with a
 working desktop display, run `./scripts/check-freecad-gui.sh`.
 
+To target a specific fork build, set `FREECADCMD_EXECUTABLE` for the command
+line check and `FREECAD_EXECUTABLE` for the GUI check. If its embedded Python
+needs additional modules, set `DATUMLOOPDS_FREECAD_EXTRA_PYTHON_PATHS` to a
+colon-separated list of directories; the check scripts pass each directory to
+FreeCAD with `-P`.
+
 Launch the source workbench in FreeCAD with:
 
 ```sh

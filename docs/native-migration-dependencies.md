@@ -20,8 +20,15 @@ OCCT 7.9.2. Its OCCT core and UI-model test targets pass, as does the existing
 Python suite. An offscreen run loads the QML tree and creates/tessellates the
 exact OCCT box, but Qt Quick 3D does not render through Qt's offscreen plugin.
 The frame smoke passed under Xvfb and visual inspection confirmed the exact
-solid and three-editor layout. Pointer-level interaction has not yet had a
-separate GUI automation check.
+solid and three-editor layout. Pointer-level native interaction has not yet had
+a separate GUI automation check.
+
+The transitional FreeCAD 1.1.3 fork build completed from its configured build
+tree. Its FreeCADCmd geometry/project smoke and the GUI smoke for workbench,
+docks, project metadata, and a visible viewport solid pass under Xvfb with
+software OpenGL. A clean FreeCAD configure remains unverified because CMake's
+Pivy compatibility check cannot import Pivy with the current Python 3.14
+interpreter; see the milestone status report.
 
 ## Dependency inventory
 
@@ -65,6 +72,8 @@ The first Move command previews a numeric translation along X/Y/Z and either
 commits it as an undoable command or cancels it without changing the document.
 
 This is a foundation, not a replacement for Part Design, assemblies, project
-migration, engineering metadata, simulation, or the previous FreeCAD release
-gate. Those remain later work until their native equivalents are implemented
-and tested. Pointer-level GUI interaction still needs an automated check.
+migration, engineering metadata, or simulation. The FreeCAD 1.1.3 compatibility
+shell's configured build and GUI smoke now pass, but a clean configure remains
+open. Keep FreeCAD integration until native equivalents for the workflows in
+scope are implemented and tested. Pointer-level native GUI interaction still
+needs an automated check.

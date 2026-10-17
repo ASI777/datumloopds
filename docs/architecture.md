@@ -139,9 +139,11 @@ engineering context. The lower panel reserves space for jobs, playback, plots,
 and evidence. Project creation, open, and save currently use native FreeCAD
 documents.
 
-The project targets FreeCAD 1.1.3. The local workbench can be exercised against
-an installed FreeCAD copy for development, but it does not substitute for a
-clean build of the pinned fork.
+The project targets FreeCAD 1.1.3 for its compatibility shell. The fork's
+configured Release build, command-line smoke, and GUI viewport smoke now pass
+in the isolated development environment. Repeating the configure and build
+from an empty build directory still needs a matching Pivy and yaml-cpp
+development environment; see the milestone status report.
 
 ## Application identity
 
@@ -165,11 +167,13 @@ but those do not complete the branded application gate by themselves.
 
 ## Compatibility release status
 
-The public DatumLoop DS repository and full FreeCAD and smlibpy forks are
+The public DatumLoop DS repository and the FreeCAD and smlibpy forks are
 available. The FreeCAD 1.1.3 branding integration is on
-`ASI777/FreeCAD:codex/datumloop-ds-1.1.3`; it retains the upstream CAD engine and
-uses `ExeName=DatumLoopDS` so its preferences and user data are separate. The
-earlier branded FreeCAD 1.1.3 build remains a useful compatibility release
-check, but does not satisfy the standalone-native application gate. Current
-native migration status is tracked in
-[`native-migration-dependencies.md`](native-migration-dependencies.md).
+ASI777/FreeCAD:codex/datumloop-ds-1.1.3; it retains the upstream CAD engine and
+uses a DatumLoopDS executable identity for separate settings. The configured
+fork build, command-line smoke, and software-rendered GUI viewport smoke pass.
+This verifies the transitional compatibility shell, not completion of the
+standalone native application. A clean configure remains open because the
+current Python 3.14 interpreter cannot import Pivy during CMake's compatibility
+check. Current native migration status is tracked in
+[native-migration-dependencies.md](native-migration-dependencies.md).

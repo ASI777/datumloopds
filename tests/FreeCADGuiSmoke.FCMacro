@@ -1,7 +1,10 @@
-"""Headless-capable integration smoke for the workbench and CAD document."""
+"""GUI integration smoke for the workbench, project, and CAD viewport."""
+
+import os
 
 import FreeCAD as App
 import FreeCADGui as Gui
+import Part
 from PySide import QtCore, QtWidgets
 
 from datumloopds.freecad import project_actions, shell
@@ -9,6 +12,7 @@ from datumloopds.freecad import project_actions, shell
 
 def finish_check():
     errors = []
+    doc = None
     try:
         main_window = Gui.getMainWindow()
         if main_window is None:
@@ -19,27 +23,53 @@ def finish_check():
                     errors.append(f"missing workbench dock: {dock_name}")
 
         doc = project_actions.create_project("DatumLoop GUI smoke")
+        if doc.getObject(project_actions.PROJECT_OBJECT_NAME) is None:
+            errors.append("project metadata object was not created")
+
+        shape = doc.addObject("Part::Box", "ViewportSmokeSolid")
+        shape.Label = "Viewport smoke solid"
+        shape.Length = 25
+        shape.Width = 12
+        shape.Height = 8
+        doc.recompute()
+        if not shape.Shape.isValid():
+            errors.append("viewport smoke solid is invalid")
+
         gui_doc = Gui.activeDocument()
         if gui_doc is None or gui_doc.activeView() is None:
             errors.append("FreeCAD CAD viewport is unavailable")
         else:
+            gui_doc.activeView().viewAxonometric()
+            gui_doc.activeView().fitAll()
+            Gui.updateGui()
+            screenshot_path = os.environ.get("DATUMLOOPDS_GUI_SMOKE_SCREENSHOT")
+            if screenshot_path:
+                screen = QtWidgets.QApplication.primaryScreen()
+                if screen is None or not screen.grabWindow(
+                    int(main_window.winId())
+                ).save(screenshot_path):
+                    errors.append("GUI smoke screenshot could not be captured")
             App.Console.PrintMessage("DATUMLOOP_VIEWPORT_PRESENT\n")
-
-        if doc.getObject(project_actions.PROJECT_OBJECT_NAME) is None:
-            errors.append("project metadata object was not created")
 
         if errors:
             App.Console.PrintError("DATUMLOOP_GUI_SMOKE_FAIL: " + "; ".join(errors) + "\n")
         else:
             App.Console.PrintMessage(
-                "DATUMLOOP_GUI_SMOKE_PASS: workbench, docks, project, viewport\n"
+                "DATUMLOOP_GUI_SMOKE_PASS: workbench, docks, project, visible viewport solid\n"
             )
     except Exception as exc:
         App.Console.PrintError(
             f"DATUMLOOP_GUI_SMOKE_FAIL: {type(exc).__name__}: {exc}\n"
         )
     finally:
-        QtWidgets.QApplication.instance().quit()
+        if doc is not None and doc.Name in App.listDocuments():
+            App.closeDocument(doc.Name)
+        main_window = Gui.getMainWindow()
+        if main_window is not None:
+            main_window.close()
+        application = QtWidgets.QApplication.instance()
+        if application is not None:
+            application.quit()
 
 
 Gui.activateWorkbench("DatumLoopWorkbench")
