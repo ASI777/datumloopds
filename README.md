@@ -49,7 +49,7 @@ configured package and Python environment to `make native-check`, for example:
 make native-check NATIVE_CMAKE_ARGS="-DMFEM_DIR=/path/to/mfem-config-dir -DDATUMLOOP_MUJOCO_PYTHON=/path/to/python-with-mujoco"
 ```
 
-The native shell can open and save schema-eight `.dld` projects. The provisional
+The native shell can open and save schema-nine `.dld` projects. The provisional
 format stores project/object/feature UUIDs, hierarchy, typed scalar properties,
 translations in millimetres, exact OCCT B-Rep shapes, persistent
 face/edge/vertex references, a recomputable primitive/transform/Boolean feature
@@ -199,3 +199,9 @@ metadata. The project's intended license and contributor ownership need a
 product-owner decision before any license change. No files were relicensed for
 the native migration. See [`docs/licensing-strategy.md`](docs/licensing-strategy.md)
 and preserve upstream licenses and notices for FreeCAD and optional dependencies.
+
+The first requirements-driven part source and editable native motor-carrier
+candidate are in [the Maxon bracket study](examples/parts/maxon-ecx-flat-22-l/README.md).
+The preserved `.dld` contains eight bores, parameter provenance, fixed mating
+interfaces and a sourced material. Its geometric manufacturing screen has run;
+machine-part FEA and automatic redesign remain pending.

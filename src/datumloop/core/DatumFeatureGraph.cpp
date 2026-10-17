@@ -14,6 +14,9 @@
 #include <Standard_Failure.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Pnt.hxx>
+#include <gp_Dir.hxx>
 
 #include <algorithm>
 #include <cmath>
@@ -90,6 +93,7 @@ TopoDS_Shape evaluate(const DatumFeature& feature,
     TopoDS_Shape shape;
     switch (feature.type) {
     case DatumFeatureType::Box:
+    case DatumFeatureType::ExtrudeRectangle:
         requireInputCount(feature, 0);
         requireParameters(feature, {"xMm", "yMm", "zMm"});
         if (parameter(feature, "xMm") <= 0.0 || parameter(feature, "yMm") <= 0.0 ||
@@ -108,6 +112,28 @@ TopoDS_Shape evaluate(const DatumFeature& feature,
             shape = BRepBuilderAPI_Transform(shape, centered, Standard_True).Shape();
         }
         break;
+    case DatumFeatureType::ThroughHole: {
+        requireInputCount(feature, 1);
+        requireParameters(feature, {"xMm", "yMm", "diameterMm"});
+        const double radius = parameter(feature, "diameterMm") * 0.5;
+        if (radius <= 0.0) throw std::invalid_argument("through-hole diameter must be positive");
+        const auto& parent = priorShapes.at(feature.inputFeatureIds.front());
+        const auto before = OcctKernel::measure(parent);
+        const double depth = before.maximum[2] - before.minimum[2];
+        const double margin = std::max(1e-4, depth * 1e-4);
+        const auto tool = BRepPrimAPI_MakeCylinder(
+            gp_Ax2(gp_Pnt(parameter(feature, "xMm"), parameter(feature, "yMm"), before.minimum[2] - margin),
+                   gp_Dir(0, 0, 1)), radius, depth + 2 * margin).Shape();
+        BRepAlgoAPI_Cut cut(parent, tool);
+        if (!cut.IsDone()) throw std::runtime_error("OCCT through-hole operation failed");
+        shape = cut.Shape();
+        const double expectedRemoval = std::acos(-1.0) * radius * radius * depth;
+        const double removed = before.volume - OcctKernel::measure(shape).volume;
+        if (std::abs(removed - expectedRemoval) > expectedRemoval * 1e-7) {
+            throw std::invalid_argument("initial through-hole feature requires a complete constant-depth bore; overlapping holes and edge slots are unsupported");
+        }
+        break;
+    }
     case DatumFeatureType::Cylinder:
         requireInputCount(feature, 0);
         requireParameters(feature, {"radiusMm", "heightMm"});
@@ -176,6 +202,8 @@ std::string datumFeatureTypeName(DatumFeatureType type)
     case DatumFeatureType::BooleanUnion: return "boolean.union";
     case DatumFeatureType::BooleanCut: return "boolean.cut";
     case DatumFeatureType::BooleanIntersection: return "boolean.intersection";
+    case DatumFeatureType::ExtrudeRectangle: return "feature.extrude-rectangle";
+    case DatumFeatureType::ThroughHole: return "feature.through-hole";
     }
     throw std::invalid_argument("unknown DatumLoop feature type");
 }
@@ -190,6 +218,8 @@ std::optional<DatumFeatureType> datumFeatureTypeFromName(const std::string& name
     if (name == "boolean.union") return DatumFeatureType::BooleanUnion;
     if (name == "boolean.cut") return DatumFeatureType::BooleanCut;
     if (name == "boolean.intersection") return DatumFeatureType::BooleanIntersection;
+    if (name == "feature.extrude-rectangle") return DatumFeatureType::ExtrudeRectangle;
+    if (name == "feature.through-hole") return DatumFeatureType::ThroughHole;
     return std::nullopt;
 }
 
@@ -239,6 +269,25 @@ void DatumFeatureGraph::recompute()
         for (const auto& [name, value] : feature.parameters) {
             if (name.find_first_not_of(" \t\n\r") == std::string::npos || !std::isfinite(value)) {
                 throw std::invalid_argument("feature parameter names and values must be non-empty and finite");
+            }
+        }
+        if (feature.type == DatumFeatureType::ExtrudeRectangle || feature.type == DatumFeatureType::ThroughHole) {
+            if (feature.name.empty() || feature.semanticRole.empty() ||
+                feature.parameterDefinitions.size() != feature.parameters.size()) {
+                throw std::invalid_argument("engineering features require names, roles and parameter provenance");
+            }
+        }
+        for (const auto& [name, definition] : feature.parameterDefinitions) {
+            if (!feature.parameters.contains(name) || definition.unit != "mm" ||
+                !isDatumUuid(definition.partRequirementsId) || definition.designVariableIds.empty() ||
+                definition.relationship.empty() || definition.sourceValues.size() != definition.designVariableIds.size()) {
+                throw std::invalid_argument("feature parameter provenance is incomplete or unsupported");
+            }
+            for (const auto& key : definition.designVariableIds) {
+                if (key.empty() || !definition.sourceValues.contains(key) ||
+                    !std::isfinite(definition.sourceValues.at(key))) {
+                    throw std::invalid_argument("missing or non-finite feature source parameter snapshot");
+                }
             }
         }
     }

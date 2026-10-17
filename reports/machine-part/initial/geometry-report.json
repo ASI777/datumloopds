@@ -1,0 +1,74 @@
+{
+    "cad_object_id": "1427b023-7192-4f4c-81cb-c21d2b3cd8a1",
+    "document_revision": 9,
+    "exact_occt_valid": true,
+    "fea_status": "not_run",
+    "feature_count": 9,
+    "geometry_classification": "reference application candidate; not released for manufacture",
+    "height_mm": 44,
+    "holes": [
+        {
+            "diameter_mm": 6.02,
+            "name": "Motor precision pilot bore",
+            "role": "precision.motor-pilot",
+            "x_mm": 0,
+            "y_mm": 8
+        },
+        {
+            "diameter_mm": 2.2,
+            "name": "Motor M2 clearance 1",
+            "role": "fastener.motor.M2-clearance",
+            "x_mm": 4.898587196589413e-16,
+            "y_mm": 16
+        },
+        {
+            "diameter_mm": 2.2,
+            "name": "Motor M2 clearance 2",
+            "role": "fastener.motor.M2-clearance",
+            "x_mm": -6.9282032302755105,
+            "y_mm": 4.000000000000002
+        },
+        {
+            "diameter_mm": 2.2,
+            "name": "Motor M2 clearance 3",
+            "role": "fastener.motor.M2-clearance",
+            "x_mm": 6.928203230275507,
+            "y_mm": 3.9999999999999964
+        },
+        {
+            "diameter_mm": 4.5,
+            "name": "Gantry M4 clearance left",
+            "role": "fastener.gantry.M4-clearance",
+            "x_mm": -11,
+            "y_mm": -15
+        },
+        {
+            "diameter_mm": 3,
+            "name": "Gantry precision dowel bore left",
+            "role": "precision.gantry-dowel",
+            "x_mm": -6,
+            "y_mm": -10
+        },
+        {
+            "diameter_mm": 4.5,
+            "name": "Gantry M4 clearance right",
+            "role": "fastener.gantry.M4-clearance",
+            "x_mm": 11,
+            "y_mm": -15
+        },
+        {
+            "diameter_mm": 3,
+            "name": "Gantry precision dowel bore right",
+            "role": "precision.gantry-dowel",
+            "x_mm": 6,
+            "y_mm": -10
+        }
+    ],
+    "manufacturing_geometric_screening_passed": true,
+    "material": "6061-T6; NIST compiled reference properties",
+    "nominal_mass_kg": 0.0057324104903947355,
+    "project_id": "1fc51786-e5ec-4734-b393-43afd042f73c",
+    "thickness_mm": 1.5,
+    "volume_mm3": 2115.280623761895,
+    "width_mm": 34
+}

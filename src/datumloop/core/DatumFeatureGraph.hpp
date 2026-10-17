@@ -20,6 +20,8 @@ enum class DatumFeatureType {
     BooleanUnion,
     BooleanCut,
     BooleanIntersection,
+    ExtrudeRectangle,
+    ThroughHole,
 };
 
 enum class DatumFeatureStatus {
@@ -30,6 +32,15 @@ enum class DatumFeatureStatus {
 [[nodiscard]] std::string datumFeatureTypeName(DatumFeatureType type);
 [[nodiscard]] std::optional<DatumFeatureType> datumFeatureTypeFromName(const std::string& name);
 [[nodiscard]] std::string datumFeatureStatusName(DatumFeatureStatus status);
+
+struct FeatureParameter {
+    std::string unit;
+    std::string partRequirementsId;
+    std::vector<std::string> designVariableIds;
+    std::string relationship;
+    std::map<std::string, double> sourceValues;
+    friend bool operator==(const FeatureParameter&, const FeatureParameter&) = default;
+};
 
 struct DatumFeature {
     std::string id;
@@ -42,6 +53,9 @@ struct DatumFeature {
     std::string error = "Feature has not been recomputed.";
     // Exact generated B-Rep. Display tessellation is derived separately.
     TopoDS_Shape generatedShape;
+    std::string name;
+    std::string semanticRole;
+    std::map<std::string, FeatureParameter> parameterDefinitions;
 };
 
 // An append-ordered DAG. Inputs must refer to earlier features, which makes
